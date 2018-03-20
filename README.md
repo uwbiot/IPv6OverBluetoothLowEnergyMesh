@@ -25,6 +25,8 @@ Porting this project to Linux is possible by removing the driver, then using soc
 
 This Windows Filtering Platform callout driver acts as part of the bridge between the TCP/IP stack on Windows and the Bluetooth stack. The driver's binary is IPv6ToBle.sys.
 
+Source code for this project is best viewed in Visual Studio, as line endings and indentation is sometimes thrown off by Git converting line endings if you view it in the browser.
+
 For detailed information about this driver, see the ReadMe.txt in its directory.
 
 ### inf
