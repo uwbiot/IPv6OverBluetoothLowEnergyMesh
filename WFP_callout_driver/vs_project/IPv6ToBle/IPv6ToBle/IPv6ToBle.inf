@@ -1,0 +1,53 @@
+;
+; IPv6ToBle.inf
+; IPv6 to Bluetooth Low Energy driver install configuration file
+;
+
+[Version]
+    Signature   ="$Windows NT$"
+    Class       = WFPCALLOUTS
+    ClassGuid   = {57465043-616C-6C6F-7574-5F636C617373}
+    Provider    = %ProviderString%
+    CatalogFile = IPv6ToBle.cat
+    DriverVer   = 03/12/2018,1.0
+
+[SourceDisksNames]
+    1 = %IPv6ToBleDisk%,,,""
+
+[SourceDisksFiles]
+    IPv6ToBle.sys  = 1,,
+
+[DestinationDirs]
+    DefaultDestDir          = 12                ; %windir%\system32\drivers
+    IPv6ToBle.DriverFiles   = 12                ; %windir%\system32\drivers
+
+[DefaultInstall]
+    OptionDesc  = %IPv6ToBleServiceDesc%
+    CopyFiles   = IPv6ToBle.DriverFiles
+
+[DefaultInstall.Services]
+    AddService = %IPv6ToBleServiceName%,,IPv6ToBle.Service
+    StartType = 0                               ; SERVICE_BOOT_START
+
+[DefaultUninstall]
+    DelFiles = IPv6ToBle.DriverFiles
+
+[DefaultUninstall.Services]
+    DelService = %IPv6ToBleServiceName%,0x200   ; SPSVCINST_STOPSERVICE
+
+[IPv6ToBle.DriverFiles]
+    IPv6ToBle.sys,,,0x00000040                  ; COPYFLG_OVERWRITE_OLDER_ONLY
+
+[IPv6ToBle.Service]
+    DisplayName    = %IPv6ToBleServiceName%
+    Description    = %IPv6ToBleServiceDesc%
+    ServiceType    = 1                          ; SERVICE_KERNEL_DRIVER
+    StartType      = 3                          ; SERVICE_DEMAND_START
+    ErrorControl   = 1                          ; SERVICE_ERROR_NORMAL
+    ServiceBinary  = %12%\IPv6ToBle.sys         ; %WinDir%\System32\Drivers\IPv6ToBle.sys
+
+[Strings]
+    ProviderString          = "Duncan MacMichael"
+    IPv6ToBleDisk           = "IPv6 to Bluetooth Low Energy Installation Disk"
+    IPv6ToBleServiceDesc    = "Driver for IPv6 over Bluetooth Low Energy"
+    IPv6ToBleServiceName    = "IPv6ToBle"
