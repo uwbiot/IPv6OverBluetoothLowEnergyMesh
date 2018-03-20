@@ -866,29 +866,17 @@ and filter. STATUS_UNSUCCESSFUL otherwise.
         goto Exit;
     }
 
-    status = IPv6ToBleCalloutRegisterOutboundIpPacketV6Callout(
-        &FWPM_LAYER_OUTBOUND_IPPACKET_V6,
-        &IPV6_TO_BLE_OUTBOUND_IP_PACKET_V6,
-        &outboundIpPacketV6CalloutId
-    );
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
-# else // Register only outbound classify on IoT core devices
-
-    status = IPv6ToBleCalloutRegisterOutboundIpPacketV6Callout(
-        &FWPM_LAYER_OUTBOUND_IPPACKET_V6,
-        &IPV6_TO_BLE_OUTBOUND_IP_PACKET_V6,
-        &outboundIpPacketV6CalloutId
-    );
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
 #endif  // BORDER_ROUTER
+
+    status = IPv6ToBleCalloutRegisterOutboundIpPacketV6Callout(
+        &FWPM_LAYER_OUTBOUND_IPPACKET_V6,
+        &IPV6_TO_BLE_OUTBOUND_IP_PACKET_V6,
+        &outboundIpPacketV6CalloutId
+    );
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
 
     //
     // Step 5
@@ -1231,30 +1219,30 @@ IPv6ToBleCalloutFilterAdd(
 /*++
 Routine Description:
 
-Adds a filter to the filter engine.
+    Adds a filter to the filter engine.
 
-For the gateway device, this is called for each filter, of which there are
-as many as there are white list entries.
+    For the gateway device, this is called for each filter, of which there are
+    as many as there are white list entries.
 
-For the Pi/IoT device, this is called once. The outbound IP packet classify
-catches all traffic and so only has one filter with no conditions.
+    For the Pi/IoT device, this is called once. The outbound IP packet classify
+    catches all traffic and so only has one filter with no conditions.
 
 Arguments:
 
-filterName - the name of the filter in human-readable form.
+    filterName - the name of the filter in human-readable form.
 
-filterDesc - the description of the filter in human-readable form.
+    filterDesc - the description of the filter in human-readable form.
 
-remoteAddr - the remote address to use in this filter (if applicable).
+    remoteAddr - the remote address to use in this filter (if applicable).
 
-layerKey - the GUID for the layer at which we are adding the filter
+    layerKey - the GUID for the layer at which we are adding the filter
 
-calloutKey - the GUID for the callout associated with this filter
+    calloutKey - the GUID for the callout associated with this filter
 
 Return Value:
 
-STATUS_SUCCESS if the callout driver successfully registers its filter.
-STATUS_UNSUCCESSFUL otherwise.
+    STATUS_SUCCESS if the callout driver successfully registers its filter.
+    STATUS_UNSUCCESSFUL otherwise.
 
 --*/
 {
@@ -1377,23 +1365,23 @@ IPv6ToBleCalloutsUnregister()
 /*++
 Routine Description:
 
-Unregisters the inbound IPV6 packet callout. This can be called either
-during driver unload or by the functions that add/remove entries from
-the white list and mesh list.
+    Unregisters the inbound IPV6 packet callout. This can be called either
+    during driver unload or by the functions that add/remove entries from
+    the white list and mesh list.
 
-The functions to add and remove entries from the white list and mesh list
-only call this function if the callouts are currently registered. Driver
-unload means the driver is unloading so the results of this function aren't
-particularly important. Therefore, we don't need to check the NTSTATUS
-that FwpsCalloutUnregisterById0 returns (the samples don't, either).
+    The functions to add and remove entries from the white list and mesh list
+    only call this function if the callouts are currently registered. Driver
+    unload means the driver is unloading so the results of this function aren't
+    particularly important. Therefore, we don't need to check the NTSTATUS
+    that FwpsCalloutUnregisterById0 returns (the samples don't, either).
 
 Arguments:
 
-None.
+    None.
 
 Return Value:
 
-VOID.
+    VOID.
 
 ---*/
 {
@@ -1413,11 +1401,9 @@ VOID.
 
     FwpsCalloutUnregisterById0(inboundIpPacketV6CalloutId);
 
-#else   // IoT Core devices
+#endif  // BORDER_ROUTER
 
     FwpsCalloutUnregisterById0(outboundIpPacketV6CalloutId);
-
-#endif // BORDER_ROUTER
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
 }
