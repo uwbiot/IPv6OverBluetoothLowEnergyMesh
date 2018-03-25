@@ -203,12 +203,12 @@ Return Value:
 	{
         // IOCTL 1: Listen inbound or outbound.
         //
-		// On the gateway device, represents a request to listen for INBOUND
-        // IPv6 packets. On the Pi/IoT device, represents a request to listen
-        // for OUTBOUND IPv6 packets.
+		// On the border router device, represents a request to listen for INBOUND or
+        // OUTBOUND IPv6 packets. On the Pi/IoT device, represents a request to 
+        // listen for OUTBOUND IPv6 packets.
 		//
 		// This IOCTL is sent by the background packet processing app on BOTH
-        // the gateway and Pi/IoT devices. The difference is that the gateway
+        // the border router and Pi/IoT devices. The difference is that the border router
         // will access the listen request queue when intercepting INBOUND
         // traffic, while the the Pi/IoT device will access the listen request
         // queue when intercepting OUTBOUND traffic.
@@ -292,7 +292,7 @@ Return Value:
 		// stack and will be validated along the way.
 		//
 		// This IOCTL is sent by the usermode packet processing app and is
-        // ONLY used on the gateway device to send a packet back out to the 
+        // ONLY used on the border router device to send a packet back out to the 
         // internet (e.g. an ACK to a previous status request from outside).
         //
 		case IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6: 
@@ -312,7 +312,7 @@ Return Value:
         // It is sent by the usermode GUI app after the app has
         // successfully registered a trusted external device.
         //
-        // This IOCTL is used ONLY on the gateway device.
+        // This IOCTL is used ONLY on the border router device.
         //
         case IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST:
         {
@@ -330,7 +330,7 @@ Return Value:
         // This IOCTL is sent by the usermode GUI app after the app has
         // successfully unregistered a trusted external device.
         //
-        // This IOCTL is used ONLY on the gateway device.
+        // This IOCTL is used ONLY on the border router device.
         //
         case IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST:
         {
@@ -347,7 +347,7 @@ Return Value:
         // It is sent by the usermode GUI app after the app has
         // successfully provisioned a new device into the BLE mesh network.
         //
-        // This IOCTL is used only on the gateway device.
+        // This IOCTL is used only on the border router device.
         //
         case IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST:
         {
@@ -365,11 +365,69 @@ Return Value:
         // It is sent by the usermode GUI app after the app has
         // successfully deleted a device from the BLE mesh network.
         //
-        // This IOCTL is ONLY used on the gateway device.
+        // This IOCTL is ONLY used on the border router device.
         //
         case IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST:
         {
             status = IPv6ToBleRuntimeListRemoveMeshListEntry(Request);
+            break;
+        }
+
+        //
+        // IOCTL 8: Destroy white list
+        //
+        // This IOCTL is sent as a request to destroy the runtime white list
+        // and clear the white list from the registry.
+        //
+        // It is sent by the usermode GUI app in the event that the app needs
+        // to reset the white list and re-send it. This is in the event that
+        // the white list in the driver is corrupted and the GUI app needs to
+        // start it over.
+        //
+        // This IOCTL is ONLY used on the border router device.
+        //
+        case IOCTL_IPV6_TO_BLE_DESTROY_WHITE_LIST:
+        {
+            IPv6ToBleRuntimeListDestroyWhiteList();
+            status = IPv6ToBleRegistryOpenWhiteListKey();
+            if (!NT_SUCCESS(status))
+            {
+                break;
+            }
+            status = WdfRegistryRemoveKey(whiteListKey);
+            if (!NT_SUCCESS(status))
+            {
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed %!STATUS!", status);
+            }
+            break;
+        }
+
+        //
+        // IOCTL 9: Destroy mesh list
+        //
+        // This IOCTL is sent as a request to destroy the runtime mesh list
+        // and clear the mesh list from the registry.
+        //
+        // It is sent by the usermode GUI app in the event that the app needs
+        // to reset the mesh list and re-send it. This is in the event that
+        // the mesh list in the driver is corrupted and the GUI app needs to
+        // start it over.
+        //
+        // This IOCTL is ONLY used on the border router device.
+        //
+        case IOCTL_IPV6_TO_BLE_DESTROY_MESH_LIST:
+        {
+            IPv6ToBleRuntimeListDestroyMeshList();
+            status = IPv6ToBleRegistryOpenMeshListKey();
+            if (!NT_SUCCESS(status))
+            {
+                break;
+            }
+            status = WdfRegistryRemoveKey(meshListKey);
+            if (!NT_SUCCESS(status))
+            {
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed %!STATUS!", status);
+            }
             break;
         }
 
@@ -398,31 +456,31 @@ IPv6ToBleQueueInjectNetworkInboundV6(
 /*++
 Routine Description:
 
-Injects a provided IPv6 packet into the inbound Network Layer data path
-when called by the usermode packet processing app.
+    Injects a provided IPv6 packet into the inbound Network Layer data path
+    when called by the usermode packet processing app.
 
-Because we create a brand new packet ourselves and this function is NOT
-called from a classify callback function, we don't have to worry about
-loopback packets. Also, because this is IPv6, we don't have to worry about
-checksum.
+    Because we create a brand new packet ourselves and this function is NOT
+    called from a classify callback function, we don't have to worry about
+    loopback packets. Also, because this is IPv6, we don't have to worry about
+    checksum.
 
-The only question is the iFace index and sub-iFace index parameters for the
-injection function. Normally, this function is called from a classify
-callback and the system provides those to you (the indices of the original
-network interface on which the original packet was indicated). But we don't
-have that information because the packet was received over Bluetooth.
+    The only question is the iFace index and sub-iFace index parameters for the
+    injection function. Normally, this function is called from a classify
+    callback and the system provides those to you (the indices of the original
+    network interface on which the original packet was indicated). But we don't
+    have that information because the packet was received over Bluetooth.
 
-This function is used on both the gateway device and on the IoT Core
-devices.
+    This function is used on both the border router device and on the IoT Core
+    devices.
 
 Arguments:
 
-Request - the WDFREQUEST object that contains the packet from usermode.
+    Request - the WDFREQUEST object that contains the packet from usermode.
 
 Return Value:
 
-STATUS_SUCCESS if the packet was successfully injected. Other appropriate
-NTSTATUS error codes otherwise, depending on where the failure occurred.
+    STATUS_SUCCESS if the packet was successfully injected. Other appropriate
+    NTSTATUS error codes otherwise, depending on where the failure occurred.
 
 --*/
 {
@@ -532,7 +590,7 @@ Routine Description:
 	Injects a provided IPv6 packet into the outbound Network Layer data path
 	when called by the usermode packet processing app.
 
-    This function is only used on the gateway device.
+    This function is only used on the border router device.
 
 Arguments:
 
