@@ -111,7 +111,7 @@ Return Value:
 	// Create the framework device object
 	//
 	status = WdfDeviceCreate(&deviceInit, 
-							 WDF_NO_OBJECT_ATTRIBUTES,
+							 &deviceAttributes,
 							 &wdfDeviceObject
 							 );
 	
@@ -401,8 +401,11 @@ Return Value:
         // the function itself will log a trace error if it fails
         status = IPv6ToBleRegistryAssignWhiteList();
 
-        // Reset the flag for next check
-        deviceContext->whiteListModified = FALSE;
+        // Reset the flag for next check if we succeeded
+        if (NT_SUCCESS(status))
+        {
+            deviceContext->whiteListModified = FALSE;
+        }        
     }
     WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
 
@@ -419,8 +422,11 @@ Return Value:
         // the function itself will log a trace error if it fails
         status = IPv6ToBleRegistryAssignMeshList();
 
-        // Reset the flag for next check
-        deviceContext->meshListModified = FALSE;
+        // Reset the flag for next check if we succeeded
+        if (NT_SUCCESS(status))
+        {
+            deviceContext->meshListModified = FALSE;
+        }        
     }
     WdfSpinLockRelease(deviceContext->meshListModifiedLock);
 
