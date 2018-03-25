@@ -45,6 +45,20 @@ namespace IPv6ToBleInteropLibrary
     /// </summary>
     public class DriverInterfaceDefinitions
     {
-
+        //
+        // Constants for CreateFile() and IOCTL definitions. These are 
+        // selective redefinitions from winioctl.h (only the ones we need).
+        //
+        public const int
+            INVALID_HANDLE_VALUE    = (-1),
+            NULL                    = 0,
+            ERROR_SUCCESS           = 0,
+            GENERIC_READ            = unchecked((int)0x80000000),
+            GENERIC_WRITE           = 0x40000000,
+            FILE_SHARE_READ         = 0x00000001,
+            OPEN_EXISTING           = 3,            // Device must exist to open
+            FILE_FLAG_OVERLAPPED    = 0x40000000,   // Open for overlapped I/O
+            METHOD_BUFFERED         = 0,            // Buffered I/O
+            FILE_ANY_ACCESS         = 0;
     }
 }
