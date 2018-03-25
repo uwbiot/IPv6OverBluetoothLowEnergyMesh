@@ -236,9 +236,6 @@ Return Value:
     // device context, then retrieve its output buffer
     //
 
-    // Get the device context
-    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
-
     // Retrieve a request from the listen request queue
     WdfSpinLockAcquire(deviceContext->listenRequestQueueLock);
     status = WdfIoQueueRetrieveNextRequest(deviceContext->listenRequestQueue,
@@ -742,30 +739,30 @@ IPv6ToBleCalloutsRegister()
 /*++
 Routine Description:
 
-Opens the session to the filter engine, then registers the callouts and
-filters. An important note is that the Windows Filtering Platform is
-session-based, so if we ever need to unregister callouts any objects such
-as filters are automatically deleted by the filter engine when we close the
-session. Then all we need to do is unregister the callouts themselves.
+    Opens the session to the filter engine, then registers the callouts and
+    filters. An important note is that the Windows Filtering Platform is
+    session-based, so if we ever need to unregister callouts any objects such
+    as filters are automatically deleted by the filter engine when we close the
+    session. Then all we need to do is unregister the callouts themselves.
 
-This function is designed to be able to register multiple types of
-callouts, with one function for each. For the initial release of this
-IPv6 To Bluetooth Low Energy project, we only need one.
+    This function is designed to be able to register multiple types of
+    callouts, with one function for each. For the initial release of this
+    IPv6 To Bluetooth Low Energy project, we only need one.
 
-***
-This is where you would call functions to register different kinds of
-callouts after having written a function for each to register that type.
+    ***
+    This is where you would call functions to register different kinds of
+    callouts after having written a function for each to register that type.
 ***
 
 Arguments:
 
-None. Accesses the WDM device object, a global variable.
+    None. Accesses the WDM device object, a global variable.
 
 
 Return Value:
 
-STATUS_SUCCESS if the callout driver successfully registers its callout
-and filter. STATUS_UNSUCCESSFUL otherwise.
+    STATUS_SUCCESS if the callout driver successfully registers its callout
+    and filter. STATUS_UNSUCCESSFUL otherwise.
 
 --*/
 {
@@ -838,7 +835,7 @@ and filter. STATUS_UNSUCCESSFUL otherwise.
                                   // compatible with Vista's IpSec
                                   // implementation.
 
-                                  // Add the sublayer
+    // Add the sublayer
     status = FwpmSubLayerAdd0(filterEngineHandle, &ipv6ToBleSublayer, NULL);
     if (!NT_SUCCESS(status))
     {
@@ -964,9 +961,9 @@ Return Value:
 
     // Register the callout
     status = FwpsCalloutRegister2(wdmDeviceObject,
-        &servicingCallout,
-        calloutId
-    );
+                                  &servicingCallout,
+                                  calloutId
+                                  );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Registering servicing callout for inbound IP packet V6 classify failed %!STATUS!", status);
@@ -989,10 +986,10 @@ Return Value:
 
     // Add the management callout
     status = FwpmCalloutAdd0(filterEngineHandle,
-        &managementCallout,
-        NULL,
-        NULL
-    );
+                             &managementCallout,
+                             NULL,
+                             NULL
+                             );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Registering management callout for inbound IP packet V6 classify failed %!STATUS!", status);
@@ -1006,17 +1003,17 @@ Return Value:
 
     // Get the context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        wdfDeviceObject
-    );
+                                                    wdfDeviceObject
+                                                );
 
     // Traverse the list and add a filter for each entry
     PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
     while (entry != deviceContext->whiteListHead)
     {
         PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
-            WHITE_LIST_ENTRY,
-            listEntry
-        );
+                                                             WHITE_LIST_ENTRY,
+                                                             listEntry
+                                                             );
         UINT8* remoteAddress = whiteListEntry->ipv6Address;
 
         // Add the filter
@@ -1024,6 +1021,7 @@ Return Value:
             L"A filter to match packets if source is from the white list. \
             There are as many filters as there are white list entries.",
             remoteAddress,
+            INBOUND,
             layerKey,
             calloutKey
         );
@@ -1065,7 +1063,9 @@ Routine Description:
 
     This function registers the callout at the outbound IP_PACKET_V6 layer and
     adds the filter. This callout and its accompanying filter are designed to
-    catch all outbound IPv6 UDP traffic on the Pi/IoT device.
+    catch all outbound IPv6 UDP traffic on the Pi/IoT device. On the border
+    router, it is designed to catch outbound traffic destined for a device
+    in the mesh.
 
 Arguments:
 
@@ -1148,24 +1148,25 @@ Return Value:
 
     // Get the context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        wdfDeviceObject
-    );
+                                                    wdfDeviceObject
+                                                );
 
     // Traverse the list and add a filter for each entry
-    PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
-    while (entry != deviceContext->whiteListHead)
+    PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
+    while (entry != deviceContext->meshListHead)
     {
-        PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
-                                                             WHITE_LIST_ENTRY,
-                                                             listEntry
-                                                             );
-        UINT8* remoteAddress = whiteListEntry->ipv6Address;
+        PMESH_LIST_ENTRY meshListEntry= CONTAINING_RECORD(entry,
+                                                          MESH_LIST_ENTRY,
+                                                          listEntry
+                                                          );
+        UINT8* destinationAddress = meshListEntry->ipv6Address;
 
         // Add the filter
         status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
-            L"A filter to match packets if source is from the white list. \
-            There are as many filters as there are white list entries.",
-            remoteAddress,
+            L"A filter to match packets if destination is in mesh list. \
+            There are as many filters as there are mesh list entries.",
+            destinationAddress,
+            OUTBOUND,
             layerKey,
             calloutKey
         );
@@ -1178,12 +1179,13 @@ Return Value:
         entry = entry->Flink;
     }
 
-#else
+#else   // On node devices, catch all outbound traffic
 
     status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
         L"A filter to match all outbound IPv6 UDP traffic and redirect to the \
         usermode packet processing app, which sends it out over BLE.",
         NULL,
+        OUTBOUND,
         layerKey,
         calloutKey
     );
@@ -1210,9 +1212,10 @@ Exit:
 _Use_decl_annotations_
 NTSTATUS
 IPv6ToBleCalloutFilterAdd(
-    wchar_t *	filterName,
-    wchar_t *	filterDesc,
-    const UINT8*	remoteAddress,
+    wchar_t *	    filterName,
+    wchar_t *	    filterDesc,
+    const UINT8*	ipv6Address,
+    int             direction,
     const GUID *	layerKey,
     const GUID *	calloutKey
 )
@@ -1248,26 +1251,47 @@ Return Value:
 {
     NTSTATUS status = STATUS_SUCCESS;
 
+    // Node devices only filter outbound, so ignore direction flag
+#ifndef BORDER_ROUTER
+
+    UNREFERENCED_PARAMETER(direction);
+
+#endif  // BORDER_ROUTER
+
     //
     // Step 1
-    // Double-check that the white list is not empty, even though that should
+    // Double-check that the runtime list is not empty, even though that should
     // have been checked before a call to this function
     //
-    // Note: This step only applies to the gateway device. The Pi/IoT devices
+    // Note: This step only applies to the border router device. Node devices
     // don't deal with the white list/mesh list.
     //
 
 #ifdef BORDER_ROUTER
 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        wdfDeviceObject
-    );
-    if (IsListEmpty(deviceContext->whiteListHead))
+                                                    wdfDeviceObject
+                                                );
+
+    if (direction == INBOUND)
     {
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for inbound IP packet V6 classify failed because the white list was empty %!STATUS!", status);
-        status = STATUS_UNSUCCESSFUL;
-        goto Exit;
+        if (IsListEmpty(deviceContext->whiteListHead))
+        {
+            TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for inbound IP packet V6 classify failed because the white list was empty %!STATUS!", status);
+            status = STATUS_UNSUCCESSFUL;
+            goto Exit;
+        }
     }
+    else    // OUTBOUND
+    {
+        if (IsListEmpty(deviceContext->meshListHead))
+        {
+            TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for outbound IP packet V6 classify failed because the mesh list was empty %!STATUS!", status);
+            status = STATUS_UNSUCCESSFUL;
+            goto Exit;
+        }
+    }
+    
 
 #endif  // BORDER_ROUTER
 
@@ -1293,35 +1317,46 @@ Return Value:
 
     filter.weight.type = FWP_EMPTY;         // auto-weight
 
-                                            //
-                                            // Step 3
-                                            // Create the filtering condition based on the passed in remote address.
-                                            //
-                                            // Note:
-                                            // This is only for the gateway machine, since the Pi/IoT devices will 
-                                            // have 0 filter conditions and thus will filter all outbound traffic.
-                                            //	
+    //
+    // Step 3
+    // Create the filtering condition based on the passed in IPv6 address.
+    //
+    // Note:
+    // This is only for the gateway machine, since the Pi/IoT devices will 
+    // have 0 filter conditions and thus will filter all outbound traffic.
+    //	
 
 #ifdef BORDER_ROUTER
 
     FWPM_FILTER_CONDITION0 filterCondition = { 0 };
 
     // This should never be null because this function only would have been
-    // called after verifying the white list had at least one entry, but still 
-    // check for good practice. At least, on the gateway machine.
-    if (remoteAddress)
+    // called after verifying the runtime list had at least one entry, but  
+    // check for good practice. At least, on the border router machine.
+    if (ipv6Address)
     {
-        filterCondition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-        filterCondition.matchType = FWP_MATCH_EQUAL;
-        filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
-        filterCondition.conditionValue.byteArray16 =
-            (FWP_BYTE_ARRAY16*)remoteAddress;
+        if (direction == INBOUND)
+        {
+            filterCondition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+            filterCondition.matchType = FWP_MATCH_EQUAL;
+            filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
+            filterCondition.conditionValue.byteArray16 =
+                (FWP_BYTE_ARRAY16*)ipv6Address;
+        }
+        else    // OUTBOUND
+        {
+            filterCondition.fieldKey = FWPM_CONDITION_IP_DESTINATION_ADDRESS;
+            filterCondition.matchType = FWP_MATCH_EQUAL;
+            filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
+            filterCondition.conditionValue.byteArray16 =
+                (FWP_BYTE_ARRAY16*)ipv6Address;
+        }
     }
 
     // Add the filter condition to the filter
     filter.filterCondition = &filterCondition;
 
-#else   // IoT Core devices
+#else   // Node devices
 
     filter.filterCondition = 0;
 
@@ -1332,13 +1367,13 @@ Return Value:
     // Add the filter
     //
     status = FwpmFilterAdd0(filterEngineHandle,
-        &filter,
-        NULL,
-        NULL
-    );
+                            &filter,
+                            NULL,
+                            NULL
+                            );
     if (!NT_SUCCESS(status))
     {
-        if (remoteAddress)
+        if (ipv6Address)
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Adding filter failed during %!FUNC! with %!STATUS!", status);
         }
@@ -1348,7 +1383,7 @@ Return Value:
         }
     }
 
-#ifdef BORDER_ROUTER
+#ifdef BORDER_ROUTER    // Node device code does not jump to an exit
 
 Exit:
 

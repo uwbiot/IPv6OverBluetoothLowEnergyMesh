@@ -108,7 +108,8 @@ NTSTATUS
 IPv6ToBleCalloutFilterAdd(
     _In_				wchar_t*	    filterName,
     _In_				wchar_t*	    filterDesc,
-    _In_reads_opt_(16)	const UINT8*	remoteAddress,
+    _In_reads_opt_(16)	const UINT8*	ipv6Address,
+    _In_                int             direction,
     _In_				const GUID*		layerKey,
     _In_				const GUID*		calloutKey
 );
@@ -148,6 +149,14 @@ DEFINE_GUID(
     0x4997,
     0xb1, 0x4, 0xf3, 0xca, 0xfc, 0xd9, 0x96, 0xca
 );
+
+//-----------------------------------------------------------------------------
+// Simple flags for marking if a callout is for inbound or outbound
+// classification (used on the border router device during filter addition)
+//-----------------------------------------------------------------------------
+
+#define INBOUND 0
+#define OUTBOUND 1
 
 EXTERN_C_END
 
