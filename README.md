@@ -13,7 +13,9 @@ There are four components to this project:
 3. 6LoWPAN header compression module
 4. GUI device provisioning app
 
-TODO: insert architectural diagram
+The following diagram illustrates the system architectue for this solution:
+
+![IPv6OverBluetoothLowEnergyMesh system architecture](images/systemArchitecture.png)
 
 ## System requirements
 
