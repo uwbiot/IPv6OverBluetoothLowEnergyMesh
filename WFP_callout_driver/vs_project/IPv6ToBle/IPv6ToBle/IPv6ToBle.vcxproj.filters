@@ -19,9 +19,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <Inf Include="IPv6ToBle.inf">
       <Filter>Driver Files</Filter>
     </Inf>
@@ -92,5 +89,8 @@
     <ClCompile Include="Helpers_IPAddress.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\..\ReadMe.txt" />
   </ItemGroup>
 </Project>

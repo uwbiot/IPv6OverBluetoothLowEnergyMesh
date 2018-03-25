@@ -64,13 +64,13 @@ Return Value:
 	// it does since that is the key assigned to the driver by the system in
 	// DriverEntry.
 	status = WdfRegistryCreateKey(parametersKey,
-		&whiteListKeyName,
-		KEY_ALL_ACCESS,
-		REG_OPTION_NON_VOLATILE,
-		NULL,
-		WDF_NO_OBJECT_ATTRIBUTES,
-		&whiteListKey
-	);
+		                          &whiteListKeyName,
+		                          KEY_ALL_ACCESS,
+		                          REG_OPTION_NON_VOLATILE,
+		                          NULL,
+		                          WDF_NO_OBJECT_ATTRIBUTES,
+		                          &whiteListKey
+	                              );
 	if (!NT_SUCCESS(status))
 	{
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Opening white list registry key failed %!STATUS!", status);
@@ -120,13 +120,13 @@ Return Value:
 	// it does since that is the key assigned to the driver by the system in
 	// DriverEntry.
 	status = WdfRegistryCreateKey(parametersKey,
-		&meshListKeyName,
-		KEY_ALL_ACCESS,
-		REG_OPTION_NON_VOLATILE,
-		NULL,
-		WDF_NO_OBJECT_ATTRIBUTES,
-		&meshListKey
-	);
+		                          &meshListKeyName,
+		                          KEY_ALL_ACCESS,
+		                          REG_OPTION_NON_VOLATILE,
+		                          NULL,
+		                          WDF_NO_OBJECT_ATTRIBUTES,
+		                          &meshListKey
+	                              );
 	if (!NT_SUCCESS(status))
 	{
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Opening mesh list registry key failed %!STATUS!", status);
