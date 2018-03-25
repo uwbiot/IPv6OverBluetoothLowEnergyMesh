@@ -32,6 +32,8 @@ Environment:
 //
 // Used on the border router device and the IoT core devices.
 //
+// Sent by the packet processing background app.
+//
 
 #define IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8081, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
@@ -40,19 +42,25 @@ Environment:
 //
 // Used on both the border router AND the Pi/IoT device.
 //
-#define IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8083, METHOD_BUFFERED, FILE_ANY_ACCESS)
+// Sent by the packet processing background app.
+//
+#define IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8082, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Third IOCTL: Inject a given IPv6 packet into the outbound data path.
 //
 // Used on the border router device.
 //
-#define IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8082, METHOD_BUFFERED, FILE_ANY_ACCESS)
+// Sent by the packet processing background app.
+//
+#define IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8083, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Fourth IOCTL: Add to the white list of trusted external IPv6 addresses in the registry
 //
 // Used on the border router device.
+//
+// Sent by the provisioning manager app.
 //
 #define IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8084, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
@@ -61,12 +69,16 @@ Environment:
 //
 // Used on the border router device.
 //
+// Sent by the provisioning manager app.
+//
 #define IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8085, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Sixth IOCTL: Add to the list of internal mesh IPv6 addresses in the registry
 //
 // Used on the border router device.
+//
+// Sent by the provisioning manager app.
 //
 #define IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8086, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
@@ -75,6 +87,8 @@ Environment:
 //
 // Used on the border router device.
 //
+// Sent by the provisioning manager app.
+//
 #define IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8087, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
@@ -82,11 +96,15 @@ Environment:
 // 
 // Used on the border router device.
 //
+// Sent by the provisioning manager app.
+//
 #define IOCTL_IPV6_TO_BLE_DESTROY_WHITE_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8088, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Ninth IOCTL: Destroy the mesh list, both runtime list and registry.
 // 
 // Used on the border router device.
+//
+// Sent by the provisioning manager app.
 //
 #define IOCTL_IPV6_TO_BLE_DESTROY_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8089, METHOD_BUFFERED, FILE_ANY_ACCESS)
