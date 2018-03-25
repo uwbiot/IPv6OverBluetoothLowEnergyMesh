@@ -44,7 +44,7 @@ Environment:
 //
 // Sent by the packet processing background app.
 //
-#define IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8083, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8082, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Third IOCTL: Inject a given IPv6 packet into the outbound data path.
@@ -53,7 +53,7 @@ Environment:
 //
 // Sent by the packet processing background app.
 //
-#define IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8082, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8083, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
 // Fourth IOCTL: Add to the white list of trusted external IPv6 addresses in the registry
