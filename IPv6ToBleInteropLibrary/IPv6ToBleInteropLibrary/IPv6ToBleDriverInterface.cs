@@ -68,7 +68,7 @@ namespace IPv6ToBleInteropLibrary
         /// </summary>
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, 
             SetLastError = true)]
-        public static extern SafeFileHandle CreateFile(
+        public static extern int CreateFile(
             String          lpFileName,
             int             dwDesiredAccess,
             int             dwShareMode,

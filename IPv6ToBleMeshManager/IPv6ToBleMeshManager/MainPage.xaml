@@ -6,8 +6,46 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
+    
+    <Grid x:Name="BackgroundGrid" Background="White">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-
+        <Viewbox x:Name="TitleViewbox" Grid.ColumnSpan="3" Grid.Row="0" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Grid x:Name="TitleContainerBox" Grid.ColumnSpan="3" Grid.Row="0" HorizontalAlignment="Left" Height="144" VerticalAlignment="Top" 
+                  Width="1500" IsTapEnabled="False" IsRightTapEnabled="False" IsHoldingEnabled="False" IsDoubleTapEnabled="False" 
+                  IsHitTestVisible="False">
+                <Grid.FocusVisualSecondaryBrush>
+                    <AcrylicBrush TintColor="#FF0082FC"/>
+                </Grid.FocusVisualSecondaryBrush>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <Grid.Background>
+                    <AcrylicBrush BackgroundSource="HostBackdrop" TintColor="#FF0082FC" TintOpacity="0.7"/>
+                </Grid.Background>
+                <TextBlock x:Name="TitleBlock" Text="IPv6 Over Bluetooth LE Mesh Manager" 
+                           TextWrapping="WrapWholeWords" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="36" 
+                           IsHitTestVisible="False" FontFamily="Segoe UI"
+                           Style="{StaticResource HeaderTextBlockStyle}">                
+                </TextBlock>
+            </Grid>
+        </Viewbox>
+        
+        <Button x:Name="Button_1_Listen" Content="Send a listen request" Grid.Column="0" Grid.Row="1"
+                    Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
+                    Width="195" Click="Button_1_Listen_Click" FontSize="18" FontWeight="Normal"/>
     </Grid>
 </Page>
