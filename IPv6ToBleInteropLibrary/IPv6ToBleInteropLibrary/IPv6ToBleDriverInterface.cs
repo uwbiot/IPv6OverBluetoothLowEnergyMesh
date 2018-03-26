@@ -75,7 +75,7 @@ namespace IPv6ToBleInteropLibrary
             IntPtr          lpSecurityAttributes,
             int             dwCreationDisposition,
             int             dwFlagsAndAttributes,
-            SafeFileHandle  hTemplateFile
+            int             hTemplateFile
         );
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace IPv6ToBleInteropLibrary
         [DllImport("Kernel32.dll", ExactSpelling = true, 
             CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern bool CloseHandle(
-            SafeFileHandle  hHandle
+            int  hHandle
         );
 
         /// <summary>
@@ -210,14 +210,14 @@ namespace IPv6ToBleInteropLibrary
         /// </summary>
         [DllImport("Kernel32.dll", SetLastError = true)]
         public static extern bool DeviceIoControl(
-            SafeFileHandle  hDevice, 
+            int             hDevice, 
             int             dwIoControlCode, 
             byte[]          lpInBuffer,
             int             nInBufferSize, 
             byte[]          lpOutBuffer, 
             int             nOutBufferSize, 
             out int         lpBytesReturned, 
-            IntPtr          lpOverlapped
+            int             lpOverlapped
         );
 
         /// <summary>
@@ -243,14 +243,14 @@ namespace IPv6ToBleInteropLibrary
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, 
             SetLastError = true)]
         public static extern bool DeviceIoControl(
-            SafeFileHandle  hDevice, 
+            int             hDevice, 
             int             dwIoControlCode, 
             String          lpInBuffer,
             int             nInBufferSize, 
             String          lpOutBuffer, 
             int             nOutBufferSize, 
             out int         lpBytesReturned, 
-            IntPtr          lpOverlapped
+            int             lpOverlapped
         );        
     }
 }
