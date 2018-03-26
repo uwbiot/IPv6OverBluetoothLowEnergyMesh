@@ -69,13 +69,13 @@ namespace IPv6ToBleInteropLibrary
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, 
             SetLastError = true)]
         public static extern SafeFileHandle CreateFile(
-            String lpFileName,
-            int dwDesiredAccess,
-            int dwShareMode,
-            IntPtr lpSecurityAttributes,
-            int dwCreationDisposition,
-            int dwFlagsAndAttributes,
-            SafeFileHandle hTemplateFile
+            String          lpFileName,
+            int             dwDesiredAccess,
+            int             dwShareMode,
+            IntPtr          lpSecurityAttributes,
+            int             dwCreationDisposition,
+            int             dwFlagsAndAttributes,
+            SafeFileHandle  hTemplateFile
         );
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace IPv6ToBleInteropLibrary
         [DllImport("Kernel32.dll", ExactSpelling = true, 
             CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern bool CloseHandle(
-            SafeFileHandle hHandle
+            SafeFileHandle  hHandle
         );
 
         /// <summary>
