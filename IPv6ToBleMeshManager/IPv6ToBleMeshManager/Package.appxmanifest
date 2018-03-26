@@ -7,14 +7,14 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="b6ff7b3b-441d-4bba-825b-dbdab94618c8"
+    Name="6a7930de-8241-4dda-a59f-2728b6debab0"
     Publisher="CN=Duncan"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="b6ff7b3b-441d-4bba-825b-dbdab94618c8" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="6a7930de-8241-4dda-a59f-2728b6debab0" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>BluetoothMeshManager</DisplayName>
+    <DisplayName>IPv6ToBleMeshManager</DisplayName>
     <PublisherDisplayName>Duncan</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -30,12 +30,12 @@
   <Applications>
     <Application Id="App"
       Executable="$targetnametoken$.exe"
-      EntryPoint="BluetoothMeshManager.App">
+      EntryPoint="IPv6ToBleMeshManager.App">
       <uap:VisualElements
-        DisplayName="BluetoothMeshManager"
+        DisplayName="IPv6ToBleMeshManager"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="BluetoothMeshManager"
+        Description="IPv6ToBleMeshManager"
         BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"/>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
