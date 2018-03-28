@@ -30,6 +30,7 @@ EXTERN_C_START
 #include <in6addr.h>			// structure to hold IPv6 addresses
 #include <ip2string.h>			// For address <-> string literal conversions
 #include <strsafe.h>            // String functions safer than C STD LIB ones
+#include <ntintsafe.h>          // For multiplying size_t values
 #include <winerror.h>           // Windows error codes (not NTSTATUS)
 
 // GUID header

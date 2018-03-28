@@ -41,9 +41,9 @@ _IRQL_requires_same_
 _Success_(return != 0)
 NET_BUFFER_LIST*
 IPv6ToBleNBLCreateFromBuffer(
-	_In_							NDIS_HANDLE	nblPoolHandle,
-	_In_reads_(inputBuffersize)		BYTE*		packetFromUsermode,
-	_In_							size_t*		packetFromUsermodeSize
+    _In_							    NDIS_HANDLE	nblPoolHandle,
+    _In_reads_(*packetFromUsermodeSize) BYTE*		packetFromUsermode,
+    _In_							    size_t*		packetFromUsermodeSize
 );
 
 _IRQL_requires_min_(PASSIVE_LEVEL)

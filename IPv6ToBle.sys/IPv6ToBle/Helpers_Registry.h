@@ -58,17 +58,16 @@ IPv6ToBleRegistryRetrieveMeshList();
 //
 // These functions are called periodically by the device timer callback, which
 // checks if the lists have changed and overwrites the registry key values if
-// they have
+// they have. The device timer is a periodic timer and is thus called at
+// IRQL == DISPATCH_LEVEL.
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignWhiteList();
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignMeshList();

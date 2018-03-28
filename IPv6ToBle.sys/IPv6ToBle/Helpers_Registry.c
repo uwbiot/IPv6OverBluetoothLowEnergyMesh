@@ -274,7 +274,7 @@ Return Value:
 			// Using non-paged pool because the list may be accessed at
             // IRQL = DISPATCH_LEVEL
 			PWHITE_LIST_ENTRY entry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
-				NonPagedPool,
+				NonPagedPoolNx,
 				sizeof(WHITE_LIST_ENTRY),
 				IPV6_TO_BLE_WHITE_LIST_TAG
 			);
@@ -437,7 +437,7 @@ Return Value:
             // Using non-paged pool because the list may be accessed at
             // IRQL = DISPATCH_LEVEL
 			PMESH_LIST_ENTRY entry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-				NonPagedPool,
+				NonPagedPoolNx,
 				sizeof(MESH_LIST_ENTRY),
 				IPV6_TO_BLE_MESH_LIST_TAG
 			);
@@ -537,6 +537,8 @@ Return Value:
     // Step 2
     // Open the key
     //
+
+    
     status = IPv6ToBleRegistryOpenWhiteListKey();
     if (!NT_SUCCESS(status))
     {
@@ -684,7 +686,7 @@ Return Value:
     BOOLEAN keyOpened = FALSE;
     WDFCOLLECTION addressCollection = { 0 };
     WDF_OBJECT_ATTRIBUTES attributes;
-    IN6_ADDR addressStorage;
+    IN6_ADDR addressStorage = { 0 };
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(

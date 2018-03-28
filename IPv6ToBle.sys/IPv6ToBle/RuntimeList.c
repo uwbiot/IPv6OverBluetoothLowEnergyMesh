@@ -129,7 +129,7 @@ Return Value:
     // Using non-paged pool because the list may be accessed at
     // IRQL = DISPATCH_LEVEL
     PWHITE_LIST_ENTRY newEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
-        NonPagedPool,
+        NonPagedPoolNx,
         sizeof(WHITE_LIST_ENTRY),
         IPV6_TO_BLE_WHITE_LIST_TAG
     );
@@ -252,7 +252,7 @@ Return Value:
     PCWSTR desiredAddress;
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
-                                           inputBuffer,
+                                           &inputBuffer,
                                            &receivedSize
                                            );
     if (!NT_SUCCESS(status))
@@ -318,7 +318,7 @@ Return Value:
     // Using non-paged pool because the list may be accessed at
     // IRQL = DISPATCH_LEVEL
     PMESH_LIST_ENTRY newEntry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-        NonPagedPool,
+        NonPagedPoolNx,
         sizeof(MESH_LIST_ENTRY),
         IPV6_TO_BLE_MESH_LIST_TAG
     );

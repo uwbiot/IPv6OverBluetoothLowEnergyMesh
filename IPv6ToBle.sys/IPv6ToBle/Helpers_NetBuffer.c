@@ -21,9 +21,9 @@ Environment:
 _Use_decl_annotations_
 NET_BUFFER_LIST*
 IPv6ToBleNBLCreateFromBuffer(
-	_In_							   NDIS_HANDLE	nblPoolHandle,
-	_In_reads_(packetFromUsermodeSize) BYTE*		packetFromUsermode,
-	_In_							   size_t*		packetFromUsermodeSize
+	_In_							    NDIS_HANDLE	nblPoolHandle,
+	_In_reads_(*packetFromUsermodeSize) BYTE*		packetFromUsermode,
+	_In_							    size_t*		packetFromUsermodeSize
 )
 /*++
 Routine Description:
@@ -200,8 +200,42 @@ Return Value:
 		}
 	}
 
+    //
+    // Step 4
+    // Create a new array of zeroes for the packet for user mode
+    //
+    for (; packetForUsermode == 0;)
+    {
+        size_t SAFE_SIZE = 0;
+        if (bytesToCopy &&
+            RtlSizeTMult(sizeof(BYTE),
+                        (size_t)bytesToCopy,
+                        &SAFE_SIZE) == STATUS_SUCCESS &&
+            SAFE_SIZE >= (sizeof(BYTE) * bytesToCopy))
+        {
+            packetForUsermode = (BYTE*)ExAllocatePoolWithTag(NonPagedPoolNx,
+                                    SAFE_SIZE,
+                                    IPV6_TO_BLE_NDIS_TAG
+                                );
+            if (packetForUsermode)
+            {
+                RtlZeroMemory(packetForUsermode, SAFE_SIZE);
+            }
+        }
+        else
+        {
+            packetForUsermode = 0;
+            break;
+        }
+    }
+    if (packetForUsermode == 0)
+    {
+        status = (UINT32)STATUS_NO_MEMORY;
+        goto Exit;
+    }
+
 	//
-	// Step 4
+	// Step 5
 	// Copy the data to the byte array
 	//
 	if (NBL)

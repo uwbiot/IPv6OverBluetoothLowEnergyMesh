@@ -62,7 +62,7 @@ Return Value:
 	// because this memory is for a network data packet that cannot be paged
 	// out (will be used in OS operations).
 	//
-	ndisPoolData = (NDIS_POOL_DATA*)ExAllocatePoolWithTag(NonPagedPool,
+	ndisPoolData = (NDIS_POOL_DATA*)ExAllocatePoolWithTag(NonPagedPoolNx,
 		sizeof(NDIS_POOL_DATA),
 		memoryTag
 	);
