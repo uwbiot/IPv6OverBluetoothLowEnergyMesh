@@ -37,7 +37,7 @@ _Check_return_
 _Success_(return == STATUS_SUCCESS)
 NTSTATUS
 IPv6ToBleNDISPoolDataCreate(
-	_Outptr_ NDIS_POOL_DATA*	ndisPoolData,
+	_Out_    NDIS_POOL_DATA*	ndisPoolData,
 	_In_opt_ UINT32				memoryTag
 );
 

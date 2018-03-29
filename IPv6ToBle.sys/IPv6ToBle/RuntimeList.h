@@ -68,7 +68,7 @@ _IRQL_requires_same_
 VOID
 IPv6ToBleRuntimeListDestroyWhiteList();
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 VOID

@@ -66,7 +66,7 @@ Return Value:
 											);
 
 	// Set the device cleanup callback for when the device is unloaded
-	deviceAttributes.EvtCleanupCallback = IPv6ToBleDeviceCleanup;
+	deviceAttributes.EvtCleanupCallback = IPv6ToBleEvtDeviceCleanup;
 
 	// Allocate the device initialization structure
 	deviceInit = WdfControlDeviceInitAllocate(Driver,
@@ -293,8 +293,8 @@ Exit:
 
 _Use_decl_annotations_
 VOID
-IPv6ToBleDeviceCleanup(
-	WDFDEVICE	Device
+IPv6ToBleEvtDeviceCleanup(
+	WDFOBJECT Object
 )
 /*++
 
@@ -313,6 +313,8 @@ Return Value:
 
 --*/
 {
+    UNREFERENCED_PARAMETER(Object);
+
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Entry");
 
 #ifdef BORDER_ROUTER
@@ -325,8 +327,8 @@ Return Value:
 
 	// Clean up the NDIS memory pool data structure in the device context
 	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-		Device
-	);
+		                                            wdfDeviceObject
+	                                            );
 	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");

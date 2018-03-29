@@ -219,7 +219,7 @@ Return Value:
                                 );
             if (packetForUsermode)
             {
-                RtlZeroMemory(packetForUsermode, SAFE_SIZE);
+                RtlSecureZeroMemory(packetForUsermode, SAFE_SIZE);
             }
         }
         else

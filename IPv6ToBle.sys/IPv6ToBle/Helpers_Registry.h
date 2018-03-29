@@ -66,18 +66,22 @@ IPv6ToBleRegistryRetrieveMeshList();
 // detects that the runtime list has changed.
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignWhiteList();
 
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignMeshList();
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 IO_WORKITEM_ROUTINE_EX IPv6ToBleRegistryFlushWhiteListWorkItemEx;
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 IO_WORKITEM_ROUTINE_EX IPv6ToBleRegistryFlushMeshListWorkItemEx;
 
 #endif	// _HELPERS_REGISTRY_H_

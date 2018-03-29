@@ -53,8 +53,12 @@ HANDLE injectionHandle;			// Handle for injecting packet at network layer
 //-----------------------------------------------------------------------------
 EXTERN_C_START
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 DRIVER_INITIALIZE DriverEntry;
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 EVT_WDF_DRIVER_UNLOAD IPv6ToBleEvtDriverUnload;
 
 EXTERN_C_END
