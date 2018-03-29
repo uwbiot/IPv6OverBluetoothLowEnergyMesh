@@ -46,7 +46,10 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Entry");
 
 	NTSTATUS status = STATUS_SUCCESS;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
 	// Objects for device creation
     WDF_OBJECT_ATTRIBUTES deviceAttributes;    
@@ -374,7 +377,9 @@ Return Value:
 
     UNREFERENCED_PARAMETER(Timer);
 
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(

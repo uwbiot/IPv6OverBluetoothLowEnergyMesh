@@ -191,6 +191,10 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
     </ClCompile>
+    <Link />
+    <Link>
+      <AdditionalDependencies>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x86\ndis.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x86\fwpkclnt.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x86\wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

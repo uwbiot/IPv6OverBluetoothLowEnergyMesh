@@ -193,7 +193,10 @@ Return Value:
 
 	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
 	// Get the device context
 	deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
@@ -491,7 +494,10 @@ Return Value:
     size_t receivedSize;
 
     NET_BUFFER_LIST* NBL = 0;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     //
     // Step 1
@@ -610,7 +616,10 @@ Return Value:
 	size_t receivedSize;
 
     NET_BUFFER_LIST* NBL = 0;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
 	//
 	// Step 1

@@ -94,7 +94,10 @@ Return Value:
 
     NTSTATUS status = STATUS_SUCCESS;
     NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
     
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
     WDFREQUEST outRequest;
@@ -435,7 +438,10 @@ Return Value:
     UNREFERENCED_PARAMETER(flowContext);
 
     NTSTATUS status = STATUS_SUCCESS;    
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
     PVOID outputBuffer = 0;

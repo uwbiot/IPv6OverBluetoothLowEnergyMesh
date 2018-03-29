@@ -48,7 +48,10 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
 
     NTSTATUS status = STATUS_SUCCESS;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     PVOID inputBuffer;
     size_t receivedSize = 0;
@@ -237,7 +240,10 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
 
     NTSTATUS status = STATUS_SUCCESS;
+
+#if DBG
     KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     PVOID inputBuffer = 0;
     size_t receivedSize = 0;

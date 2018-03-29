@@ -855,8 +855,11 @@ Return Value:
     UNREFERENCED_PARAMETER(Context);    
 
     NTSTATUS status = STATUS_SUCCESS;
-    KIRQL irql = KeGetCurrentIrql();
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+
+#if DBG
+    KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
 
@@ -922,8 +925,11 @@ Return Value:
     UNREFERENCED_PARAMETER(Context);
 
     NTSTATUS status = STATUS_SUCCESS;
-    KIRQL irql = KeGetCurrentIrql();
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+
+#if DBG
+    KIRQL irql = KeGetCurrentIrql();
+#endif // DBG
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
 
