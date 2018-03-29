@@ -75,10 +75,6 @@ devices in the mesh. If they are not, the packet must be destined for the
 gateway and it is permitted. If it is for a mesh device, the classify function 
 clones the packet, sends it up to usermode, and blocks the original.
 
-On the border router, the outbound classify function also compares to the mesh
-list, as the border router itself should have been added to the white list. If
-the source is on the white list, the function passes the packet to user mode.
-
 On the nodes, the outbound classify function simply redirects all outbound 
 traffic to user mode, as it is assumed the node device is either not connected 
 to the internet, or is not meant to be. This is because all nodes within a BLE
@@ -86,8 +82,13 @@ mesh subnet are isolated within the mesh for security purposes, so any reply
 from the node device back out would go over BLE back to the border router 
 device and then out to the internet.
 
+On the border router, the outbound classify function also compares to the mesh
+list to check if the packet is destined for a mesh device or if it is not. If
+the destination is on the mesh list, the function passes the packet to user
+mode.
+
 A secondary goal of this driver is to re-inject packets back into the network
-stack upon reception from user mode. For instance, if a whitelisted device
+stack upon reception from user mode. For instance, if a whitelisted external device
 initiates communication with a device in the mesh, the mesh device's reply
 would come back to the gateway device over BLE and be passed down to the driver
 for subsequent injection into the outbound data path. The driver can also
@@ -109,8 +110,9 @@ removing from both lists.
 On the border router device, the main WDFDEVICE device object also registers a 
 timer that fires every 5 seconds. This timer's purpose is to flush the runtime
 lists to the registry for permanent storage in the event of unexpected shutdown
-or driver uninstallation. The driver then checks the registry the next time it
-begins.
+or driver uninstallation. This is accomplished by queueing work items with 
+system worker threads that run at IRQL == PASSIVE_LEVEL. The driver then checks 
+the registry the next time it begins.
 
 //-----------------------------------------------------------------------------
 // High-level driver code order of operations
@@ -151,7 +153,7 @@ Unloading
 
 Functions take the following form:
 
-Domain Subject Action [opt: Object] [opt: device type]
+Domain Subject Action [opt: Object]
 
 All domain prefixes are "IPv6ToBle" to identify functions for this driver as
 unique. All functions have a minimum of the DomainSubjectAction form except for
@@ -166,9 +168,6 @@ Examples of Domain Subject Action Object:
 - IPv6ToBle Registry Open WhiteListKey
 - IPv6ToBle Queue Inject NetworkInboundV6
 - IPv6ToBle Callout Register InboundIpPacketV6Callout
-
-Example of Domain Subject Action Object Devicetype: 
-- IPv6ToBle Callout Classify OutboundIpPacketV6 BorderRouter
 
 Structures take the following form:
 
