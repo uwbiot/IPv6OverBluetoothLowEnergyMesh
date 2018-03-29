@@ -825,3 +825,137 @@ Exit:
 
     return status;
 }
+
+_Use_decl_annotations_
+VOID
+IPv6ToBleRegistryFlushWhiteListWorkItemEx(
+    _In_     PVOID        IoObject,
+    _In_opt_ PVOID        Context,
+    _In_     PIO_WORKITEM IoWorkItem
+)
+/*++
+Routine Description:
+
+    A callback routine associated with a work item for a system worker thread.
+    Does the actual calling of AssignWhiteList() at IRQL == PASSIVE_LEVEL, then
+    frees the work item. The system worker thread is scheduled in the device
+    timer callback.
+
+Arguments:
+
+    Parameter - the work item object previously allocated in the timer func.
+
+Return Value:
+
+    None.
+
+--*/
+{
+    UNREFERENCED_PARAMETER(IoObject);   // The WDM device object, unused
+    UNREFERENCED_PARAMETER(Context);    
+
+    NTSTATUS status = STATUS_SUCCESS;
+    KIRQL irql = KeGetCurrentIrql();
+    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
+
+
+    // Get the device context
+    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+
+
+    //
+    // Step 1
+    // Assign the runtime white list to the registry
+    //
+
+    // No need to check this for failure, as if it fails we'll try again 
+    // later; plus, the function itself will log a trace error if it fails
+    status = IPv6ToBleRegistryAssignWhiteList();
+
+    // Reset the flag for next check if we succeeded
+    if (NT_SUCCESS(status))
+    {
+        WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
+        deviceContext->whiteListModified = FALSE;
+        WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
+    }
+
+    NT_ASSERT(irql == KeGetCurrentIrql());
+
+    //
+    // Step 2
+    // Free the work item
+    //
+    IoFreeWorkItem(IoWorkItem);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
+}
+
+_Use_decl_annotations_
+VOID
+IPv6ToBleRegistryFlushMeshListWorkItemEx(
+    _In_     PVOID        IoObject,
+    _In_opt_ PVOID        Context,
+    _In_     PIO_WORKITEM IoWorkItem
+)
+/*++
+Routine Description:
+
+    A callback routine associated with a work item for a system worker thread.
+    Does the actual calling of AssignMeshList() at IRQL == PASSIVE_LEVEL, then
+    frees the work item. The system worker thread is scheduled in the device
+    timer callback.
+
+Arguments:
+
+    Parameter - the work item object previously allocated in the timer func.
+
+Return Value:
+
+    None.
+
+--*/
+{
+    UNREFERENCED_PARAMETER(IoObject);   // the WDM device object, unused
+    UNREFERENCED_PARAMETER(Context);
+
+    NTSTATUS status = STATUS_SUCCESS;
+    KIRQL irql = KeGetCurrentIrql();
+    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
+
+
+    // Get the device context
+    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+
+
+    //
+    // Step 1
+    // Assign the runtime mesh list to the registry
+    //
+
+    // No need to check this for failure, as if it fails we'll try again 
+    // later; plus, the function itself will log a trace error if it fails
+    status = IPv6ToBleRegistryAssignMeshList();
+
+    // Reset the flag for next check if we succeeded
+    if (NT_SUCCESS(status))
+    {
+        WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
+        deviceContext->meshListModified = FALSE;
+        WdfSpinLockRelease(deviceContext->meshListModifiedLock);
+    }
+
+    NT_ASSERT(irql == KeGetCurrentIrql());
+
+    //
+    // Step 2
+    // Free the work item
+    //
+    IoFreeWorkItem(IoWorkItem);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
+}

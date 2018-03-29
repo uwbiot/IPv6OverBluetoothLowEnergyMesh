@@ -60,6 +60,10 @@ IPv6ToBleRegistryRetrieveMeshList();
 // checks if the lists have changed and overwrites the registry key values if
 // they have. The device timer is a periodic timer and is thus called at
 // IRQL == DISPATCH_LEVEL.
+//
+// Because working with the registry requires many PASSIVE_LEVEL functions,
+// the timer callback schedules a worker thread to perform the task if it
+// detects that the runtime list has changed.
 //-----------------------------------------------------------------------------
 
 _IRQL_requires_(DISPATCH_LEVEL)
@@ -72,5 +76,8 @@ _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignMeshList();
 
+IO_WORKITEM_ROUTINE_EX IPv6ToBleRegistryFlushWhiteListWorkItemEx;
+
+IO_WORKITEM_ROUTINE_EX IPv6ToBleRegistryFlushMeshListWorkItemEx;
 
 #endif	// _HELPERS_REGISTRY_H_

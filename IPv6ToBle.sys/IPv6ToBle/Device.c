@@ -351,21 +351,11 @@ Routine Description:
     
     Since there is no way to guarantee that you will be able to flush to the
     registry once during device or driver unload, such as an unexpected
-    shutdown, the solution is to flush every 5 second, and only if the lists
+    shutdown, the solution is to flush every 5 seconds, and only if the lists
     have been modified. This is not a major load on the system.
 
-    This function is called at DISPATCH_LEVEL. It checks the booleans stored
-    in the device context to tell whether the lists have been updated since
-    last time. Those booleans are also potentially modified by
-    EvtIoDeviceControl, which can also run at DISPATCH_LEVEL. However, we 
-    created the queue with no object attributes; therefore, since we did not 
-    specify an execution level, the queue's callbacks are called and
-    automatically synchronized at PASSIVE_LEVEL. 
-
-    So, this function can preempt anything happening in EvtIoDeviceControl 
-    (including adding and removing entries from the lists). Therefore,
-    the functions called from EvtIoDeviceControl must acquire a spin lock
-    when they modify the "list modified" booleans.
+    This function is called at DISPATCH_LEVEL. If the lists have changed, it
+    queues a work item to assign the list to the registry at PASSIVE_LEVEL.
 
 Arguments:
 
@@ -382,7 +372,6 @@ Return Value:
 
     UNREFERENCED_PARAMETER(Timer);
 
-    NTSTATUS status = STATUS_SUCCESS;
     KIRQL irql = KeGetCurrentIrql();
 
     // Get the device context
@@ -392,19 +381,22 @@ Return Value:
 
     //
     // Step 1
-    // Flush the white list if it has changed
+    // Flush the white list if it has changed by scheduling a PASSIVE_LEVEL
+    // system worker thread. We use a system worker thread because assigning
+    // the list to the registry is expected to be very infrequent and doesn't
+    // take long to do (no delayed processing, etc.).
     //
     WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
     if (deviceContext->whiteListModified)
     {
-        // No need to check this, as if it fails we'll try again later; plus,
-        // the function itself will log a trace error if it fails
-        status = IPv6ToBleRegistryAssignWhiteList();
-
-        // Reset the flag for next check if we succeeded
-        if (NT_SUCCESS(status))
+        PIO_WORKITEM workItem = IoAllocateWorkItem(wdmDeviceObject);
+        if (workItem)
         {
-            deviceContext->whiteListModified = FALSE;
+            IoQueueWorkItemEx(workItem,
+                              IPv6ToBleRegistryFlushWhiteListWorkItemEx,
+                              DelayedWorkQueue,
+                              NULL
+                              );
         }        
     }
     WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
@@ -413,20 +405,20 @@ Return Value:
 
     //
     // Step 2
-    // Flush the mesh list if it has changed
+    // Flush the mesh list if it has changed, also with a system worker thread.
     //
     WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
     if (deviceContext->meshListModified)
     {
-        // No need to check this, as if it fails we'll try again later; plus,
-        // the function itself will log a trace error if it fails
-        status = IPv6ToBleRegistryAssignMeshList();
-
-        // Reset the flag for next check if we succeeded
-        if (NT_SUCCESS(status))
+        PIO_WORKITEM workItem = IoAllocateWorkItem(wdmDeviceObject);
+        if (workItem)
         {
-            deviceContext->meshListModified = FALSE;
-        }        
+            IoQueueWorkItemEx(workItem,
+                              IPv6ToBleRegistryFlushMeshListWorkItemEx,
+                              DelayedWorkQueue,
+                              NULL
+                              );
+        }
     }
     WdfSpinLockRelease(deviceContext->meshListModifiedLock);
 

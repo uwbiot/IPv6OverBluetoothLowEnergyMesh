@@ -33,9 +33,6 @@ IPv6ToBleQueuesInitialize(
 // I/O event callback - i.e. callback for receiving IOCTLs from apps
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
 EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL IPv6ToBleEvtIoDeviceControl;
 
 //-----------------------------------------------------------------------------

@@ -97,16 +97,12 @@ IPv6ToBleControlDeviceCreate(
 // context space when the device is unloaded.
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
 EVT_WDF_DEVICE_CONTEXT_CLEANUP IPv6ToBleDeviceCleanup;
 
 //-----------------------------------------------------------------------------
 // Timer event callback function to flush the runtime lists to the registry
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_(DISPATCH_LEVEL)
-_IRQL_requires_same_
 EVT_WDF_TIMER IPv6ToBleDeviceTimerCheckAndFlushLists;
 
 EXTERN_C_END

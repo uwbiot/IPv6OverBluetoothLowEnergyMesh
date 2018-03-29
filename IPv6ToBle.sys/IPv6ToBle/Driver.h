@@ -46,24 +46,21 @@ UINT32 outboundIpPacketV6CalloutId; // Runtime ID,outbound IP packet v6 callout
 
 
 HANDLE filterEngineHandle;		// Handle to the WFP filter engine
-HANDLE injectionHandle;			// Handle for injecting outbound packets
+HANDLE injectionHandle;			// Handle for injecting packet at network layer
 
 //-----------------------------------------------------------------------------
 // WDFDRIVER Events
 //-----------------------------------------------------------------------------
 EXTERN_C_START
 
-_IRQL_requires_same_
 DRIVER_INITIALIZE DriverEntry;
 
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-EVT_WDF_DRIVER_UNLOAD IPv6ToBleDriverUnload;
+EVT_WDF_DRIVER_UNLOAD IPv6ToBleEvtDriverUnload;
 
 EXTERN_C_END
 
 //-----------------------------------------------------------------------------
-// Other defines, including memory pool tags (which are reversed)
+// Other defines, including memory pool tags (which are read in reverse)
 //-----------------------------------------------------------------------------
 
 #define IPV6_ADDRESS_LENGTH 16

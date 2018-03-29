@@ -79,7 +79,7 @@ Return Value:
 	config.DriverInitFlags = WdfDriverInitNonPnpDriver;
 
 	// Specify the driver's unload function
-	config.EvtDriverUnload = IPv6ToBleDriverUnload;
+	config.EvtDriverUnload = IPv6ToBleEvtDriverUnload;
 
 	//
 	// Step 2
@@ -273,7 +273,7 @@ Exit:
 
 _Use_decl_annotations_
 VOID
-IPv6ToBleDriverUnload(
+IPv6ToBleEvtDriverUnload(
 	_In_ WDFDRIVER Driver
 )
 /*++
