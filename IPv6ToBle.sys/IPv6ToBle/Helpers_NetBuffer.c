@@ -68,7 +68,7 @@ Return Value:
 	// Allocate and build the MDL from the buffer
 	//
 	memoryDescriptorList = IoAllocateMdl(packetFromUsermode,
-		                                 (ULONG)&packetFromUsermodeSize,
+		                                 (ULONG)*packetFromUsermodeSize,
 		                                 FALSE,
 		                                 FALSE,
 		                                 0
