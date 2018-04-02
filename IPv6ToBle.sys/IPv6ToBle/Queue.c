@@ -99,7 +99,7 @@ Return Value:
 
 	// Get the device context
 	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-		wdfDeviceObject
+		globalWdfDeviceObject
 	);
 
 	// Configure the queue to manual dispatch and non-power managed
@@ -109,7 +109,7 @@ Return Value:
 	queueConfig.PowerManaged = WdfFalse;
 
 	// Create the manual queue
-	status = WdfIoQueueCreate(wdfDeviceObject,
+	status = WdfIoQueueCreate(globalWdfDeviceObject,
 							  &queueConfig,
 							  WDF_NO_OBJECT_ATTRIBUTES,
 							  &deviceContext->listenRequestQueue
@@ -199,7 +199,7 @@ Return Value:
 #endif // DBG
 
 	// Get the device context
-	deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 	// Switch based on the IOCTL sent to us by the usermode app(s)
 	switch (IoControlCode)
@@ -397,7 +397,7 @@ Return Value:
             {
                 break;
             }
-            status = WdfRegistryRemoveKey(whiteListKey);
+            status = WdfRegistryRemoveKey(globalWhiteListKey);
             if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed %!STATUS!", status);
@@ -426,7 +426,7 @@ Return Value:
             {
                 break;
             }
-            status = WdfRegistryRemoveKey(meshListKey);
+            status = WdfRegistryRemoveKey(globalMeshListKey);
             if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed %!STATUS!", status);
@@ -527,7 +527,7 @@ Return Value:
 
     // Get the context so we can retrieve the NDIS NBL pool handle
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        wdfDeviceObject
+        globalWdfDeviceObject
     );
     HANDLE nblPoolHandle = deviceContext->ndisPoolData->nblPoolHandle;
 
@@ -547,7 +547,7 @@ Return Value:
     // Step 3
     // Inject the packet into the receive path
     //
-    status = FwpsInjectNetworkReceiveAsync0(injectionHandle,
+    status = FwpsInjectNetworkReceiveAsync0(globalInjectionHandleNetwork,
                                             0,
                                             0,
                                             DEFAULT_COMPARTMENT_ID,
@@ -648,7 +648,7 @@ Return Value:
 
     // Get the context so we can retrieve the NDIS NBL pool handle
 	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-													wdfDeviceObject
+													globalWdfDeviceObject
 												);
     HANDLE nblPoolHandle = deviceContext->ndisPoolData->nblPoolHandle;
 
@@ -668,7 +668,7 @@ Return Value:
 	// Step 3
 	// Inject the packet into the send path
     //
-    status = FwpsInjectNetworkSendAsync0(injectionHandle,
+    status = FwpsInjectNetworkSendAsync0(globalInjectionHandleNetwork,
                                          0,
                                          0,
                                          DEFAULT_COMPARTMENT_ID,

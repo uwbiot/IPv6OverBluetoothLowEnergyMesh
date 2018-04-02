@@ -130,7 +130,7 @@ Return Value:
 
     // Check to make sure we don't try to re-inspect packets we inspected
     // earlier; permit and clear the write permissions flag if so
-    packetState = FwpsQueryPacketInjectionState0(injectionHandle,
+    packetState = FwpsQueryPacketInjectionState0(globalInjectionHandleNetwork,
                                                  layerData,
                                                  NULL
                                                  );
@@ -160,7 +160,7 @@ Return Value:
     //
 
     // Get the context
-    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
     // Extract the destination address from the IP header by retreating 16
     // bytes (as it is at the end of the IPv6 header)
@@ -472,7 +472,7 @@ Return Value:
 
     // Check to make sure we don't try to re-inspect packets we inspected
     // earlier; permit and clear the write permissions flag if so
-    packetState = FwpsQueryPacketInjectionState0(injectionHandle,
+    packetState = FwpsQueryPacketInjectionState0(globalInjectionHandleNetwork,
                                                  layerData,
                                                  NULL
                                                  );
@@ -502,7 +502,7 @@ Return Value:
     //
 
     // Get the device context
-    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 #ifdef BORDER_ROUTER
 
@@ -799,7 +799,7 @@ Return Value:
         RPC_C_AUTHN_WINNT,
         NULL,
         &session,
-        &filterEngineHandle
+        &globalFilterEngineHandle
     );
     if (!NT_SUCCESS(status))
     {
@@ -812,7 +812,7 @@ Return Value:
     // Step 2
     // Begin the transaction with the filter engine
     //
-    status = FwpmTransactionBegin0(filterEngineHandle, 0);
+    status = FwpmTransactionBegin0(globalFilterEngineHandle, 0);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Beginning the transaction with the filter engine failed %!STATUS!", status);
@@ -842,7 +842,7 @@ Return Value:
                                   // implementation.
 
     // Add the sublayer
-    status = FwpmSubLayerAdd0(filterEngineHandle, &ipv6ToBleSublayer, NULL);
+    status = FwpmSubLayerAdd0(globalFilterEngineHandle, &ipv6ToBleSublayer, NULL);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Adding the sublayer for callouts failed %!STATUS!", status);
@@ -885,7 +885,7 @@ Return Value:
     // Step 5
     // Commit the transaction to the filter engine
     //
-    status = FwpmTransactionCommit0(filterEngineHandle);
+    status = FwpmTransactionCommit0(globalFilterEngineHandle);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Committing the transaction to the filter engine failed %!STATUS!", status);
@@ -900,14 +900,14 @@ Exit:
     {
         if (inTransaction)
         {
-            FwpmTransactionAbort0(filterEngineHandle);
-            _Analysis_assume_lock_not_held_(filterEngineHandle); // Potential
+            FwpmTransactionAbort0(globalFilterEngineHandle);
+            _Analysis_assume_lock_not_held_(globalFilterEngineHandle); // Potential
                                                                  // leak if "FwpmTransactionAbort" fails
         }
         if (engineOpened)
         {
-            FwpmEngineClose0(filterEngineHandle);
-            filterEngineHandle = NULL;
+            FwpmEngineClose0(globalFilterEngineHandle);
+            globalFilterEngineHandle = NULL;
         }
     }
 
@@ -966,7 +966,7 @@ Return Value:
     servicingCallout.notifyFn = IPv6ToBleCalloutNotifyIpPacket;
 
     // Register the callout
-    status = FwpsCalloutRegister2(wdmDeviceObject,
+    status = FwpsCalloutRegister2(globalWdmDeviceObject,
                                   &servicingCallout,
                                   calloutId
                                   );
@@ -991,7 +991,7 @@ Return Value:
     managementCallout.applicableLayer = *layerKey;
 
     // Add the management callout
-    status = FwpmCalloutAdd0(filterEngineHandle,
+    status = FwpmCalloutAdd0(globalFilterEngineHandle,
                              &managementCallout,
                              NULL,
                              NULL
@@ -1009,7 +1009,7 @@ Return Value:
 
     // Get the context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     // Traverse the list and add a filter for each entry
@@ -1110,7 +1110,7 @@ Return Value:
     servicingCallout.notifyFn = IPv6ToBleCalloutNotifyIpPacket;
 
     // Register the serviding callout callout
-    status = FwpsCalloutRegister2(wdmDeviceObject,
+    status = FwpsCalloutRegister2(globalWdmDeviceObject,
                                   &servicingCallout,
                                   calloutId
                                   );
@@ -1133,7 +1133,7 @@ Return Value:
     managementCallout.applicableLayer = *layerKey;
 
     // Add the management callout
-    status = FwpmCalloutAdd0(filterEngineHandle,
+    status = FwpmCalloutAdd0(globalFilterEngineHandle,
                              &managementCallout,
                              NULL,
                              NULL
@@ -1154,7 +1154,7 @@ Return Value:
 
     // Get the context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     // Traverse the list and add a filter for each entry
@@ -1276,7 +1276,7 @@ Return Value:
 #ifdef BORDER_ROUTER
 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     if (direction == INBOUND)
@@ -1372,7 +1372,7 @@ Return Value:
     // Step 4
     // Add the filter
     //
-    status = FwpmFilterAdd0(filterEngineHandle,
+    status = FwpmFilterAdd0(globalFilterEngineHandle,
                             &filter,
                             NULL,
                             NULL
@@ -1430,10 +1430,10 @@ Return Value:
 
     // Close the handle to the filter engine, which removes filters and other
     // objects added during the session since we created a dynamic session
-    if (filterEngineHandle)
+    if (globalFilterEngineHandle)
     {
-        FwpmEngineClose0(filterEngineHandle);
-        filterEngineHandle = NULL;
+        FwpmEngineClose0(globalFilterEngineHandle);
+        globalFilterEngineHandle = NULL;
     }
 
     // Unregister the callout

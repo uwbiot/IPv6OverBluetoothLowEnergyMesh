@@ -104,6 +104,7 @@ Return Value:
 	if (!NT_SUCCESS(status)) 
 	{
         TraceEvents(TRACE_LEVEL_WARNING, TRACE_DEVICE, "Device init assigning native device name failed %!STATUS!", status);
+        WdfDeviceInitFree(deviceInit);
 		goto Exit;
 	}
 
@@ -115,7 +116,7 @@ Return Value:
 	//
 	status = WdfDeviceCreate(&deviceInit, 
 							 &deviceAttributes,
-							 &wdfDeviceObject
+							 &globalWdfDeviceObject
 							 );
 	
 	if (!NT_SUCCESS(status)) 
@@ -126,7 +127,7 @@ Return Value:
 	}
 
 	// Finish initializing the control device object
-	WdfControlFinishInitializing(wdfDeviceObject);	
+	WdfControlFinishInitializing(globalWdfDeviceObject);	
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
@@ -140,7 +141,7 @@ Return Value:
 
 	// Create a symbolic link to the created device object, as one way that
 	// usermode apps can talk to us
-	status = WdfDeviceCreateSymbolicLink(wdfDeviceObject, 
+	status = WdfDeviceCreateSymbolicLink(globalWdfDeviceObject, 
 										 &userDeviceName
 										 );
 	
@@ -156,7 +157,7 @@ Return Value:
 	// 
 
 	// Get the context
-	deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
     //
     // Initialize the spin locks
@@ -165,7 +166,7 @@ Return Value:
     // Listen request queue spinlock
     WDF_OBJECT_ATTRIBUTES listenRequestQueueLockAttributes;
     WDF_OBJECT_ATTRIBUTES_INIT(&listenRequestQueueLockAttributes);
-    listenRequestQueueLockAttributes.ParentObject = wdfDeviceObject;
+    listenRequestQueueLockAttributes.ParentObject = globalWdfDeviceObject;
 
     status = WdfSpinLockCreate(&listenRequestQueueLockAttributes,
                                &deviceContext->listenRequestQueueLock
@@ -181,11 +182,11 @@ Return Value:
     // White list spinlock
     WDF_OBJECT_ATTRIBUTES whiteListModifiedLockAttributes;
     WDF_OBJECT_ATTRIBUTES_INIT(&whiteListModifiedLockAttributes);
-    whiteListModifiedLockAttributes.ParentObject = wdfDeviceObject;
+    whiteListModifiedLockAttributes.ParentObject = globalWdfDeviceObject;
 
     status = WdfSpinLockCreate(&whiteListModifiedLockAttributes,
-        &deviceContext->whiteListModifiedLock
-    );
+                               &deviceContext->whiteListModifiedLock
+                               );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Creating white list modified spin lock failed %!STATUS!", status);
@@ -195,11 +196,11 @@ Return Value:
     // Mesh list spinlock
     WDF_OBJECT_ATTRIBUTES meshListModifiedLockAttributes;
     WDF_OBJECT_ATTRIBUTES_INIT(&meshListModifiedLockAttributes);
-    meshListModifiedLockAttributes.ParentObject = wdfDeviceObject;
+    meshListModifiedLockAttributes.ParentObject = globalWdfDeviceObject;
 
     status = WdfSpinLockCreate(&meshListModifiedLockAttributes,
-        &deviceContext->meshListModifiedLock
-    );
+                               &deviceContext->meshListModifiedLock
+                               );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Creating mesh list modified spin lock failed %!STATUS!", status);
@@ -237,7 +238,7 @@ Return Value:
 	// Step 5
 	// Initialize the I/O queues
 	//
-	status = IPv6ToBleQueuesInitialize(wdfDeviceObject);
+	status = IPv6ToBleQueuesInitialize(globalWdfDeviceObject);
     if (!NT_SUCCESS(status))
     {
         goto Exit;
@@ -269,7 +270,7 @@ Return Value:
 
     // Initialize the timer attributes to make the device object its parent
     WDF_OBJECT_ATTRIBUTES_INIT(&timerAttributes);
-    timerAttributes.ParentObject = wdfDeviceObject;
+    timerAttributes.ParentObject = globalWdfDeviceObject;
 
     // Create the timer
     status = WdfTimerCreate(&timerConfig, 
@@ -330,7 +331,7 @@ Return Value:
 
 	// Clean up the NDIS memory pool data structure in the device context
 	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-		                                            wdfDeviceObject
+		                                            globalWdfDeviceObject
 	                                            );
 	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
 
@@ -383,7 +384,7 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     //
@@ -396,7 +397,7 @@ Return Value:
     WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
     if (deviceContext->whiteListModified)
     {
-        PIO_WORKITEM workItem = IoAllocateWorkItem(wdmDeviceObject);
+        PIO_WORKITEM workItem = IoAllocateWorkItem(globalWdmDeviceObject);
         if (workItem)
         {
             IoQueueWorkItemEx(workItem,
@@ -417,7 +418,7 @@ Return Value:
     WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
     if (deviceContext->meshListModified)
     {
-        PIO_WORKITEM workItem = IoAllocateWorkItem(wdmDeviceObject);
+        PIO_WORKITEM workItem = IoAllocateWorkItem(globalWdmDeviceObject);
         if (workItem)
         {
             IoQueueWorkItemEx(workItem,

@@ -95,7 +95,7 @@ Return Value:
     // Get the device context and white list head
     // 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
     PLIST_ENTRY whiteListEntry = deviceContext->whiteListHead->Flink;
 
@@ -287,7 +287,7 @@ Return Value:
     // Get the device context and mesh list head
     // 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
     PLIST_ENTRY meshListEntry = deviceContext->meshListHead->Flink;
 
@@ -474,7 +474,7 @@ Return Value:
     // Get the device context and white list head
     // 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
     PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
 
@@ -621,7 +621,7 @@ Return Value:
     // Get the device context and mesh list head
     // 
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
     PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
 
@@ -720,7 +720,7 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     // Clean up the linked list
@@ -765,7 +765,7 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        wdfDeviceObject
+        globalWdfDeviceObject
     );
 
     // Clean up the linked list

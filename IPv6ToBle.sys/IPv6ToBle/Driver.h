@@ -34,19 +34,19 @@ Environment:
 //
 // Required objects for the callout driver in global space
 //
-WDFDEVICE wdfDeviceObject;		// Our main device object itself
-PDEVICE_OBJECT wdmDeviceObject;	// WDM device object for registering callouts
+WDFDEVICE globalWdfDeviceObject;		// Our main device object itself
+PDEVICE_OBJECT globalWdmDeviceObject;	// WDM device object to go with above
 
-WDFKEY parametersKey;			// The driver's framework registry key object
-WDFKEY whiteListKey;			// Key of white list, child of parametersKey
-WDFKEY meshListKey;				// Key of mesh list, child of parametersKey
+WDFKEY globalParametersKey;			// Driver's framework registry key object
+WDFKEY globalWhiteListKey;			// White list key, child of parametersKey
+WDFKEY globalMeshListKey;		    // Key of mesh list, child of parametersKey
 
-UINT32 inboundIpPacketV6CalloutId;// Runtime IT, inbound IP packet v6 callout
+UINT32 inboundIpPacketV6CalloutId;  // Runtime IT, inbound IP packet v6 callout
 UINT32 outboundIpPacketV6CalloutId; // Runtime ID,outbound IP packet v6 callout
 
 
-HANDLE filterEngineHandle;		// Handle to the WFP filter engine
-HANDLE injectionHandle;			// Handle for injecting packet at network layer
+HANDLE globalFilterEngineHandle;	    // Handle to the WFP filter engine
+HANDLE globalInjectionHandleNetwork;    // Handle for injecting packets
 
 //-----------------------------------------------------------------------------
 // WDFDRIVER Events
@@ -66,8 +66,6 @@ EXTERN_C_END
 //-----------------------------------------------------------------------------
 // Other defines, including memory pool tags (which are read in reverse)
 //-----------------------------------------------------------------------------
-
-#define WPP_DEBUG KdPrint   // For sending trace output to the debugger
 
 #define IPV6_ADDRESS_LENGTH 16
 

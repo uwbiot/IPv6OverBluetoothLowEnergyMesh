@@ -63,13 +63,13 @@ Return Value:
 	// exist or opens the key if it does exist. The parent key must exist, and
 	// it does since that is the key assigned to the driver by the system in
 	// DriverEntry.
-	status = WdfRegistryCreateKey(parametersKey,
+	status = WdfRegistryCreateKey(globalParametersKey,
 		                          &whiteListKeyName,
 		                          KEY_ALL_ACCESS,
 		                          REG_OPTION_NON_VOLATILE,
 		                          NULL,
 		                          WDF_NO_OBJECT_ATTRIBUTES,
-		                          &whiteListKey
+		                          &globalWhiteListKey
 	                              );
 	if (!NT_SUCCESS(status))
 	{
@@ -119,13 +119,13 @@ Return Value:
 	// exist or opens the key if it does exist. The parent key must exist, and
 	// it does since that is the key assigned to the driver by the system in
 	// DriverEntry.
-	status = WdfRegistryCreateKey(parametersKey,
+	status = WdfRegistryCreateKey(globalParametersKey,
 		                          &meshListKeyName,
 		                          KEY_ALL_ACCESS,
 		                          REG_OPTION_NON_VOLATILE,
 		                          NULL,
 		                          WDF_NO_OBJECT_ATTRIBUTES,
-		                          &meshListKey
+		                          &globalMeshListKey
 	                              );
 	if (!NT_SUCCESS(status))
 	{
@@ -222,7 +222,7 @@ Return Value:
 
 	// Query the white list key. Fails first time driver is installed or if the
 	// user purged the list and rebooted because the key exists but is empty.
-	status = WdfRegistryQueryMultiString(whiteListKey,
+	status = WdfRegistryQueryMultiString(globalWhiteListKey,
 		                                &whiteListValueName,
 		                                &addressStringsAttributes,
 		                                whiteListAddresses
@@ -244,7 +244,7 @@ Return Value:
 	//
 
 	// Get the context
-	deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 	// Since the list is non-empty, we can walk the list, get the strings, and
 	// assign them to the context. No need for synchronization because this
@@ -310,7 +310,7 @@ Exit:
     // Close the key
     if (keyOpened)
     {
-        WdfRegistryClose(whiteListKey);
+        WdfRegistryClose(globalWhiteListKey);
     }
 
     // Clean up the collection object and its children
@@ -395,7 +395,7 @@ Return Value:
 
 	// Query the white list key. Fails first time driver is installed or if the
 	// user purged the list and rebooted because the key exists but is empty.
-	status = WdfRegistryQueryMultiString(meshListKey,
+	status = WdfRegistryQueryMultiString(globalMeshListKey,
 		&meshListValueName,
 		&addressStringsAttributes,
 		meshListAddresses
@@ -408,7 +408,7 @@ Return Value:
 	}
 
 	// Get the device context
-	deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 	// Since the list is non-empty, we can walk the list, get the strings, and
 	// assign them to the context. No need for synchronization because this
@@ -473,7 +473,7 @@ Exit:
     // Close the key
     if (keyOpened)
     {
-        WdfRegistryClose(meshListKey);
+        WdfRegistryClose(globalMeshListKey);
     }
 
     // Clean up the collection object and its children
@@ -520,7 +520,7 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     //
@@ -629,7 +629,7 @@ Return Value:
     DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
 
     // Assign the collection of strings to the registry key's value
-    status = WdfRegistryAssignMultiString(whiteListKey, 
+    status = WdfRegistryAssignMultiString(globalWhiteListKey, 
                                           &whiteListValueName, 
                                           addressCollection
                                           );
@@ -643,7 +643,7 @@ Exit:
     // Close the key if it were opened
     if (keyOpened)
     {
-        WdfRegistryClose(whiteListKey);
+        WdfRegistryClose(globalWhiteListKey);
     }
 
     // Clean up collection object
@@ -690,7 +690,7 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
 
     //
@@ -798,7 +798,7 @@ Return Value:
     DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
 
     // Assign the collection of strings to the registry key's value
-    status = WdfRegistryAssignMultiString(meshListKey,
+    status = WdfRegistryAssignMultiString(globalMeshListKey,
                                           &meshListValueName,
                                           addressCollection
                                           );
@@ -812,7 +812,7 @@ Exit:
     // Close the key if it were opened
     if (keyOpened)
     {
-        WdfRegistryClose(meshListKey);
+        WdfRegistryClose(globalMeshListKey);
     }
 
     // Clean up collection object
@@ -865,7 +865,7 @@ Return Value:
 
 
     // Get the device context
-    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 
     //
@@ -935,7 +935,7 @@ Return Value:
 
 
     // Get the device context
-    deviceContext = IPv6ToBleGetContextFromDevice(wdfDeviceObject);
+    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 
     //

@@ -76,7 +76,7 @@ Return Value:
                            );
 	
 	// Indicate that this is not a PnP driver
-	config.DriverInitFlags = WdfDriverInitNonPnpDriver;
+	config.DriverInitFlags |= WdfDriverInitNonPnpDriver;
 
 	// Specify the driver's unload function
 	config.EvtDriverUnload = IPv6ToBleEvtDriverUnload;
@@ -111,7 +111,7 @@ Return Value:
 	}
 
     // Get the associated WDM device object, for registering the callouts
-    wdmDeviceObject = WdfDeviceWdmGetDeviceObject(wdfDeviceObject);
+    globalWdmDeviceObject = WdfDeviceWdmGetDeviceObject(globalWdfDeviceObject);
 
     //
     // Step 4
@@ -123,7 +123,7 @@ Return Value:
     //
     status = FwpsInjectionHandleCreate0(AF_INET6,
                                         FWPS_INJECTION_TYPE_NETWORK,
-                                        &injectionHandle
+                                        &globalInjectionHandleNetwork
                                         );
     if (!NT_SUCCESS(status))
     {
@@ -148,7 +148,7 @@ Return Value:
 	status = WdfDriverOpenParametersRegistryKey(driver,
 												KEY_READ,
 												WDF_NO_OBJECT_ATTRIBUTES,
-												&parametersKey
+												&globalParametersKey
 												);	
 	if (!NT_SUCCESS(status)){
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Opening parameters registry key failed %!STATUS!", status);
@@ -185,15 +185,15 @@ Return Value:
 	// Close keys
 	if (whiteListLoaded)
 	{
-		WdfRegistryClose(whiteListKey);
+		WdfRegistryClose(globalWhiteListKey);
 	}
 	if (meshListLoaded)
 	{
-		WdfRegistryClose(meshListKey);
+		WdfRegistryClose(globalMeshListKey);
 	}
     if (parametersKeyOpened)
     {
-        WdfRegistryClose(parametersKey);
+        WdfRegistryClose(globalParametersKey);
     }	
 
 	// Still succeed if one failed but not the other, or if they both failed,
@@ -240,7 +240,7 @@ Return Value:
     // may not be registered, depending on the state of the white list and
     // mesh list. On the IoT core devices, the callouts are always registered.
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    wdfDeviceObject
+                                                    globalWdfDeviceObject
                                                 );
     deviceContext->calloutsRegistered = TRUE;
 
@@ -251,13 +251,13 @@ Exit:
 	// clean up the handles if we failed
 	if (!NT_SUCCESS(status))
 	{
-		if (filterEngineHandle)
+		if (globalFilterEngineHandle)
 		{
 			IPv6ToBleCalloutsUnregister();
 		}
-		if (injectionHandle)
+		if (globalInjectionHandleNetwork)
 		{
-			FwpsInjectionHandleDestroy0(injectionHandle);
+			FwpsInjectionHandleDestroy0(globalInjectionHandleNetwork);
 		}
 
         // Stop WPP Tracing if DriverEntry fails
@@ -303,7 +303,7 @@ Return Value:
 
 	// Destroy the injection handle. If this fails then just log the error
     // since the driver is unloading.
-	NTSTATUS status = FwpsInjectionHandleDestroy0(injectionHandle);
+	NTSTATUS status = FwpsInjectionHandleDestroy0(globalInjectionHandleNetwork);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Destroying the injection handle failed %!STATUS!", status);
