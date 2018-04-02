@@ -377,9 +377,9 @@ Return Value:
         }
 
         //
-        // IOCTL 8: Destroy white list
+        // IOCTL 8: Purge white list
         //
-        // This IOCTL is sent as a request to destroy the runtime white list
+        // This IOCTL is sent as a request to purge the runtime white list
         // and clear the white list from the registry.
         //
         // It is sent by the usermode GUI app in the event that the app needs
@@ -389,9 +389,9 @@ Return Value:
         //
         // This IOCTL is ONLY used on the border router device.
         //
-        case IOCTL_IPV6_TO_BLE_DESTROY_WHITE_LIST:
+        case IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST:
         {
-            IPv6ToBleRuntimeListDestroyWhiteList();
+            IPv6ToBleRuntimeListPurgeWhiteList();
             status = IPv6ToBleRegistryOpenWhiteListKey();
             if (!NT_SUCCESS(status))
             {
@@ -406,9 +406,9 @@ Return Value:
         }
 
         //
-        // IOCTL 9: Destroy mesh list
+        // IOCTL 9: Purge mesh list
         //
-        // This IOCTL is sent as a request to destroy the runtime mesh list
+        // This IOCTL is sent as a request to purge the runtime mesh list
         // and clear the mesh list from the registry.
         //
         // It is sent by the usermode GUI app in the event that the app needs
@@ -418,9 +418,9 @@ Return Value:
         //
         // This IOCTL is ONLY used on the border router device.
         //
-        case IOCTL_IPV6_TO_BLE_DESTROY_MESH_LIST:
+        case IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST:
         {
-            IPv6ToBleRuntimeListDestroyMeshList();
+            IPv6ToBleRuntimeListPurgeMeshList();
             status = IPv6ToBleRegistryOpenMeshListKey();
             if (!NT_SUCCESS(status))
             {

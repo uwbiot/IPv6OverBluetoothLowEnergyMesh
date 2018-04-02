@@ -286,7 +286,7 @@ Return Value:
 			}
 
 			// Add the entry to the list
-			InsertHeadList(deviceContext->whiteListHead, entry->listEntry);
+			InsertHeadList(deviceContext->whiteListHead, &entry->listEntry);
 
 			// Insert the address into the entry
 			entry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
@@ -304,7 +304,7 @@ Exit:
     // Clean up any memory allocated if we failed at some point
     if (!NT_SUCCESS(status))
     {
-        IPv6ToBleRuntimeListDestroyWhiteList();
+        IPv6ToBleRuntimeListPurgeWhiteList();
     }
 
     // Close the key
@@ -449,7 +449,7 @@ Return Value:
 			}
 
 			// Add the entry to the list
-			InsertHeadList(deviceContext->meshListHead, entry->listEntry);
+			InsertHeadList(deviceContext->meshListHead, &entry->listEntry);
 
 			// Insert the address into the entry
 			entry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
@@ -467,7 +467,7 @@ Exit:
 	// Clean up any memory allocated if we failed at some point
 	if (!NT_SUCCESS(status))
 	{
-		IPv6ToBleRuntimeListDestroyMeshList();
+		IPv6ToBleRuntimeListPurgeMeshList();
 	}
 
     // Close the key

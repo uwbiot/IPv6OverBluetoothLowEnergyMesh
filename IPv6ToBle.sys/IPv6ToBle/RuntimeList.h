@@ -66,12 +66,12 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 VOID
-IPv6ToBleRuntimeListDestroyWhiteList();
+IPv6ToBleRuntimeListPurgeWhiteList();
 
 _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 VOID
-IPv6ToBleRuntimeListDestroyMeshList();
+IPv6ToBleRuntimeListPurgeMeshList();
 
 #endif  // _RUNTIMELIST_H_

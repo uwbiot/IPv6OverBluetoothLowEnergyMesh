@@ -144,7 +144,7 @@ Return Value:
     }
 
     // Add the entry to the list
-    InsertHeadList(deviceContext->whiteListHead, newEntry->listEntry);
+    InsertHeadList(deviceContext->whiteListHead, &newEntry->listEntry);
 
     // Insert the address into the entry
     newEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
@@ -336,7 +336,7 @@ Return Value:
     }
 
     // Add the entry to the list
-    InsertHeadList(deviceContext->meshListHead, newEntry->listEntry);
+    InsertHeadList(deviceContext->meshListHead, &newEntry->listEntry);
 
     // Insert the address into the entry
     newEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
@@ -697,7 +697,7 @@ Exit:
 
 _Use_decl_annotations_
 VOID
-IPv6ToBleRuntimeListDestroyWhiteList()
+IPv6ToBleRuntimeListPurgeWhiteList()
 /*++
 Routine Description:
 
@@ -742,7 +742,7 @@ Return Value:
 
 _Use_decl_annotations_
 VOID
-IPv6ToBleRuntimeListDestroyMeshList()
+IPv6ToBleRuntimeListPurgeMeshList()
 /*++
 Routine Description:
 

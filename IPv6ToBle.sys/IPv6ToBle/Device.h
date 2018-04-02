@@ -31,13 +31,13 @@ EXTERN_C_START
 typedef struct _WHITE_LIST_ENTRY
 {
 	UINT8*		ipv6Address;	// The IPv6 address
-	PLIST_ENTRY	listEntry;		// Links this list entry to the list
+	LIST_ENTRY	listEntry;		// Links this list entry to the list
 } WHITE_LIST_ENTRY, *PWHITE_LIST_ENTRY;
 
 typedef struct _MESH_LIST_ENTRY
 {
 	UINT8*		ipv6Address;	// The IPv6 address
-	PLIST_ENTRY	listEntry;		// Links this list entry to the list
+	LIST_ENTRY	listEntry;		// Links this list entry to the list
 } MESH_LIST_ENTRY, *PMESH_LIST_ENTRY;
 
 //-----------------------------------------------------------------------------

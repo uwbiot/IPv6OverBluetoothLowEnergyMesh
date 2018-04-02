@@ -212,8 +212,34 @@ Return Value:
     // Set that callouts are not registered yet
     deviceContext->calloutsRegistered = FALSE;
 
+    //
     // Initialize the list heads
+    //
+    
+    // White list head
+    deviceContext->whiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(
+                                        NonPagedPoolNx, 
+                                        sizeof(LIST_ENTRY), 
+                                        IPV6_TO_BLE_WHITE_LIST_TAG
+                                        );
+    if (!deviceContext->whiteListHead)
+    {
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto Exit;
+    }
     InitializeListHead(deviceContext->whiteListHead);
+
+    // Mesh list head
+    deviceContext->meshListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(
+                                        NonPagedPoolNx,
+                                        sizeof(LIST_ENTRY),
+                                        IPV6_TO_BLE_MESH_LIST_TAG
+                                        );
+    if (!deviceContext->meshListHead)
+    {
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto Exit;
+    }
     InitializeListHead(deviceContext->meshListHead);
 
     // Initialize the list booleans
@@ -317,22 +343,25 @@ Return Value:
 
 --*/
 {
-    UNREFERENCED_PARAMETER(Object);
-
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Entry");
+
+    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
+                                                    Object
+                                                );
 
 #ifdef BORDER_ROUTER
 
 	// Clean up the runtime lists
-	IPv6ToBleRuntimeListDestroyWhiteList();
-	IPv6ToBleRuntimeListDestroyMeshList();
+	IPv6ToBleRuntimeListPurgeWhiteList();
+    ExFreePoolWithTag(deviceContext->whiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
+
+	IPv6ToBleRuntimeListPurgeMeshList();
+    ExFreePoolWithTag(deviceContext->meshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
 
 #endif  // BORDER_ROUTER
 
 	// Clean up the NDIS memory pool data structure in the device context
-	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-		                                            globalWdfDeviceObject
-	                                            );
+	
 	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");

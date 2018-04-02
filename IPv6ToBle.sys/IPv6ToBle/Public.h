@@ -92,19 +92,19 @@ Environment:
 #define IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8087, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
-// Eighth IOCTL: Destroy the white list, both runtime list and registry.
+// Eighth IOCTL: Purge the white list, both runtime list and registry.
 // 
 // Used on the border router device.
 //
 // Sent by the provisioning manager app.
 //
-#define IOCTL_IPV6_TO_BLE_DESTROY_WHITE_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8088, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8088, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 //
-// Ninth IOCTL: Destroy the mesh list, both runtime list and registry.
+// Ninth IOCTL: Purge the mesh list, both runtime list and registry.
 // 
 // Used on the border router device.
 //
 // Sent by the provisioning manager app.
 //
-#define IOCTL_IPV6_TO_BLE_DESTROY_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8089, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8089, METHOD_BUFFERED, FILE_ANY_ACCESS)

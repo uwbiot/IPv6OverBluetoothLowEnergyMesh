@@ -52,7 +52,7 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NDIS, "%!FUNC! Entry");
 
 
-	NT_ASSERT(ndisPoolData);
+	//NT_ASSERT(ndisPoolData);
 
 	NTSTATUS status = STATUS_SUCCESS;
 
