@@ -67,6 +67,8 @@ EXTERN_C_END
 // Other defines, including memory pool tags (which are read in reverse)
 //-----------------------------------------------------------------------------
 
+#define WPP_DEBUG KdPrint   // For sending trace output to the debugger
+
 #define IPV6_ADDRESS_LENGTH 16
 
 #define IPV6_TO_BLE_NDIS_TAG		(UINT32)'TNBI'	// 'Ipv6 Ble Ndis Tag'
