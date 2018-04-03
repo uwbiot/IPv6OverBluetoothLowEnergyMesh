@@ -186,21 +186,21 @@ Return Value:
     //
     if (!IsListEmpty(deviceContext->meshListHead))
     {
-        if (deviceContext->calloutsRegistered)
+        if (globalCalloutsRegistered)
         {
             IPv6ToBleCalloutsUnregister();
             status = IPv6ToBleCalloutsRegister();
-            if (NT_SUCCESS(status))
+            if (!NT_SUCCESS(status))
             {
-                deviceContext->calloutsRegistered = TRUE;
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
         }
         else
         {
             status = IPv6ToBleCalloutsRegister();
-            if (NT_SUCCESS(status))
+            if (!NT_SUCCESS(status))
             {
-                deviceContext->calloutsRegistered = TRUE;
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
         }
     }
@@ -376,13 +376,13 @@ Return Value:
     //
     if (!IsListEmpty(deviceContext->whiteListHead))
     {
-        if (deviceContext->calloutsRegistered) 
+        if (globalCalloutsRegistered) 
         {
             IPv6ToBleCalloutsUnregister();
             status = IPv6ToBleCalloutsRegister();
             if (NT_SUCCESS(status))
             {
-                deviceContext->calloutsRegistered = TRUE;
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
         }
         else
@@ -390,7 +390,7 @@ Return Value:
             status = IPv6ToBleCalloutsRegister();
             if (NT_SUCCESS(status))
             {
-                deviceContext->calloutsRegistered = TRUE;
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
         }        
     }    
@@ -535,11 +535,9 @@ Return Value:
     // If the white list is now empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the mesh list.
     //
-    if (IsListEmpty(deviceContext->whiteListHead) && 
-        deviceContext->calloutsRegistered)
+    if (IsListEmpty(deviceContext->whiteListHead) && globalCalloutsRegistered)
     {
         IPv6ToBleCalloutsUnregister();
-        deviceContext->calloutsRegistered = FALSE;
     }
 
 Exit:
@@ -682,11 +680,9 @@ Return Value:
     // If the mesh list is now empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the white list.
     //
-    if (IsListEmpty(deviceContext->meshListHead) &&
-        deviceContext->calloutsRegistered)
+    if (IsListEmpty(deviceContext->meshListHead) && globalCalloutsRegistered)        
     {
         IPv6ToBleCalloutsUnregister();
-        deviceContext->calloutsRegistered = FALSE;
     }
 
 Exit:

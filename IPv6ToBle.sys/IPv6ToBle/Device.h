@@ -57,9 +57,7 @@ typedef struct _IPV6_TO_BLE_DEVICE_CONTEXT
     NDIS_POOL_DATA* ndisPoolData;	// NDIS memory pools (see Helpers_NDIS.h) 
 
 	PLIST_ENTRY	whiteListHead;		// Head of the white list
-	PLIST_ENTRY	meshListHead;		// Head of the mesh list
-    
-    BOOLEAN calloutsRegistered;     // Tracker for whether callouts registered
+	PLIST_ENTRY	meshListHead;		// Head of the mesh list   
 
     BOOLEAN whiteListModified;      // Tracker for whether white list changed
     BOOLEAN meshListModified;       // Tracker for whether mesh list changed

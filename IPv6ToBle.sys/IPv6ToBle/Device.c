@@ -206,9 +206,6 @@ Return Value:
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
-    // Set that callouts are not registered yet
-    deviceContext->calloutsRegistered = FALSE;
-
     //
     // Initialize the list heads
     //
@@ -363,8 +360,7 @@ Return Value:
 
 #endif  // BORDER_ROUTER
 
-	// Clean up the NDIS memory pool data structure in the device context
-	
+	// Clean up the NDIS memory pool data structure in the device context	
 	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");

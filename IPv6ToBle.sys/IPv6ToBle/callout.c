@@ -910,6 +910,10 @@ Exit:
             globalFilterEngineHandle = NULL;
         }
     }
+    else
+    {
+        globalCalloutsRegistered = TRUE;
+    }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
 
@@ -1255,6 +1259,8 @@ Return Value:
 
 --*/
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
+
     NTSTATUS status = STATUS_SUCCESS;
 
     // Node devices only filter outbound, so ignore direction flag
@@ -1428,23 +1434,49 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Entry");
 
+    NTSTATUS status = STATUS_SUCCESS;
+
+    //
+    // Step 1
     // Close the handle to the filter engine, which removes filters and other
     // objects added during the session since we created a dynamic session
+    //
     if (globalFilterEngineHandle)
     {
-        FwpmEngineClose0(globalFilterEngineHandle);
+        status = FwpmEngineClose0(globalFilterEngineHandle);
+        if (!NT_SUCCESS(status))
+        {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Closing the filter engine failed %!STATUS!", status);
+        }
         globalFilterEngineHandle = NULL;
     }
 
-    // Unregister the callout
-
+    //
+    // Step 2
+    // Unregister the callouts. We don't check status here partially because
+    // the samples don't, but also because this function must return VOID.
+    // Log the error if they do fail.
+    //
+    if (globalCalloutsRegistered)
+    {
 #ifdef BORDER_ROUTER
 
-    FwpsCalloutUnregisterById0(inboundIpPacketV6CalloutId);
+        status = FwpsCalloutUnregisterById0(inboundIpPacketV6CalloutId);
+        if (!NT_SUCCESS(status))
+        {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the inbound IPv6 packet callout failed %!STATUS!", status);
+        }
 
 #endif  // BORDER_ROUTER
 
-    FwpsCalloutUnregisterById0(outboundIpPacketV6CalloutId);
+        status = FwpsCalloutUnregisterById0(outboundIpPacketV6CalloutId);
+        if (!NT_SUCCESS(status))
+        {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the outbound IPv6 packet callout failed %!STATUS!", status);
+        }
+
+        globalCalloutsRegistered = FALSE;
+    }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
 }

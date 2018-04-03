@@ -44,6 +44,7 @@ WDFKEY globalMeshListKey;		    // Key of mesh list, child of parametersKey
 UINT32 inboundIpPacketV6CalloutId;  // Runtime IT, inbound IP packet v6 callout
 UINT32 outboundIpPacketV6CalloutId; // Runtime ID,outbound IP packet v6 callout
 
+BOOLEAN globalCalloutsRegistered;         // Tracker for whether callouts registered
 
 HANDLE globalFilterEngineHandle;	    // Handle to the WFP filter engine
 HANDLE globalInjectionHandleNetwork;    // Handle for injecting packets

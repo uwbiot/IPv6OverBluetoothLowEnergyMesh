@@ -61,12 +61,16 @@ Return Value:
 
     // Initialize WPP Tracing
     WPP_INIT_TRACING(DriverObject, RegistryPath);
+
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
 	//
 	// Step 1
 	// Prepare for driver object creation
 	//
+
+    // Set the global callouts registered variable to FALSE to start
+    globalCalloutsRegistered = FALSE;
 
 	// Initialize the driver config structure. Second parameter is does not
 	// have a pointer to a device add callback because there is no device add 
@@ -234,17 +238,6 @@ Return Value:
         goto Exit;
     }
 
-#ifdef BORDER_ROUTER
-
-    // Set that callouts are registered. On the gateway device, they may or
-    // may not be registered, depending on the state of the white list and
-    // mesh list. On the IoT core devices, the callouts are always registered.
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-    deviceContext->calloutsRegistered = TRUE;
-
-#endif  // BORDER_ROUTER
 
 Exit:
 
