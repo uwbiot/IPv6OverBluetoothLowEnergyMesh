@@ -124,10 +124,7 @@ Return Value:
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Device creation failed %!STATUS!", status);
 		WdfDeviceInitFree(deviceInit);
 		goto Exit;
-	}
-
-	// Finish initializing the control device object
-	WdfControlFinishInitializing(globalWdfDeviceObject);	
+	}		
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
@@ -313,6 +310,12 @@ Return Value:
     WdfTimerStart(deviceContext->registryTimer, WDF_REL_TIMEOUT_IN_MS(5000));
 
 #endif  // BORDER_ROUTER
+
+    //
+    // Step 7
+    // Finish initializing the control device object
+    //
+    WdfControlFinishInitializing(globalWdfDeviceObject);
 
 Exit:	
 
