@@ -730,10 +730,10 @@ Return Value:
         entry = RemoveHeadList(deviceContext->whiteListHead);   // remove from list
         entry = 0;
         ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG); // free memory
-        whiteListEntry = 0;  // free pointer
-
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Exit");
+        whiteListEntry = 0;  // free pointer        
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Exit");
 }
 
 _Use_decl_annotations_
@@ -761,8 +761,8 @@ Return Value:
 
     // Get the device context
     PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        globalWdfDeviceObject
-    );
+                                                    globalWdfDeviceObject
+                                                );
 
     // Clean up the linked list
     while (!IsListEmpty(deviceContext->meshListHead))
