@@ -237,7 +237,7 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NDIS, "%!FUNC! Entry");
 
-	NT_ASSERT(ndisPoolData);
+	//NT_ASSERT(ndisPoolData);
 
 	if (ndisPoolData)
 	{
@@ -282,7 +282,7 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NDIS, "%!FUNC! Entry");
 
-	NT_ASSERT(ndisPoolData);
+	//NT_ASSERT(ndisPoolData);
 
 	if (ndisPoolData->ndisHandle)
 	{

@@ -69,7 +69,7 @@ Return Value:
 											);
 
 	// Set the device cleanup callback for when the device is unloaded
-	deviceAttributes.EvtCleanupCallback = IPv6ToBleEvtDeviceCleanup;
+	deviceAttributes.EvtCleanupCallback = IPv6ToBleEvtDeviceContextCleanup;
 
 	// Allocate the device initialization structure
 	deviceInit = WdfControlDeviceInitAllocate(Driver,
@@ -323,7 +323,7 @@ Exit:
 
 _Use_decl_annotations_
 VOID
-IPv6ToBleEvtDeviceCleanup(
+IPv6ToBleEvtDeviceContextCleanup(
 	WDFOBJECT Object
 )
 /*++
@@ -332,6 +332,10 @@ Routine Description:
 
 	Routine called to free any memory allocated in the device's context space.
 	This is called when the device is unloaded.
+
+    This is the very last function to be called when the driver unloads, even
+    after the parent driver object's DriverUnload routine. Therefore, we must
+    stop WPP tracing here.
 
 Arguments:
 
@@ -351,19 +355,34 @@ Return Value:
 
 #ifdef BORDER_ROUTER
 
+    //
+    // Step 1
 	// Clean up the runtime lists
+    //
 	IPv6ToBleRuntimeListPurgeWhiteList();
-    ExFreePoolWithTag(deviceContext->whiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
-
+    if (deviceContext->whiteListHead)
+    {
+        ExFreePoolWithTag(deviceContext->whiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
+    }
+    
 	IPv6ToBleRuntimeListPurgeMeshList();
-    ExFreePoolWithTag(deviceContext->meshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
+    if (deviceContext->meshListHead)
+    {
+        ExFreePoolWithTag(deviceContext->meshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
+    }    
 
 #endif  // BORDER_ROUTER
 
+    //
+    // Step 2
 	// Clean up the NDIS memory pool data structure in the device context	
+    //
 	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");
+
+    // Stop WPP Tracing
+    WPP_CLEANUP(globalWdmDeviceObject);
 }
 
 _Use_decl_annotations_

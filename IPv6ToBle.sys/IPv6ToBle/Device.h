@@ -97,7 +97,7 @@ IPv6ToBleControlDeviceCreate(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-EVT_WDF_DEVICE_CONTEXT_CLEANUP IPv6ToBleEvtDeviceCleanup;
+EVT_WDF_DEVICE_CONTEXT_CLEANUP IPv6ToBleEvtDeviceContextCleanup;
 
 //-----------------------------------------------------------------------------
 // Timer event callback function to flush the runtime lists to the registry

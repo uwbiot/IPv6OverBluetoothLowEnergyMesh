@@ -276,6 +276,9 @@ Routine Description:
 	the callouts they registered with the filter engine are unregistered
 	before the system unloads the driver's memory.
 
+    This function is called to clean up the driver object BEFORE the driver
+    object's child device object performs its own context cleanup.
+
 Arguments:
 
 	Driver - the driver's driver object.
@@ -302,8 +305,5 @@ Return Value:
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Destroying the injection handle failed %!STATUS!", status);
     }
 
-	TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
-
-    // Stop WPP Tracing
-    WPP_CLEANUP(WdfDriverWdmGetDriverObject(Driver));
+	TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");    
 }
