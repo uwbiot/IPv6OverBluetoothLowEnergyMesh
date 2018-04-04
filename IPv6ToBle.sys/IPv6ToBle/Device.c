@@ -71,9 +71,17 @@ Return Value:
 	// Set the device cleanup callback for when the device is unloaded
 	deviceAttributes.EvtCleanupCallback = IPv6ToBleEvtDeviceContextCleanup;
 
-	// Allocate the device initialization structure
+	// Allocate the device initialization structure with a security descriptor.
+    // This security descriptor grants GENERIC_ALL permissions to SYSTEM, the
+    // built-in administrator account, authenticated users, and appcontainer
+    // applications. See wdmsec.h for details.
+    DECLARE_CONST_UNICODE_STRING(IPV6_TO_BLE_PROTECTION,
+                                 L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;AU)(A;;GA;;;AC)"
+                                 );
+
+
 	deviceInit = WdfControlDeviceInitAllocate(Driver,
-											  &SDDL_DEVOBJ_KERNEL_ONLY
+											  &IPV6_TO_BLE_PROTECTION
 											  );
 	
 	if (!deviceInit)
@@ -130,14 +138,13 @@ Return Value:
 
 	//
 	// Step 3
-	// Make the device accessible to usermode apps
+	// Make the device accessible to usermode apps with a symbolic link
 	//
 
 	// Define a friendly name for user mode apps to access the device
 	DECLARE_CONST_UNICODE_STRING(userDeviceName, L"\\Global??\\IPv6ToBle");
 
-	// Create a symbolic link to the created device object, as one way that
-	// usermode apps can talk to us
+	// Create a symbolic link to the created device object
 	status = WdfDeviceCreateSymbolicLink(globalWdfDeviceObject, 
 										 &userDeviceName
 										 );

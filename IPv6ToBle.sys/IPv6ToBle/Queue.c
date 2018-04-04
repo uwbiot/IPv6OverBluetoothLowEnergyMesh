@@ -261,8 +261,10 @@ Return Value:
 			// If successful in forwarding the request to the listening
 			// queue, return here with the request pending and **do not break
 			// or fall through**
-			return;
 
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "Successfully pended the listening request.\n");
+
+			return;
 		}
 
         //
