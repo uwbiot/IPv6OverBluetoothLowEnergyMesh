@@ -535,9 +535,25 @@ Return Value:
     // If the white list is now empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the mesh list.
     //
-    if (IsListEmpty(deviceContext->whiteListHead) && globalCalloutsRegistered)
+    if (IsListEmpty(deviceContext->whiteListHead))
     {
-        IPv6ToBleCalloutsUnregister();
+        // Unregister the callouts
+        if (globalCalloutsRegistered)
+        {
+            IPv6ToBleCalloutsUnregister();
+        }
+
+        // Remove the mesh list registry key since the list is now empty
+        status = IPv6ToBleRegistryOpenWhiteListKey();
+        if (!NT_SUCCESS(status))
+        {
+            goto Exit;
+        }
+        status = WdfRegistryRemoveKey(globalWhiteListKey);
+        if (!NT_SUCCESS(status))
+        {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
+        }
     }
 
 Exit:
@@ -680,9 +696,25 @@ Return Value:
     // If the mesh list is now empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the white list.
     //
-    if (IsListEmpty(deviceContext->meshListHead) && globalCalloutsRegistered)        
+    if (IsListEmpty(deviceContext->meshListHead))        
     {
-        IPv6ToBleCalloutsUnregister();
+        // Unregister the callouts
+        if (globalCalloutsRegistered)
+        {
+            IPv6ToBleCalloutsUnregister();
+        }
+
+        // Remove the mesh list registry key since the list is now empty
+        status = IPv6ToBleRegistryOpenMeshListKey();
+        if (!NT_SUCCESS(status))
+        {
+            goto Exit;
+        }
+        status = WdfRegistryRemoveKey(globalMeshListKey);
+        if (!NT_SUCCESS(status))
+        {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
+        }        
     }
 
 Exit:

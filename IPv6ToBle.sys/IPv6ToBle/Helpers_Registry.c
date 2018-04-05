@@ -396,10 +396,10 @@ Return Value:
 	// Query the white list key. Fails first time driver is installed or if the
 	// user purged the list and rebooted because the key exists but is empty.
 	status = WdfRegistryQueryMultiString(globalMeshListKey,
-		&meshListValueName,
-		&addressStringsAttributes,
-		meshListAddresses
-	);
+		                                 &meshListValueName,
+		                                 &addressStringsAttributes,
+		                                 meshListAddresses
+	                                     );
 	if (!NT_SUCCESS(status))
 	{
 		// If the key is empty, status will be STATUS_RESOURCE_DATA_NOT_FOUND.
@@ -536,9 +536,7 @@ Return Value:
     //
     // Step 2
     // Open the key
-    //
-
-    
+    //    
     status = IPv6ToBleRegistryOpenWhiteListKey();
     if (!NT_SUCCESS(status))
     {

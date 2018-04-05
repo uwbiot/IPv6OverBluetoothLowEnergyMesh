@@ -402,7 +402,7 @@ Return Value:
             status = WdfRegistryRemoveKey(globalWhiteListKey);
             if (!NT_SUCCESS(status))
             {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed %!STATUS!", status);
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
             }
             break;
         }
@@ -431,7 +431,7 @@ Return Value:
             status = WdfRegistryRemoveKey(globalMeshListKey);
             if (!NT_SUCCESS(status))
             {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed %!STATUS!", status);
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
             }
             break;
         }
