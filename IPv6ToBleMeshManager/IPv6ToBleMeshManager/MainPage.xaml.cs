@@ -34,20 +34,28 @@ namespace IPv6ToBleMeshManager
             this.InitializeComponent();
         }
 
+        /// <summary>
+        /// Displays an error dialog since UI apps don't have console access.
+        /// Uses asynchronous dispatching to update the app's GUI
+        /// </summary>
+        /// <param name="errorText"></param>
         private async void DisplayErrorDialog(string errorText)
         {
-            ContentDialog errorDialog = new ContentDialog()
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
             {
-                Title = "You broked it!",
-                Content = errorText,
-                CloseButtonText = "OK"
-            };
+                ContentDialog errorDialog = new ContentDialog()
+                {
+                    Title = "You broked it!",
+                    Content = errorText,
+                    CloseButtonText = "OK"
+                };
 
-            await errorDialog.ShowAsync();
+                await errorDialog.ShowAsync();
+            });
         }
 
         /// <summary>
-        /// Sends the IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 to the driver.
+        /// Sends IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 to the driver.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -194,6 +202,261 @@ namespace IPv6ToBleMeshManager
         {
             Overlapped.Unpack(nativeOverlapped);
             Overlapped.Free(nativeOverlapped);
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 to the driver.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_2_Inject_Inbound_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,                                          // synchronous
+                IntPtr.Zero
+            );
+
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the given packet to the driver
+            //
+
+            // TODO: in the packet processing app, receive a packet and send it
+            // to the driver for inbound injection
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_INJECT_OUTBOUND_NETWORK_V6 to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_3_Inject_Outbound_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,                                          // synchronous
+                IntPtr.Zero
+            );
+
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the given packet to the driver
+            //
+
+            // TODO: in the packet processing app, receive a packet and send it
+            // to the driver for outbound injection
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_4_Add_To_White_List_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,  // synchronous
+                IntPtr.Zero
+            );
+
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the supplied IPv6 address for the white list to the driver
+            // to add it to the list
+            //
+
+            // Hard-coded for testing, would normally acquire from an
+            // authenticated service or other source
+            String whiteListAddress = "fe80::71c4:225:d048:9476%11";
+            int bytesReturned = 0;
+
+            // Send the IOCTL
+            bool result = IPv6ToBleDriverInterface.DeviceIoControl(
+                                    driverHandle,
+                                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST,
+                                    whiteListAddress,
+                                    sizeof(char) * whiteListAddress.Length,
+                                    "",
+                                    0,
+                                    out bytesReturned, // Not returning bytes
+                                    null
+                                    );
+            if (!result)
+            {
+                int error = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Adding to white list failed with this" +
+                                    "error code: " + error.ToString());
+            }
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_5_Remove_From_White_List_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,  // synchronous
+                IntPtr.Zero
+            );
+
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the supplied IPv6 address for the white list to the driver
+            //
+
+            // Hard-coded for testing, would normally acquire from an
+            // authenticated service or other source
+            String whiteListAddress = "fe80::71c4:225:d048:9476%11";
+            int bytesReturned = 0;
+
+            // Send the IOCTL
+            bool result = IPv6ToBleDriverInterface.DeviceIoControl(
+                                    driverHandle,
+                                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST,
+                                    whiteListAddress,
+                                    sizeof(char) * whiteListAddress.Length,
+                                    "",
+                                    0,
+                                    out bytesReturned, // Not returning bytes
+                                    null
+                                    );
+            if (!result)
+            {
+                int error = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Adding to white list failed with this" +
+                                    "error code: " + error.ToString());
+            }
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_6_Add_To_Mesh_List_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_7_Remove_From_Mesh_List_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_8_Purge_White_List_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        /// <summary>
+        /// Sends IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST to the driver
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private unsafe void Button_9_Purge_Mesh_List_Click(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }
