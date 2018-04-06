@@ -109,9 +109,9 @@ Return Value:
                                                                 );
             // Compare the memory (byte arrays). Bug checks if memory isn't
             // resident with: page fault in nonpaged area.
-            if (RtlCompareMemory(whiteListEntry->ipv6Address,
-                &ipv6AddressStorage.u.Byte[0],
-                IPV6_ADDRESS_LENGTH))
+            if (RtlCompareMemory(&whiteListEntry->ipv6Address,
+                                 &ipv6AddressStorage.u.Byte[0],
+                                 IPV6_ADDRESS_LENGTH))
             {
                 // Found it            
                 status = STATUS_INVALID_PARAMETER;
@@ -127,8 +127,6 @@ Return Value:
     // Step 5
     // Assuming it is not a duplicate, add the entry to the list
     //
-    // Using non-paged pool because the list may be accessed at
-    // IRQL = DISPATCH_LEVEL
     PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
                                                 NonPagedPoolNx,
                                                 sizeof(WHITE_LIST_ENTRY),
@@ -140,25 +138,6 @@ Return Value:
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "New white list entry allocation failed %!STATUS!", status);
         goto Exit;
     }
-
-    // Finish setting up the entry
-    RtlZeroMemory(newWhiteListEntry, sizeof(WHITE_LIST_ENTRY));
-    PLIST_ENTRY newListEntry = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
-                                                                  sizeof(LIST_ENTRY),
-                                                                  IPV6_TO_BLE_WHITE_LIST_TAG
-                                                                  );
-    if (!newListEntry)
-    {
-        if (newWhiteListEntry)
-        {
-            ExFreePoolWithTag(newWhiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
-        }
-        status = STATUS_INSUFFICIENT_RESOURCES;        
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "LIST_ENTRY allocation failed for new white list entry %!STATUS!", status);
-        goto Exit;
-    }
-
-    newWhiteListEntry->listEntry = *newListEntry;
 
     // Add the entry to the list
     InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);
@@ -333,10 +312,10 @@ Return Value:
     // Using non-paged pool because the list may be accessed at
     // IRQL = DISPATCH_LEVEL
     PMESH_LIST_ENTRY newEntry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-        NonPagedPoolNx,
-        sizeof(MESH_LIST_ENTRY),
-        IPV6_TO_BLE_MESH_LIST_TAG
-    );
+                                    NonPagedPoolNx,
+                                    sizeof(MESH_LIST_ENTRY),
+                                    IPV6_TO_BLE_MESH_LIST_TAG
+                                );
     if (!newEntry)
     {
         status = STATUS_INSUFFICIENT_RESOURCES;
@@ -498,38 +477,35 @@ Return Value:
 
     NT_ASSERT(entry);
 
-    if (!IsListEmpty(gWhiteListHead))
+    while (entry != gWhiteListHead)
     {
-        while (entry != gWhiteListHead)
+        PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
+                                                            WHITE_LIST_ENTRY,
+                                                            listEntry
+                                                            );
+        // Compare the memory (byte arrays)        
+        if (RtlCompareMemory(&whiteListEntry->ipv6Address,
+                             &ipv6AddressStorage.u.Byte[0],
+                             IPV6_ADDRESS_LENGTH))
         {
-            PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
-                                                                WHITE_LIST_ENTRY,
-                                                                listEntry
-                                                                );
-            // Compare the memory (byte arrays)        
-            if (RtlCompareMemory(whiteListEntry->ipv6Address,
-                (UINT8*)&ipv6AddressStorage.u.Byte[0],
-                IPV6_ADDRESS_LENGTH))
+            // Found it, now remove it
+            isInList = TRUE;
+            BOOLEAN removed = RemoveEntryList(entry);
+            if (!removed)
             {
-                // Found it, now remove it
-                isInList = TRUE;
-                BOOLEAN removed = RemoveEntryList(entry);
-                if (!removed)
-                {
-                    status = STATUS_UNSUCCESSFUL;
-                    TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list entry from the list failed %!STATUS!", status);
-                    goto Exit;
-                }
-
-                // Free the memory (should be valid if we got to this point)
-                ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
-                whiteListEntry = 0;
-                break;
+                status = STATUS_UNSUCCESSFUL;
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list entry from the list failed %!STATUS!", status);
+                goto Exit;
             }
 
-            entry = entry->Flink;
+            // Free the memory (should be valid if we got to this point)
+            ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
+            whiteListEntry = 0;
+            break;
         }
-    }    
+
+        entry = entry->Flink;
+    }  
 
     //
     // Step 5
@@ -806,12 +782,12 @@ Return Value:
     // Clean up the linked list
     while (!IsListEmpty(gWhiteListHead))
     {
-        PLIST_ENTRY entry = gWhiteListHead->Flink;
+        PLIST_ENTRY entry = RemoveHeadList(gWhiteListHead);   // remove from list
         PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
                                                              WHITE_LIST_ENTRY,
                                                              listEntry
                                                              );
-        entry = RemoveHeadList(gWhiteListHead);   // remove from list
+        
         ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG); // free white list entry memory
         whiteListEntry = 0;       
     }

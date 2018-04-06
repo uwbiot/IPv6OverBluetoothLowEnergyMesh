@@ -303,36 +303,16 @@ Return Value:
 			// Using non-paged pool because the list may be accessed at
             // IRQL = DISPATCH_LEVEL
             PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
-                NonPagedPoolNx,
-                sizeof(WHITE_LIST_ENTRY),
-                IPV6_TO_BLE_WHITE_LIST_TAG
-            );
+                                                      NonPagedPoolNx,
+                                                      sizeof(WHITE_LIST_ENTRY),
+                                                      IPV6_TO_BLE_WHITE_LIST_TAG
+                                                  );
             if (!newWhiteListEntry)
             {
                 status = STATUS_INSUFFICIENT_RESOURCES;
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "New white list entry allocation failed during %!FUNC! with this error code: %!STATUS!", status);
                 goto Exit;
             }
-
-            // Finish setting up the entry
-            RtlZeroMemory(newWhiteListEntry, sizeof(WHITE_LIST_ENTRY));
-            PLIST_ENTRY newListEntry = (PLIST_ENTRY)ExAllocatePoolWithTag(
-                                            NonPagedPoolNx,
-                                            sizeof(LIST_ENTRY),
-                                            IPV6_TO_BLE_WHITE_LIST_TAG
-                                        );
-            if (!newListEntry)
-            {
-                if (newWhiteListEntry)
-                {
-                    ExFreePoolWithTag(newWhiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
-                }
-                status = STATUS_INSUFFICIENT_RESOURCES;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "LIST_ENTRY allocation failed for new white list entry %!STATUS!", status);
-                goto Exit;
-            }
-
-            newWhiteListEntry->listEntry = *newListEntry;
 
             // Add the entry to the list
             InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);

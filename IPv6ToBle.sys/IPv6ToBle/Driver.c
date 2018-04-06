@@ -121,10 +121,7 @@ Return Value:
 	{
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "WdfDeviceCreate failed %!STATUS!", status);
 		goto Exit;
-	}
-
-    // Get the associated WDM device object, for registering the callouts
-    gWdmDeviceObject = WdfDeviceWdmGetDeviceObject(gWdfDeviceObject);
+	}    
 
     //
     // Step 5
@@ -138,6 +135,26 @@ Return Value:
 
     //
     // Step 6
+    // Finish initializing the control device object
+    //
+    WdfControlFinishInitializing(gWdfDeviceObject);
+
+    // Get the associated WDM device object, for registering the callouts and
+    // other functions that take the underlying WDM device object as a param
+    gWdmDeviceObject = WdfDeviceWdmGetDeviceObject(gWdfDeviceObject);
+
+    //
+    // Step 7
+    // Initialize and start the periodic timer
+    //
+    status = IPv6ToBleDriverInitTimer();
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
+
+    //
+    // Step 8
     // Create the injection handle for packet injection. We do that here
     // because, on the border router device, we may not register callouts right away
     // if loading lists from the registry fails. But we still want to create
@@ -155,7 +172,7 @@ Return Value:
     }
 
 	//
-	// Step 7
+	// Step 9
 	// Populate the device context with runtime information about the white 
     // list and mesh list if applicable. These function calls open and close
     // the registry keys as needed.
@@ -206,7 +223,7 @@ Return Value:
 #endif  // BORDER_ROUTER
 
 	//
-	// Step 8
+	// Step 10
 	// Register the callout and filter. 
     //
     // BORDER_ROUTER device
@@ -339,19 +356,27 @@ Return Value:
     //
 
     // White list head
-    /*gWhiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(
-        NonPagedPoolNx,
-        sizeof(LIST_ENTRY),
-        IPV6_TO_BLE_WHITE_LIST_TAG
-    );
+    gWhiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
+                                                        sizeof(LIST_ENTRY),
+                                                        IPV6_TO_BLE_WHITE_LIST_TAG
+                                                        );
     if (!gWhiteListHead)
     {
         status = STATUS_INSUFFICIENT_RESOURCES;
         goto Exit;
-    }*/
+    }
     InitializeListHead(gWhiteListHead);
 
     // Mesh list head
+    gMeshListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
+                                                        sizeof(LIST_ENTRY),
+                                                        IPV6_TO_BLE_WHITE_LIST_TAG
+                                                        );
+    if (!gMeshListHead)
+    {
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto Exit;
+    }
     InitializeListHead(gMeshListHead);
 
     //
@@ -373,20 +398,39 @@ Return Value:
     if (!NT_SUCCESS(status) && gNdisPoolData != NULL)
     {
         IPv6ToBleNDISPoolDataDestroy(gNdisPoolData);
-        goto Exit;
     }
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
-    //
-    // Step 5
-    // Initialize the timer object for flushing the runtime lists to the
-    // registry periodically (if they've changed)
-    //
-    // Note: this only applies on the border router device.
-    //
+Exit:
+    
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 
-#ifdef BORDER_ROUTER
+    return status;
+}
+
+_Use_decl_annotations_
+NTSTATUS
+IPv6ToBleDriverInitTimer()
+/*++
+Routine Description:
+
+    Initializes and starts the periodic timer object.
+
+Arguments:
+
+    None. Accesses the global timer variable.
+
+Return Value:
+
+    STATUS_SUCCESS if the operation was successful; appropriate NTSTATUS error
+    code otherwise.
+
+--*/
+{
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    NTSTATUS status = STATUS_SUCCESS;
 
     WDF_TIMER_CONFIG timerConfig;
     WDF_OBJECT_ATTRIBUTES timerAttributes;
@@ -394,9 +438,9 @@ Return Value:
     // Initialize the timer configuration object with the timer event callback
     // and a period of 5 seconds (5000 milliseconds)
     WDF_TIMER_CONFIG_INIT_PERIODIC(&timerConfig,
-                                  IPv6ToBleTimerCheckAndFlushLists,
-                                  5000
-                                  );
+                                   IPv6ToBleTimerCheckAndFlushLists,
+                                   5000
+                                   );
 
     // Set the framework to automatically synchronize this with callbacks under
     // the parent object (the device), at least at DISPATCH_LEVEL
@@ -420,14 +464,13 @@ Return Value:
     // Start the timer
     WdfTimerStart(gRegistryTimer, WDF_REL_TIMEOUT_IN_MS(5000));
 
-#endif  // BORDER_ROUTER
-
 Exit:
-    
+
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 
     return status;
 }
+
 
 _Use_decl_annotations_
 VOID
@@ -481,8 +524,16 @@ Return Value:
     // Clean up the runtime lists
     //
     IPv6ToBleRuntimeListPurgeWhiteList();
+    if (gWhiteListHead)
+    {
+        ExFreePoolWithTag(gWhiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
+    }
 
     IPv6ToBleRuntimeListPurgeMeshList();
+    if (gMeshListHead)
+    {
+        ExFreePoolWithTag(gMeshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
+    }
 
 #endif  // BORDER_ROUTER
 
@@ -506,31 +557,31 @@ IPv6ToBleTimerCheckAndFlushLists(
 /*++
 Routine Description:
 
-The framework calls this timer function every 5  seconds to check if the
-runtime lists have changed. If they have, flush the runtime lists to the
-registry.
+    The framework calls this timer function every 5  seconds to check if the
+    runtime lists have changed. If they have, flush the runtime lists to the
+    registry.
 
-This behavior is to prevent loss of state; the driver generally works with
-the runtime lists so it doesn't have to open and close the registry keys
-all the time, but if the lists are modified during runtime then we need to
-save that state in the registry at some point.
+    This behavior is to prevent loss of state; the driver generally works with
+    the runtime lists so it doesn't have to open and close the registry keys
+    all the time, but if the lists are modified during runtime then we need to
+    save that state in the registry at some point.
 
-Since there is no way to guarantee that you will be able to flush to the
-registry once during device or driver unload, such as an unexpected
-shutdown, the solution is to flush every 5 seconds, and only if the lists
-have been modified. This is not a major load on the system.
+    Since there is no way to guarantee that you will be able to flush to the
+    registry once during device or driver unload, such as an unexpected
+    shutdown, the solution is to flush every 5 seconds, and only if the lists
+    have been modified. This is not a major load on the system.
 
-This function is called at DISPATCH_LEVEL. If the lists have changed, it
-queues a work item to assign the list to the registry at PASSIVE_LEVEL.
+    This function is called at DISPATCH_LEVEL. If the lists have changed, it
+    queues a work item to assign the list to the registry at PASSIVE_LEVEL.
 
 Arguments:
 
-Timer - the WDF timer object created during device creation
+    Timer - the global WDF timer object
 
 Return Value:
 
-None. The two functions called by this callback do return NTSTATUS, so if
-they fail we log the error and continue because this function returns VOID.
+    None. The two functions called by this callback do return NTSTATUS, so if
+    they fail we log the error and continue because this function returns VOID.
 
 --*/
 {

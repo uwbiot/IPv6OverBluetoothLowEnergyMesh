@@ -145,12 +145,6 @@ Return Value:
 		goto Exit;
 	}
 
-    //
-    // Step 4
-    // Finish initializing the control device object
-    //
-    WdfControlFinishInitializing(gWdfDeviceObject);
-
 Exit:	
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");
