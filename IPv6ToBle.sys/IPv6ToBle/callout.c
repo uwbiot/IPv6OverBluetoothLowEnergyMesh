@@ -99,7 +99,7 @@ Return Value:
     KIRQL irql = KeGetCurrentIrql();
 #endif // DBG
     
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+    
     WDFREQUEST outRequest;
     PVOID outputBuffer = 0;
 
@@ -130,7 +130,7 @@ Return Value:
 
     // Check to make sure we don't try to re-inspect packets we inspected
     // earlier; permit and clear the write permissions flag if so
-    packetState = FwpsQueryPacketInjectionState0(globalInjectionHandleNetwork,
+    packetState = FwpsQueryPacketInjectionState0(gInjectionHandleNetwork,
                                                  layerData,
                                                  NULL
                                                  );
@@ -158,9 +158,6 @@ Return Value:
     // If the packet is not intended for a mesh device, permit it as it must
     // be destined for the border router itself.
     //
-
-    // Get the context
-    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
     // Extract the destination address from the IP header by retreating 16
     // bytes (as it is at the end of the IPv6 header)
@@ -196,8 +193,8 @@ Return Value:
                                       );
 
     // Compare each address in the mesh list to the destination address
-    PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
-    while (entry != deviceContext->meshListHead)
+    PLIST_ENTRY entry = gMeshListHead->Flink;
+    while (entry != gMeshListHead)
     {
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
                                                           MESH_LIST_ENTRY,
@@ -240,11 +237,11 @@ Return Value:
     //
 
     // Retrieve a request from the listen request queue
-    WdfSpinLockAcquire(deviceContext->listenRequestQueueLock);
-    status = WdfIoQueueRetrieveNextRequest(deviceContext->listenRequestQueue,
+    WdfSpinLockAcquire(gListenRequestQueueLock);
+    status = WdfIoQueueRetrieveNextRequest(gListenRequestQueue,
                                            &outRequest
                                            );
-    WdfSpinLockRelease(deviceContext->listenRequestQueueLock);
+    WdfSpinLockRelease(gListenRequestQueueLock);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Retrieving request to listen for inbound IPv6 packets failed %!STATUS!", status);
@@ -328,6 +325,13 @@ Exit:
     if (requestRetrieved)
     {
         WdfRequestComplete(outRequest, status);
+    }
+
+    // Free the packet(buffer) now that it's been copied to usermode
+    if (packetForUsermode)
+    {
+        ExFreePoolWithTag(&packetForUsermode, IPV6_TO_BLE_NDIS_TAG);
+        packetForUsermode = 0;
     }
 
     //
@@ -443,7 +447,7 @@ Return Value:
     KIRQL irql = KeGetCurrentIrql();
 #endif // DBG
 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+    
     PVOID outputBuffer = 0;
 
     WDFREQUEST outRequest;
@@ -472,7 +476,7 @@ Return Value:
 
     // Check to make sure we don't try to re-inspect packets we inspected
     // earlier; permit and clear the write permissions flag if so
-    packetState = FwpsQueryPacketInjectionState0(globalInjectionHandleNetwork,
+    packetState = FwpsQueryPacketInjectionState0(gInjectionHandleNetwork,
                                                  layerData,
                                                  NULL
                                                  );
@@ -500,9 +504,6 @@ Return Value:
     // If the packet is not intended for a mesh device, permit it as it must
     // be normal traffic destined elsewhere.
     //
-
-    // Get the device context
-    deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 #ifdef BORDER_ROUTER
 
@@ -543,8 +544,8 @@ Return Value:
     BOOLEAN isInMeshList = FALSE;
 
     // Compare each address in the mesh list to the destination address
-    PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
-    while (entry != deviceContext->meshListHead)
+    PLIST_ENTRY entry = gMeshListHead->Flink;
+    while (entry != gMeshListHead)
     {
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
             MESH_LIST_ENTRY,
@@ -590,11 +591,11 @@ Return Value:
     // Retrieve the output buffer. It should be large enough to hold the MTU of
     // 1280 bytes because the EvtIoControl callback verifies that before even
     // adding the request to the listening queue.    
-    WdfSpinLockAcquire(deviceContext->listenRequestQueueLock);
-    status = WdfIoQueueRetrieveNextRequest(deviceContext->listenRequestQueue,
+    WdfSpinLockAcquire(gListenRequestQueueLock);
+    status = WdfIoQueueRetrieveNextRequest(gListenRequestQueue,
                                            &outRequest
                                            );
-    WdfSpinLockRelease(deviceContext->listenRequestQueueLock);
+    WdfSpinLockRelease(gListenRequestQueueLock);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving request to listen for inbound IPv6 packets failed %!STATUS!", status);
@@ -679,6 +680,13 @@ Exit:
     if (requestRetrieved)
     {
         WdfRequestComplete(outRequest, status);
+    }
+
+    // Free the packet(buffer) now that it has been passed to usermode
+    if (packetForUsermode)
+    {
+        ExFreePoolWithTag(&packetForUsermode, IPV6_TO_BLE_NDIS_TAG);
+        packetForUsermode = 0;
     }
 
     //
@@ -799,7 +807,7 @@ Return Value:
         RPC_C_AUTHN_WINNT,
         NULL,
         &session,
-        &globalFilterEngineHandle
+        &gFilterEngineHandle
     );
     if (!NT_SUCCESS(status))
     {
@@ -812,7 +820,7 @@ Return Value:
     // Step 2
     // Begin the transaction with the filter engine
     //
-    status = FwpmTransactionBegin0(globalFilterEngineHandle, 0);
+    status = FwpmTransactionBegin0(gFilterEngineHandle, 0);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Beginning the transaction with the filter engine failed %!STATUS!", status);
@@ -842,7 +850,7 @@ Return Value:
                                   // implementation.
 
     // Add the sublayer
-    status = FwpmSubLayerAdd0(globalFilterEngineHandle, &ipv6ToBleSublayer, NULL);
+    status = FwpmSubLayerAdd0(gFilterEngineHandle, &ipv6ToBleSublayer, NULL);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Adding the sublayer for callouts failed %!STATUS!", status);
@@ -862,7 +870,7 @@ Return Value:
     status = IPv6ToBleCalloutRegisterInboundIpPacketV6Callout(
         &FWPM_LAYER_INBOUND_IPPACKET_V6,
         &IPV6_TO_BLE_INBOUND_IP_PACKET_V6,
-        &inboundIpPacketV6CalloutId
+        &gInboundIpPacketV6CalloutId
     );
     if (!NT_SUCCESS(status))
     {
@@ -874,7 +882,7 @@ Return Value:
     status = IPv6ToBleCalloutRegisterOutboundIpPacketV6Callout(
         &FWPM_LAYER_OUTBOUND_IPPACKET_V6,
         &IPV6_TO_BLE_OUTBOUND_IP_PACKET_V6,
-        &outboundIpPacketV6CalloutId
+        &gOutboundIpPacketV6CalloutId
     );
     if (!NT_SUCCESS(status))
     {
@@ -885,7 +893,7 @@ Return Value:
     // Step 5
     // Commit the transaction to the filter engine
     //
-    status = FwpmTransactionCommit0(globalFilterEngineHandle);
+    status = FwpmTransactionCommit0(gFilterEngineHandle);
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Committing the transaction to the filter engine failed %!STATUS!", status);
@@ -900,19 +908,19 @@ Exit:
     {
         if (inTransaction)
         {
-            FwpmTransactionAbort0(globalFilterEngineHandle);
-            _Analysis_assume_lock_not_held_(globalFilterEngineHandle); // Potential
+            FwpmTransactionAbort0(gFilterEngineHandle);
+            _Analysis_assume_lock_not_held_(gFilterEngineHandle); // Potential
                                                                  // leak if "FwpmTransactionAbort" fails
         }
         if (engineOpened)
         {
-            FwpmEngineClose0(globalFilterEngineHandle);
-            globalFilterEngineHandle = NULL;
+            FwpmEngineClose0(gFilterEngineHandle);
+            gFilterEngineHandle = NULL;
         }
     }
     else
     {
-        globalCalloutsRegistered = TRUE;
+        gCalloutsRegistered = TRUE;
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
@@ -970,7 +978,7 @@ Return Value:
     servicingCallout.notifyFn = IPv6ToBleCalloutNotifyIpPacket;
 
     // Register the callout
-    status = FwpsCalloutRegister2(globalWdmDeviceObject,
+    status = FwpsCalloutRegister2(gWdmDeviceObject,
                                   &servicingCallout,
                                   calloutId
                                   );
@@ -995,7 +1003,7 @@ Return Value:
     managementCallout.applicableLayer = *layerKey;
 
     // Add the management callout
-    status = FwpmCalloutAdd0(globalFilterEngineHandle,
+    status = FwpmCalloutAdd0(gFilterEngineHandle,
                              &managementCallout,
                              NULL,
                              NULL
@@ -1011,14 +1019,9 @@ Return Value:
     // Add a filter for each entry in the white list
     //
 
-    // Get the context
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-
     // Traverse the list and add a filter for each entry
-    PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
-    while (entry != deviceContext->whiteListHead)
+    PLIST_ENTRY entry = gWhiteListHead->Flink;
+    while (entry != gWhiteListHead)
     {
         PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
                                                              WHITE_LIST_ENTRY,
@@ -1114,7 +1117,7 @@ Return Value:
     servicingCallout.notifyFn = IPv6ToBleCalloutNotifyIpPacket;
 
     // Register the serviding callout callout
-    status = FwpsCalloutRegister2(globalWdmDeviceObject,
+    status = FwpsCalloutRegister2(gWdmDeviceObject,
                                   &servicingCallout,
                                   calloutId
                                   );
@@ -1137,7 +1140,7 @@ Return Value:
     managementCallout.applicableLayer = *layerKey;
 
     // Add the management callout
-    status = FwpmCalloutAdd0(globalFilterEngineHandle,
+    status = FwpmCalloutAdd0(gFilterEngineHandle,
                              &managementCallout,
                              NULL,
                              NULL
@@ -1156,14 +1159,9 @@ Return Value:
 
 #ifdef BORDER_ROUTER
 
-    // Get the context
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-
     // Traverse the list and add a filter for each entry
-    PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
-    while (entry != deviceContext->meshListHead)
+    PLIST_ENTRY entry = gMeshListHead->Flink;
+    while (entry != gMeshListHead)
     {
         PMESH_LIST_ENTRY meshListEntry= CONTAINING_RECORD(entry,
                                                           MESH_LIST_ENTRY,
@@ -1281,13 +1279,9 @@ Return Value:
 
 #ifdef BORDER_ROUTER
 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-
     if (direction == INBOUND)
     {
-        if (IsListEmpty(deviceContext->whiteListHead))
+        if (IsListEmpty(gWhiteListHead))
         {
             TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for inbound IP packet V6 classify failed because the white list was empty %!STATUS!", status);
             status = STATUS_UNSUCCESSFUL;
@@ -1296,7 +1290,7 @@ Return Value:
     }
     else    // OUTBOUND
     {
-        if (IsListEmpty(deviceContext->meshListHead))
+        if (IsListEmpty(gMeshListHead))
         {
             TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for outbound IP packet V6 classify failed because the mesh list was empty %!STATUS!", status);
             status = STATUS_UNSUCCESSFUL;
@@ -1378,7 +1372,7 @@ Return Value:
     // Step 4
     // Add the filter
     //
-    status = FwpmFilterAdd0(globalFilterEngineHandle,
+    status = FwpmFilterAdd0(gFilterEngineHandle,
                             &filter,
                             NULL,
                             NULL
@@ -1441,14 +1435,14 @@ Return Value:
     // Close the handle to the filter engine, which removes filters and other
     // objects added during the session since we created a dynamic session
     //
-    if (globalFilterEngineHandle)
+    if (gFilterEngineHandle)
     {
-        status = FwpmEngineClose0(globalFilterEngineHandle);
+        status = FwpmEngineClose0(gFilterEngineHandle);
         if (!NT_SUCCESS(status))
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Closing the filter engine failed %!STATUS!", status);
         }
-        globalFilterEngineHandle = NULL;
+        gFilterEngineHandle = NULL;
     }
 
     //
@@ -1457,11 +1451,11 @@ Return Value:
     // the samples don't, but also because this function must return VOID.
     // Log the error if they do fail.
     //
-    if (globalCalloutsRegistered)
+    if (gCalloutsRegistered)
     {
 #ifdef BORDER_ROUTER
 
-        status = FwpsCalloutUnregisterById0(inboundIpPacketV6CalloutId);
+        status = FwpsCalloutUnregisterById0(gInboundIpPacketV6CalloutId);
         if (!NT_SUCCESS(status))
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the inbound IPv6 packet callout failed %!STATUS!", status);
@@ -1469,13 +1463,13 @@ Return Value:
 
 #endif  // BORDER_ROUTER
 
-        status = FwpsCalloutUnregisterById0(outboundIpPacketV6CalloutId);
+        status = FwpsCalloutUnregisterById0(gOutboundIpPacketV6CalloutId);
         if (!NT_SUCCESS(status))
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the outbound IPv6 packet callout failed %!STATUS!", status);
         }
 
-        globalCalloutsRegistered = FALSE;
+        gCalloutsRegistered = FALSE;
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");

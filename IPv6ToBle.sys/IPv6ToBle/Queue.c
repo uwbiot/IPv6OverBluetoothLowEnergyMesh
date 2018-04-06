@@ -93,14 +93,8 @@ Return Value:
 	//
 	// Step 2
 	// Configure secondary, manual-dispatch queue for our IOCTL notifications
-	// we'll receive from the usermode app. This queue lives in the driver
-	// context space.
+	// we'll receive from the usermode app. 
 	//
-
-	// Get the device context
-	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-		globalWdfDeviceObject
-	);
 
 	// Configure the queue to manual dispatch and non-power managed
 	WDF_IO_QUEUE_CONFIG_INIT(&queueConfig,
@@ -109,10 +103,10 @@ Return Value:
 	queueConfig.PowerManaged = WdfFalse;
 
 	// Create the manual queue
-	status = WdfIoQueueCreate(globalWdfDeviceObject,
+	status = WdfIoQueueCreate(gWdfDeviceObject,
 							  &queueConfig,
 							  WDF_NO_OBJECT_ATTRIBUTES,
-							  &deviceContext->listenRequestQueue
+							  &gListenRequestQueue
 							  );
     if (!NT_SUCCESS(status))
     {
@@ -191,15 +185,12 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "%!FUNC! Entry");
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "%!FUNC! Queue 0x%p, Request 0x%p OutputBufferLength %d InputBufferLength %d IoControlCode %d", Queue, Request, (int) OutputBufferLength, (int) InputBufferLength, IoControlCode);
 
-	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;
+	
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 #if DBG
     KIRQL irql = KeGetCurrentIrql();
 #endif // DBG
-
-	// Get the device context
-	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
 
 	// Switch based on the IOCTL sent to us by the usermode app(s)
 	switch (IoControlCode)
@@ -244,11 +235,11 @@ Return Value:
             // The spin lock automatically raises this thread to DISPATCH_LEVEL
             // when acquired, blocking other thread interrupts, and lowers it
             // when released.
-            WdfSpinLockAcquire(deviceContext->listenRequestQueueLock);
+            WdfSpinLockAcquire(gListenRequestQueueLock);
 			status = WdfRequestForwardToIoQueue(Request,
-				                                deviceContext->listenRequestQueue
+				                                gListenRequestQueue
 			                                    );
-            WdfSpinLockRelease(deviceContext->listenRequestQueueLock);
+            WdfSpinLockRelease(gListenRequestQueueLock);
 
             NT_ASSERT(irql == KeGetCurrentIrql());
 
@@ -393,16 +384,35 @@ Return Value:
         //
         case IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST:
         {
+            // Purge the runtime list
             IPv6ToBleRuntimeListPurgeWhiteList();
+
+            // Open the parent key
+            BOOLEAN parametersKeyOpened = FALSE;
+            status = IPv6ToBleRegistryOpenParametersKey();
+            if (!NT_SUCCESS(status))
+            {
+                goto PurgeWhiteListError;
+            }
+            parametersKeyOpened = TRUE;
+
+            // Remove the list's registry key
             status = IPv6ToBleRegistryOpenWhiteListKey();
             if (!NT_SUCCESS(status))
             {
-                break;
+                goto PurgeWhiteListError;
             }
-            status = WdfRegistryRemoveKey(globalWhiteListKey);
+            status = WdfRegistryRemoveKey(gWhiteListKey);
             if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
+            }
+
+        PurgeWhiteListError:
+
+            if (parametersKeyOpened)
+            {
+                WdfRegistryClose(gParametersKey);
             }
             break;
         }
@@ -422,16 +432,35 @@ Return Value:
         //
         case IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST:
         {
+            // Purge the runtime list
             IPv6ToBleRuntimeListPurgeMeshList();
+
+            // Open the parent key
+            BOOLEAN parametersKeyOpened = FALSE;
+            status = IPv6ToBleRegistryOpenParametersKey();
+            if (!NT_SUCCESS(status))
+            {
+                goto PurgeMeshListError;
+            }
+            parametersKeyOpened = TRUE;
+
+            // Remove the list's registry key
             status = IPv6ToBleRegistryOpenMeshListKey();
             if (!NT_SUCCESS(status))
             {
-                break;
+                goto PurgeMeshListError;
             }
-            status = WdfRegistryRemoveKey(globalMeshListKey);
+            status = WdfRegistryRemoveKey(gMeshListKey);
             if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
+            }
+
+        PurgeMeshListError:
+
+            if (parametersKeyOpened)
+            {
+                WdfRegistryClose(gParametersKey);
             }
             break;
         }
@@ -526,12 +555,7 @@ Return Value:
     // Step 2
     // Create the NET_BUFFER_LIST from the buffer
     //
-
-    // Get the context so we can retrieve the NDIS NBL pool handle
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-        globalWdfDeviceObject
-    );
-    HANDLE nblPoolHandle = deviceContext->ndisPoolData->nblPoolHandle;
+    HANDLE nblPoolHandle = gNdisPoolData->nblPoolHandle;
 
     // Create the NBL from the usermode packet (buffer)
     NBL = IPv6ToBleNBLCreateFromBuffer(nblPoolHandle,
@@ -549,7 +573,7 @@ Return Value:
     // Step 3
     // Inject the packet into the receive path
     //
-    status = FwpsInjectNetworkReceiveAsync0(globalInjectionHandleNetwork,
+    status = FwpsInjectNetworkReceiveAsync0(gInjectionHandleNetwork,
                                             0,
                                             0,
                                             DEFAULT_COMPARTMENT_ID,
@@ -647,12 +671,7 @@ Return Value:
 	// Step 2
 	// Create the NET_BUFFER_LIST from the buffer
 	//
-
-    // Get the context so we can retrieve the NDIS NBL pool handle
-	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-													globalWdfDeviceObject
-												);
-    HANDLE nblPoolHandle = deviceContext->ndisPoolData->nblPoolHandle;
+    HANDLE nblPoolHandle = gNdisPoolData->nblPoolHandle;
 
     // Create the NBL from the usermode packet (buffer)
 	NBL = IPv6ToBleNBLCreateFromBuffer(nblPoolHandle, 
@@ -670,7 +689,7 @@ Return Value:
 	// Step 3
 	// Inject the packet into the send path
     //
-    status = FwpsInjectNetworkSendAsync0(globalInjectionHandleNetwork,
+    status = FwpsInjectNetworkSendAsync0(gInjectionHandleNetwork,
                                          0,
                                          0,
                                          DEFAULT_COMPARTMENT_ID,

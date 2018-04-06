@@ -18,12 +18,12 @@ Environment:
 #include "device.tmh"   // auto-generated tracing file
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text (PAGE, IPv6ToBleControlDeviceCreate)
+#pragma alloc_text (PAGE, IPv6ToBleDeviceCreate)
 #endif
 
 _Use_decl_annotations_
 NTSTATUS
-IPv6ToBleControlDeviceCreate(
+IPv6ToBleDeviceCreate(
     _In_	WDFDRIVER		Driver
 )
 /*++
@@ -51,10 +51,8 @@ Return Value:
     KIRQL irql = KeGetCurrentIrql();
 #endif // DBG
 
-	// Objects for device creation
-    WDF_OBJECT_ATTRIBUTES deviceAttributes;    
-	PWDFDEVICE_INIT deviceInit;
-	PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext;    
+	// Object for device creation
+	PWDFDEVICE_INIT deviceInit;    
 
 	//
 	// Step 1
@@ -62,14 +60,6 @@ Return Value:
 	//
 
     PAGED_CODE();
-
-	// Initialize the device attributes with the context
-    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&deviceAttributes, 
-											IPV6_TO_BLE_DEVICE_CONTEXT
-											);
-
-	// Set the device cleanup callback for when the device is unloaded
-	deviceAttributes.EvtCleanupCallback = IPv6ToBleEvtDeviceContextCleanup;
 
 	// Allocate the device initialization structure with a security descriptor.
     // This security descriptor grants GENERIC_ALL permissions to SYSTEM, the
@@ -123,8 +113,8 @@ Return Value:
 	// Create the framework device object
 	//
 	status = WdfDeviceCreate(&deviceInit, 
-							 &deviceAttributes,
-							 &globalWdfDeviceObject
+							 WDF_NO_OBJECT_ATTRIBUTES,
+							 &gWdfDeviceObject
 							 );
 	
 	if (!NT_SUCCESS(status)) 
@@ -145,7 +135,7 @@ Return Value:
 	DECLARE_CONST_UNICODE_STRING(userDeviceName, L"\\Global??\\IPv6ToBle");
 
 	// Create a symbolic link to the created device object
-	status = WdfDeviceCreateSymbolicLink(globalWdfDeviceObject, 
+	status = WdfDeviceCreateSymbolicLink(gWdfDeviceObject, 
 										 &userDeviceName
 										 );
 	
@@ -155,338 +145,15 @@ Return Value:
 		goto Exit;
 	}
 
-	//
-	// Step 4
-	// Initialize the device context
-	// 
-
-	// Get the context
-	deviceContext = IPv6ToBleGetContextFromDevice(globalWdfDeviceObject);
-
     //
-    // Initialize the spin locks
-    //
-
-    // Listen request queue spinlock
-    WDF_OBJECT_ATTRIBUTES listenRequestQueueLockAttributes;
-    WDF_OBJECT_ATTRIBUTES_INIT(&listenRequestQueueLockAttributes);
-    listenRequestQueueLockAttributes.ParentObject = globalWdfDeviceObject;
-
-    status = WdfSpinLockCreate(&listenRequestQueueLockAttributes,
-                               &deviceContext->listenRequestQueueLock
-                               );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Creating listen request queue spin lock failed %!STATUS!", status);
-        goto Exit;
-    }
-
-#ifdef BORDER_ROUTER
-
-    // White list spinlock
-    WDF_OBJECT_ATTRIBUTES whiteListModifiedLockAttributes;
-    WDF_OBJECT_ATTRIBUTES_INIT(&whiteListModifiedLockAttributes);
-    whiteListModifiedLockAttributes.ParentObject = globalWdfDeviceObject;
-
-    status = WdfSpinLockCreate(&whiteListModifiedLockAttributes,
-                               &deviceContext->whiteListModifiedLock
-                               );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Creating white list modified spin lock failed %!STATUS!", status);
-        goto Exit;
-    }
-
-    // Mesh list spinlock
-    WDF_OBJECT_ATTRIBUTES meshListModifiedLockAttributes;
-    WDF_OBJECT_ATTRIBUTES_INIT(&meshListModifiedLockAttributes);
-    meshListModifiedLockAttributes.ParentObject = globalWdfDeviceObject;
-
-    status = WdfSpinLockCreate(&meshListModifiedLockAttributes,
-                               &deviceContext->meshListModifiedLock
-                               );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Creating mesh list modified spin lock failed %!STATUS!", status);
-        goto Exit;
-    }
-
-    NT_ASSERT(irql == KeGetCurrentIrql());
-
-    //
-    // Initialize the list heads
-    //
-    
-    // White list head
-    deviceContext->whiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(
-                                        NonPagedPoolNx, 
-                                        sizeof(LIST_ENTRY), 
-                                        IPV6_TO_BLE_WHITE_LIST_TAG
-                                        );
-    if (!deviceContext->whiteListHead)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        goto Exit;
-    }
-    InitializeListHead(deviceContext->whiteListHead);
-
-    // Mesh list head
-    deviceContext->meshListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(
-                                        NonPagedPoolNx,
-                                        sizeof(LIST_ENTRY),
-                                        IPV6_TO_BLE_MESH_LIST_TAG
-                                        );
-    if (!deviceContext->meshListHead)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        goto Exit;
-    }
-    InitializeListHead(deviceContext->meshListHead);
-
-    // Initialize the list booleans
-    deviceContext->whiteListModified = FALSE;
-    deviceContext->meshListModified = FALSE;
-
-#endif  // BORDER_ROUTER
-
-	// Create the NDIS pool data structure, which also populates it
-	status = IPv6ToBleNDISPoolDataCreate(deviceContext->ndisPoolData,
-										 IPV6_TO_BLE_NDIS_TAG
-										 );
-	if (!NT_SUCCESS(status) && deviceContext->ndisPoolData != NULL)
-	{
-		IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
-		goto Exit;
-	}
-
-    NT_ASSERT(irql == KeGetCurrentIrql());
-
-	//
-	// Step 5
-	// Initialize the I/O queues
-	//
-	status = IPv6ToBleQueuesInitialize(globalWdfDeviceObject);
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
-    //
-    // Step 6
-    // Initialize the timer object for flushing the runtime lists to the
-    // registry periodically (if they've changed)
-    //
-    // Note: this only applies on the gateway device.
-    //
-
-#ifdef BORDER_ROUTER
-
-    WDF_TIMER_CONFIG timerConfig;
-    WDF_OBJECT_ATTRIBUTES timerAttributes;
-
-    // Initialize the timer configuration object with the timer event callback
-    // and a period of 5 seconds (5000 milliseconds)
-    WDF_TIMER_CONFIG_INIT_PERIODIC(&timerConfig,
-                                   IPv6ToBleDeviceTimerCheckAndFlushLists,
-                                   5000
-                                   );
-
-    // Set the framework to automatically synchronize this with callbacks under
-    // the parent object (the device), at least at DISPATCH_LEVEL
-    timerConfig.AutomaticSerialization = TRUE;
-
-    // Initialize the timer attributes to make the device object its parent
-    WDF_OBJECT_ATTRIBUTES_INIT(&timerAttributes);
-    timerAttributes.ParentObject = globalWdfDeviceObject;
-
-    // Create the timer
-    status = WdfTimerCreate(&timerConfig, 
-                            &timerAttributes, 
-                            &deviceContext->registryTimer
-                            );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "Timer creation failed failed %!STATUS!", status);
-        goto Exit;
-    }
-
-    // Start the timer
-    WdfTimerStart(deviceContext->registryTimer, WDF_REL_TIMEOUT_IN_MS(5000));
-
-#endif  // BORDER_ROUTER
-
-    //
-    // Step 7
+    // Step 4
     // Finish initializing the control device object
     //
-    WdfControlFinishInitializing(globalWdfDeviceObject);
+    WdfControlFinishInitializing(gWdfDeviceObject);
 
 Exit:	
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");
 
     return status;
-}
-
-_Use_decl_annotations_
-VOID
-IPv6ToBleEvtDeviceContextCleanup(
-	WDFOBJECT Object
-)
-/*++
-
-Routine Description:
-
-	Routine called to free any memory allocated in the device's context space.
-	This is called when the device is unloaded.
-
-    This is the very last function to be called when the driver unloads, even
-    after the parent driver object's DriverUnload routine. Therefore, we must
-    stop WPP tracing here.
-
-Arguments:
-
-	Device - the main WDF control device for this driver.
-
-Return Value:
-
-	None.
-
---*/
-{
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Entry");
-
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    Object
-                                                );
-
-#ifdef BORDER_ROUTER
-
-    //
-    // Step 1
-	// Clean up the runtime lists
-    //
-	IPv6ToBleRuntimeListPurgeWhiteList();
-    if (deviceContext->whiteListHead)
-    {
-        ExFreePoolWithTag(deviceContext->whiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
-    }
-    
-	IPv6ToBleRuntimeListPurgeMeshList();
-    if (deviceContext->meshListHead)
-    {
-        ExFreePoolWithTag(deviceContext->meshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
-    }    
-
-#endif  // BORDER_ROUTER
-
-    //
-    // Step 2
-	// Clean up the NDIS memory pool data structure in the device context	
-    //
-	IPv6ToBleNDISPoolDataDestroy(deviceContext->ndisPoolData);
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit");
-
-    // Stop WPP Tracing
-    WPP_CLEANUP(globalWdmDeviceObject);
-}
-
-_Use_decl_annotations_
-VOID
-IPv6ToBleDeviceTimerCheckAndFlushLists(
-    _In_    WDFTIMER    Timer
-)
-/*++
-Routine Description:
-
-    The framework calls this timer function every 5  seconds to check if the 
-    runtime lists have changed. If they have, flush the runtime lists to the 
-    registry.
-
-    This behavior is to prevent loss of state; the driver generally works with
-    the runtime lists so it doesn't have to open and close the registry keys 
-    all the time, but if the lists are modified during runtime then we need to 
-    save that state in the registry at some point.
-    
-    Since there is no way to guarantee that you will be able to flush to the
-    registry once during device or driver unload, such as an unexpected
-    shutdown, the solution is to flush every 5 seconds, and only if the lists
-    have been modified. This is not a major load on the system.
-
-    This function is called at DISPATCH_LEVEL. If the lists have changed, it
-    queues a work item to assign the list to the registry at PASSIVE_LEVEL.
-
-Arguments:
-
-    Timer - the WDF timer object created during device creation
-
-Return Value:
-
-    None. The two functions called by this callback do return NTSTATUS, so if
-    they fail we log the error and continue because this function returns VOID.
-
---*/
-{
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_TIMER, "%!FUNC! Entry");
-
-    UNREFERENCED_PARAMETER(Timer);
-
-#if DBG
-    KIRQL irql = KeGetCurrentIrql();
-#endif // DBG
-
-    // Get the device context
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-
-    //
-    // Step 1
-    // Flush the white list if it has changed by scheduling a PASSIVE_LEVEL
-    // system worker thread. We use a system worker thread because assigning
-    // the list to the registry is expected to be very infrequent and doesn't
-    // take long to do (no delayed processing, etc.).
-    //
-    WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
-    if (deviceContext->whiteListModified)
-    {
-        PIO_WORKITEM workItem = IoAllocateWorkItem(globalWdmDeviceObject);
-        if (workItem)
-        {
-            IoQueueWorkItemEx(workItem,
-                              IPv6ToBleRegistryFlushWhiteListWorkItemEx,
-                              DelayedWorkQueue,
-                              NULL
-                              );
-        }        
-    }
-    WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
-
-    NT_ASSERT(irql == KeGetCurrentIrql());
-
-    //
-    // Step 2
-    // Flush the mesh list if it has changed, also with a system worker thread.
-    //
-    WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
-    if (deviceContext->meshListModified)
-    {
-        PIO_WORKITEM workItem = IoAllocateWorkItem(globalWdmDeviceObject);
-        if (workItem)
-        {
-            IoQueueWorkItemEx(workItem,
-                              IPv6ToBleRegistryFlushMeshListWorkItemEx,
-                              DelayedWorkQueue,
-                              NULL
-                              );
-        }
-    }
-    WdfSpinLockRelease(deviceContext->meshListModifiedLock);
-
-    NT_ASSERT(irql == KeGetCurrentIrql());
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_TIMER, "%!FUNC! Exit");
-
-    return;
 }

@@ -81,8 +81,9 @@ Return Value:
     // Validate the received address and get its 16 byte value form
     //
     IN6_ADDR ipv6AddressStorage;
+
     UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-                                   &ipv6AddressStorage.u.Byte[0]
+                                    &ipv6AddressStorage.u.Byte[0]
                                );
     if (conversionStatus != NO_ERROR)
     {
@@ -91,39 +92,36 @@ Return Value:
     }
 
     //
-    // Step 3
-    // Get the device context and white list head
-    // 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-    PLIST_ENTRY whiteListEntry = deviceContext->whiteListHead->Flink;
-
-    NT_ASSERT(whiteListEntry);
-
-    //
     // Step 4
     // Verify the entry isn't already in the list
     // 
-    while (whiteListEntry != deviceContext->whiteListHead)
-    {
-        PWHITE_LIST_ENTRY entry = CONTAINING_RECORD(whiteListEntry, 
-                                                    WHITE_LIST_ENTRY, 
-                                                    listEntry
-                                                    );
-        // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(entry->ipv6Address,
-                             (UINT8*)&ipv6AddressStorage.u.Byte[0],
-                             IPV6_ADDRESS_LENGTH))
-        {
-            // Found it            
-            status = STATUS_INVALID_PARAMETER;
-            TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "Entry is already in the white list %!STATUS!", status);
-            goto Exit;
-        }
+    PLIST_ENTRY entry = gWhiteListHead->Flink;
 
-        whiteListEntry = whiteListEntry->Flink;
-    }
+    NT_ASSERT(entry);
+
+    if (!IsListEmpty(gWhiteListHead))
+    {
+        while (entry != gWhiteListHead)
+        {
+            PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
+                                                                WHITE_LIST_ENTRY,
+                                                                listEntry
+                                                                );
+            // Compare the memory (byte arrays). Bug checks if memory isn't
+            // resident with: page fault in nonpaged area.
+            if (RtlCompareMemory(whiteListEntry->ipv6Address,
+                &ipv6AddressStorage.u.Byte[0],
+                IPV6_ADDRESS_LENGTH))
+            {
+                // Found it            
+                status = STATUS_INVALID_PARAMETER;
+                TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "Entry is already in the white list %!STATUS!", status);
+                goto Exit;
+            }
+
+            entry = entry->Flink;
+        }
+    }    
 
     //
     // Step 5
@@ -131,23 +129,42 @@ Return Value:
     //
     // Using non-paged pool because the list may be accessed at
     // IRQL = DISPATCH_LEVEL
-    PWHITE_LIST_ENTRY newEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
-        NonPagedPoolNx,
-        sizeof(WHITE_LIST_ENTRY),
-        IPV6_TO_BLE_WHITE_LIST_TAG
-    );
-    if (!newEntry)
+    PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
+                                                NonPagedPoolNx,
+                                                sizeof(WHITE_LIST_ENTRY),
+                                                IPV6_TO_BLE_WHITE_LIST_TAG
+                                            );
+    if (!newWhiteListEntry)
     {
         status = STATUS_INSUFFICIENT_RESOURCES;
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "New white list entry allocation failed %!STATUS!", status);
         goto Exit;
     }
 
+    // Finish setting up the entry
+    RtlZeroMemory(newWhiteListEntry, sizeof(WHITE_LIST_ENTRY));
+    PLIST_ENTRY newListEntry = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
+                                                                  sizeof(LIST_ENTRY),
+                                                                  IPV6_TO_BLE_WHITE_LIST_TAG
+                                                                  );
+    if (!newListEntry)
+    {
+        if (newWhiteListEntry)
+        {
+            ExFreePoolWithTag(newWhiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
+        }
+        status = STATUS_INSUFFICIENT_RESOURCES;        
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "LIST_ENTRY allocation failed for new white list entry %!STATUS!", status);
+        goto Exit;
+    }
+
+    newWhiteListEntry->listEntry = *newListEntry;
+
     // Add the entry to the list
-    InsertHeadList(deviceContext->whiteListHead, &newEntry->listEntry);
+    InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);
 
     // Insert the address into the entry
-    newEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
+    newWhiteListEntry->ipv6Address = (UINT8*)(&ipv6AddressStorage.u.Byte[0]);
 
     //
     // Step 6
@@ -156,9 +173,9 @@ Return Value:
     // interrupted by the timer callback that flushes the list to the registry
     // if the list has been updated
     //
-    WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
-    deviceContext->whiteListModified = TRUE;
-    WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
+    WdfSpinLockAcquire(gWhiteListModifiedLock);
+    gWhiteListModified = TRUE;
+    WdfSpinLockRelease(gWhiteListModifiedLock);
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
@@ -184,9 +201,9 @@ Return Value:
     // IRQL > PASSIVE_LEVEL that nees to check whether the callouts are
     // registered.
     //
-    if (!IsListEmpty(deviceContext->meshListHead))
+    if (!IsListEmpty(gMeshListHead))
     {
-        if (globalCalloutsRegistered)
+        if (gCalloutsRegistered)
         {
             IPv6ToBleCalloutsUnregister();
             status = IPv6ToBleCalloutsRegister();
@@ -283,21 +300,13 @@ Return Value:
     }
 
     //
-    // Step 3
-    // Get the device context and mesh list head
-    // 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-    PLIST_ENTRY meshListEntry = deviceContext->meshListHead->Flink;
-
-    NT_ASSERT(meshListEntry);
-
-    //
     // Step 4
     // Verify the entry isn't already in the list
     // 
-    while (meshListEntry != deviceContext->meshListHead)
+    PLIST_ENTRY meshListEntry = gMeshListHead->Flink;
+
+    NT_ASSERT(meshListEntry);
+    while (meshListEntry != gMeshListHead)
     {
         PMESH_LIST_ENTRY entry = CONTAINING_RECORD(meshListEntry,
                                                    MESH_LIST_ENTRY,
@@ -336,7 +345,7 @@ Return Value:
     }
 
     // Add the entry to the list
-    InsertHeadList(deviceContext->meshListHead, &newEntry->listEntry);
+    InsertHeadList(gMeshListHead, &newEntry->listEntry);
 
     // Insert the address into the entry
     newEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
@@ -348,9 +357,9 @@ Return Value:
     // interrupted by the timer callback that flushes the list to the registry
     // if the list has been updated
     //
-    WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
-    deviceContext->meshListModified = TRUE;
-    WdfSpinLockRelease(deviceContext->meshListModifiedLock);
+    WdfSpinLockAcquire(gMeshListModifiedLock);
+    gMeshListModified = TRUE;
+    WdfSpinLockRelease(gMeshListModifiedLock);
 
     NT_ASSERT(irql == KeGetCurrentIrql());
 
@@ -374,9 +383,9 @@ Return Value:
     // EvtIoDeviceControl, which is guaranteed to be synchronized by the
     // framework.
     //
-    if (!IsListEmpty(deviceContext->whiteListHead))
+    if (!IsListEmpty(gWhiteListHead))
     {
-        if (globalCalloutsRegistered) 
+        if (gCalloutsRegistered) 
         {
             IPv6ToBleCalloutsUnregister();
             status = IPv6ToBleCalloutsRegister();
@@ -431,12 +440,24 @@ Return Value:
 
     NTSTATUS status = STATUS_SUCCESS;
     BOOLEAN isInList = FALSE;
+    BOOLEAN parametersKeyOpened = FALSE;
 
     PVOID inputBuffer;
     size_t receivedSize = 0;
 
     //
     // Step 1
+    // Check for empty list
+    //
+    if (IsListEmpty(gWhiteListHead))
+    {
+        status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "White list was empty, error code: %!STATUS!", status);
+        goto Exit;
+    }
+
+    //
+    // Step 2
     // Retrieve the address from the request's input buffer. It must be in the
     // form of a string representation of the IPv6 address. Technically, an
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
@@ -456,7 +477,7 @@ Return Value:
     desiredAddress = (PCWSTR)inputBuffer;
 
     //
-    // Step 2
+    // Step 3
     // Validate the received address and get its 16 byte value form
     //
     IN6_ADDR ipv6AddressStorage;
@@ -470,47 +491,45 @@ Return Value:
     }
 
     //
-    // Step 3
-    // Get the device context and white list head
-    // 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-    PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
+    // Step 4
+    // Traverse the list and remove the entry if we find it
+    //
+    PLIST_ENTRY entry = gWhiteListHead->Flink;
 
     NT_ASSERT(entry);
 
-    //
-    // Step 4
-    // Traverse the list and remove the entry if we find it
-    // 
-    while (entry != deviceContext->whiteListHead)
+    if (!IsListEmpty(gWhiteListHead))
     {
-        PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
-                                                             WHITE_LIST_ENTRY,
-                                                             listEntry
-                                                             );
-        // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(whiteListEntry->ipv6Address,
-            (UINT8*)&ipv6AddressStorage.u.Byte[0],
-            IPV6_ADDRESS_LENGTH))
+        while (entry != gWhiteListHead)
         {
-            // Found it, now remove it
-            isInList = TRUE;
-            BOOLEAN removed = RemoveEntryList(entry);
-            if (!removed)
+            PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
+                                                                WHITE_LIST_ENTRY,
+                                                                listEntry
+                                                                );
+            // Compare the memory (byte arrays)        
+            if (RtlCompareMemory(whiteListEntry->ipv6Address,
+                (UINT8*)&ipv6AddressStorage.u.Byte[0],
+                IPV6_ADDRESS_LENGTH))
             {
-                status = STATUS_UNSUCCESSFUL;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list entry from the list failed %!STATUS!", status);
-                goto Exit;
-            }
-            ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
-            whiteListEntry = 0;            
-            break;
-        }
+                // Found it, now remove it
+                isInList = TRUE;
+                BOOLEAN removed = RemoveEntryList(entry);
+                if (!removed)
+                {
+                    status = STATUS_UNSUCCESSFUL;
+                    TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list entry from the list failed %!STATUS!", status);
+                    goto Exit;
+                }
 
-        entry = entry->Flink;
-    }
+                // Free the memory (should be valid if we got to this point)
+                ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
+                whiteListEntry = 0;
+                break;
+            }
+
+            entry = entry->Flink;
+        }
+    }    
 
     //
     // Step 5
@@ -525,38 +544,51 @@ Return Value:
     }
     else
     {
-        WdfSpinLockAcquire(deviceContext->whiteListModifiedLock);
-        deviceContext->whiteListModified = TRUE;
-        WdfSpinLockRelease(deviceContext->whiteListModifiedLock);
+        WdfSpinLockAcquire(gWhiteListModifiedLock);
+        gWhiteListModified = TRUE;
+        WdfSpinLockRelease(gWhiteListModifiedLock);
     }
 
     //
     // Step 6
-    // If the white list is now empty and the callouts were registered,
+    // If the white list is *now* empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the mesh list.
     //
-    if (IsListEmpty(deviceContext->whiteListHead))
+    if (IsListEmpty(gWhiteListHead))
     {
         // Unregister the callouts
-        if (globalCalloutsRegistered)
+        if (gCalloutsRegistered)
         {
             IPv6ToBleCalloutsUnregister();
         }
 
-        // Remove the mesh list registry key since the list is now empty
+        // Remove the white list registry key since the list is now empty
+        status = IPv6ToBleRegistryOpenParametersKey();
+        if (!NT_SUCCESS(status))
+        {
+            goto Exit;
+        }
+        parametersKeyOpened = TRUE;
+
         status = IPv6ToBleRegistryOpenWhiteListKey();
         if (!NT_SUCCESS(status))
         {
             goto Exit;
         }
-        status = WdfRegistryRemoveKey(globalWhiteListKey);
+        status = WdfRegistryRemoveKey(gWhiteListKey);
         if (!NT_SUCCESS(status))
         {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
         }
     }
 
 Exit:
+
+    // Close the parent key if we opened it to remove the child list key
+    if (parametersKeyOpened)
+    {
+        WdfRegistryClose(gParametersKey);
+    }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Exit");
     return status;
@@ -592,12 +624,24 @@ Return Value:
 
     NTSTATUS status = STATUS_SUCCESS;
     BOOLEAN isInList = FALSE;
+    BOOLEAN parametersKeyOpened = FALSE;
 
     PVOID inputBuffer;
     size_t receivedSize = 0;
 
     //
     // Step 1
+    // Check for empty list
+    //
+    if (IsListEmpty(gMeshListHead))
+    {
+        status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "Mesh list was empty, error code: %!STATUS!", status);
+        goto Exit;
+    }
+
+    //
+    // Step 2
     // Retrieve the address from the request's input buffer. It must be in the
     // form of a string representation of the IPv6 address. Technically, an
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
@@ -605,10 +649,10 @@ Return Value:
     // 
     PCWSTR desiredAddress;
     status = WdfRequestRetrieveInputBuffer(Request,
-                                           sizeof(WCHAR) * 3,
-                                           &inputBuffer,
-                                           &receivedSize
-                                           );
+                                          sizeof(WCHAR) * 3,
+                                          &inputBuffer,
+                                          &receivedSize
+                                          );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input bufer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
@@ -617,13 +661,13 @@ Return Value:
     desiredAddress = (PCWSTR)inputBuffer;
 
     //
-    // Step 2
+    // Step 3
     // Validate the received address and get its 16 byte value form
     //
     IN6_ADDR ipv6AddressStorage;
     UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-                                    &ipv6AddressStorage.u.Byte[0]
-                              );
+        &ipv6AddressStorage.u.Byte[0]
+    );
     if (conversionStatus != NO_ERROR)
     {
         status = STATUS_INVALID_PARAMETER;
@@ -631,21 +675,14 @@ Return Value:
     }
 
     //
-    // Step 3
-    // Get the device context and mesh list head
-    // 
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-    PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
+    // Step 4
+    // Traverse the list and remove the entry if we find it
+    //
+    PLIST_ENTRY entry = gMeshListHead->Flink;
 
     NT_ASSERT(entry);
 
-    //
-    // Step 4
-    // Traverse the list and remove the entry if we find it
-    // 
-    while (entry != deviceContext->meshListHead)
+    while (entry != gMeshListHead)
     {
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
                                                            MESH_LIST_ENTRY,
@@ -662,11 +699,11 @@ Return Value:
             if (!removed)
             {
                 status = STATUS_UNSUCCESSFUL;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing mesh list entry from list failed %!STATUS!", status);
+                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing mesh list entry from the list failed %!STATUS!", status);
                 goto Exit;
             }
-            ExFreePoolWithTag(meshListEntry, IPV6_TO_BLE_MESH_LIST_TAG);
-            meshListEntry = 0;            
+            ExFreePoolWithTag(meshListEntry, IPV6_TO_BLE_WHITE_LIST_TAG);
+            meshListEntry = 0;
             break;
         }
 
@@ -686,38 +723,51 @@ Return Value:
     }
     else
     {
-        WdfSpinLockAcquire(deviceContext->meshListModifiedLock);
-        deviceContext->meshListModified = TRUE;
-        WdfSpinLockRelease(deviceContext->meshListModifiedLock);
+        WdfSpinLockAcquire(gMeshListModifiedLock);
+        gMeshListModified = TRUE;
+        WdfSpinLockRelease(gMeshListModifiedLock);
     }
 
     //
     // Step 6
-    // If the mesh list is now empty and the callouts were registered,
-    // unregister the callouts. Doesn't matter about the white list.
+    // If the mesh list is *now* empty and the callouts were registered,
+    // unregister the callouts. Doesn't matter about the mesh list.
     //
-    if (IsListEmpty(deviceContext->meshListHead))        
+    if (IsListEmpty(gMeshListHead))
     {
         // Unregister the callouts
-        if (globalCalloutsRegistered)
+        if (gCalloutsRegistered)
         {
             IPv6ToBleCalloutsUnregister();
         }
 
-        // Remove the mesh list registry key since the list is now empty
+        // Remove the white list registry key since the list is now empty
+        status = IPv6ToBleRegistryOpenParametersKey();
+        if (!NT_SUCCESS(status))
+        {
+            goto Exit;
+        }
+        parametersKeyOpened = TRUE;
+
         status = IPv6ToBleRegistryOpenMeshListKey();
         if (!NT_SUCCESS(status))
         {
             goto Exit;
         }
-        status = WdfRegistryRemoveKey(globalMeshListKey);
+        status = WdfRegistryRemoveKey(gMeshListKey);
         if (!NT_SUCCESS(status))
         {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
-        }        
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
+        }
     }
 
 Exit:
+
+    // Close the parent key if we opened it to remove the child list key
+    if (parametersKeyOpened)
+    {
+        WdfRegistryClose(gParametersKey);
+    }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Exit");
     return status;
@@ -746,23 +796,24 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
 
-    // Get the device context
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
+    // Check for empty list
+    if (IsListEmpty(gWhiteListHead))
+    {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "List is empty; nothing to purge.\n");
+        return;
+    }
 
     // Clean up the linked list
-    while (!IsListEmpty(deviceContext->whiteListHead))
+    while (!IsListEmpty(gWhiteListHead))
     {
-        PLIST_ENTRY entry = deviceContext->whiteListHead->Flink;
+        PLIST_ENTRY entry = gWhiteListHead->Flink;
         PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
                                                              WHITE_LIST_ENTRY,
                                                              listEntry
                                                              );
-        entry = RemoveHeadList(deviceContext->whiteListHead);   // remove from list
-        entry = 0;
-        ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG); // free memory
-        whiteListEntry = 0;  // free pointer        
+        entry = RemoveHeadList(gWhiteListHead);   // remove from list
+        ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG); // free white list entry memory
+        whiteListEntry = 0;       
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Exit");
@@ -791,20 +842,15 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
 
-    // Get the device context
-    PIPV6_TO_BLE_DEVICE_CONTEXT deviceContext = IPv6ToBleGetContextFromDevice(
-                                                    globalWdfDeviceObject
-                                                );
-
     // Clean up the linked list
-    while (!IsListEmpty(deviceContext->meshListHead))
+    while (!IsListEmpty(gMeshListHead))
     {
-        PLIST_ENTRY entry = deviceContext->meshListHead->Flink;
+        PLIST_ENTRY entry = gMeshListHead->Flink;
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
                                                            MESH_LIST_ENTRY,
                                                            listEntry
                                                            );
-        entry = RemoveHeadList(deviceContext->meshListHead); // remove from list
+        entry = RemoveHeadList(gMeshListHead); // remove from list
         entry = 0;
         ExFreePoolWithTag(meshListEntry, IPV6_TO_BLE_MESH_LIST_TAG); // free memory
         meshListEntry = 0;  // free pointer        

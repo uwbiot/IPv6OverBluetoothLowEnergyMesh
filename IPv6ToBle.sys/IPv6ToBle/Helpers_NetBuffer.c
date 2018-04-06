@@ -326,5 +326,7 @@ Exit:
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NET_BUFFER, "%!FUNC! Exit");
 
+    // If successful, the packet for usermode will be copied to a usermode-
+    // supplied buffer in the classify callbacks, then freed there
 	return packetForUsermode;
 }

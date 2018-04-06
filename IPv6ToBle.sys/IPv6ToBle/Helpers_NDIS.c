@@ -63,9 +63,9 @@ Return Value:
 	// out (will be used in OS operations).
 	//
 	ndisPoolData = (NDIS_POOL_DATA*)ExAllocatePoolWithTag(NonPagedPoolNx,
-		sizeof(NDIS_POOL_DATA),
-		memoryTag
-	);
+		                                                 sizeof(NDIS_POOL_DATA),
+		                                                 memoryTag
+	                                                     );
 	if (!ndisPoolData) {
 		status = STATUS_INSUFFICIENT_RESOURCES;
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_NDIS, "NDIS_POOL_DATA memory allocation failed %!STATUS!", status);

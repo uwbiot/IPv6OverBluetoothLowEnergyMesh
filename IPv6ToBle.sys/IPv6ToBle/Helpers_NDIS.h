@@ -21,15 +21,6 @@ Environment:
 
 EXTERN_C_START
 
-// This structure holds handles to the memory pools used to create
-// NET_BUFFER_LIST and NET_BUFFER structures. NDIS uses special pools for
-// performance reasons and so kernel executive memory is not fragmented.
-typedef struct _NDIS_POOL_DATA {
-	HANDLE	ndisHandle;		// NDIS_HANDLE
-	HANDLE	nblPoolHandle;	// NDIS_HANDLE
-	HANDLE	nbPoolHandle;	// NDIS_HANDLE
-}NDIS_POOL_DATA, *PNDIS_POOL_DATA;
-
 _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_

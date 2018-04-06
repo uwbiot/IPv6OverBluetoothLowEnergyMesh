@@ -150,14 +150,14 @@ namespace IPv6ToBleInteropLibrary
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_DESTROY_WHITE_LIST =
+        public static int IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8088,
                 METHOD_BUFFERED,
                 FILE_ANY_ACCESS
                 );
-        public static int IOCTL_IPV6_TO_BLE_DESTROY_MESH_LIST =
+        public static int IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8089,

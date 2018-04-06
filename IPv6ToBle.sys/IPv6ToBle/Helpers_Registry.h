@@ -23,7 +23,16 @@ Environment:
 #define _HELPERS_REGISTRY_H_
 
 //-----------------------------------------------------------------------------
-// Functions to open the white list and mesh list keys
+// Wrapper function to open the parent registry key (the driver object's key)
+//-----------------------------------------------------------------------------
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+NTSTATUS
+IPv6ToBleRegistryOpenParametersKey();
+
+//-----------------------------------------------------------------------------
+// Wrapper functions to open the white list and mesh list keys
 //-----------------------------------------------------------------------------
 
 _IRQL_requires_(PASSIVE_LEVEL)

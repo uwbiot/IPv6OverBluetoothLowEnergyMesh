@@ -28,26 +28,83 @@ Environment:
 #define BORDER_ROUTER
 
 //-----------------------------------------------------------------------------
-// Global variables and objects
+// Custom structures
 //-----------------------------------------------------------------------------
 
 //
-// Required objects for the callout driver in global space
+// This structure holds handles to the memory pools used to create
+// NET_BUFFER_LIST and NET_BUFFER structures. NDIS uses special pools for
+// performance reasons and so kernel executive memory is not fragmented.
 //
-WDFDEVICE globalWdfDeviceObject;		// Our main device object itself
-PDEVICE_OBJECT globalWdmDeviceObject;	// WDM device object to go with above
+typedef struct _NDIS_POOL_DATA {
+    HANDLE	ndisHandle;		// NDIS_HANDLE
+    HANDLE	nblPoolHandle;	// NDIS_HANDLE
+    HANDLE	nbPoolHandle;	// NDIS_HANDLE
+}NDIS_POOL_DATA, *PNDIS_POOL_DATA;
 
-WDFKEY globalParametersKey;			// Driver's framework registry key object
-WDFKEY globalWhiteListKey;			// White list key, child of parametersKey
-WDFKEY globalMeshListKey;		    // Key of mesh list, child of parametersKey
+//
+// Structures to contain entries for runtime versions of the lists: the list
+// of trusted external devices (the white list) and the list of devices in the
+// mesh network (the mesh list).
+//
+// These lists are only used on the border router device.
+//
+typedef struct _WHITE_LIST_ENTRY
+{
+    UINT8*		ipv6Address;	// The IPv6 address
+    LIST_ENTRY	listEntry;		// Links this list entry to the list
+} WHITE_LIST_ENTRY, *PWHITE_LIST_ENTRY;
 
-UINT32 inboundIpPacketV6CalloutId;  // Runtime IT, inbound IP packet v6 callout
-UINT32 outboundIpPacketV6CalloutId; // Runtime ID,outbound IP packet v6 callout
+typedef struct _MESH_LIST_ENTRY
+{
+    UINT8*		ipv6Address;	// The IPv6 address
+    LIST_ENTRY	listEntry;		// Links this list entry to the list
+} MESH_LIST_ENTRY, *PMESH_LIST_ENTRY;
 
-BOOLEAN globalCalloutsRegistered;         // Tracker for whether callouts registered
+//-----------------------------------------------------------------------------
+// Global variables and objects (with a "g" prefix)
+//-----------------------------------------------------------------------------
 
-HANDLE globalFilterEngineHandle;	    // Handle to the WFP filter engine
-HANDLE globalInjectionHandleNetwork;    // Handle for injecting packets
+//
+// Required objects for the callout driver
+//
+WDFDRIVER gWdfDriverObject;        // The WDFDRIVER object for the driver
+WDFDEVICE gWdfDeviceObject;		// Our main device object itself
+PDEVICE_OBJECT gWdmDeviceObject;	// WDM device object to go with above
+
+WDFKEY gParametersKey;			// Driver's framework registry key object
+WDFKEY gWhiteListKey;			// White list key, child of parametersKey
+WDFKEY gMeshListKey;		    // Key of mesh list, child of parametersKey
+
+//
+// Objects for the WFP callouts
+//
+UINT32 gInboundIpPacketV6CalloutId;  // Runtime IT, inbound IP packet v6 callout
+UINT32 gOutboundIpPacketV6CalloutId; // Runtime ID,outbound IP packet v6 callout
+
+BOOLEAN gCalloutsRegistered;         // Tracker for whether callouts registered
+
+HANDLE gFilterEngineHandle;	    // Handle to the WFP filter engine
+HANDLE gInjectionHandleNetwork;    // Handle for injecting packets
+
+//
+//
+WDFQUEUE	gListenRequestQueue;	// Queue to listen for inbound IPv6 packets
+WDFSPINLOCK gListenRequestQueueLock; // Lock to access listen request queue
+
+NDIS_POOL_DATA* gNdisPoolData;	// NDIS memory pools (see Helpers_NDIS.h) 
+
+PLIST_ENTRY	gWhiteListHead;		// Head of the white list
+PLIST_ENTRY	gMeshListHead;		// Head of the mesh list   
+
+BOOLEAN gWhiteListModified;      // Tracker for whether white list changed
+BOOLEAN gMeshListModified;       // Tracker for whether mesh list changed
+WDFSPINLOCK gWhiteListModifiedLock;  // Lock to check if white list changed
+WDFSPINLOCK gMeshListModifiedLock;   // Lock to check if mesh list changed
+
+WDFTIMER gRegistryTimer;         // Timer to flush runtime lists to registry
+                                // periodically (if they changed), to avoid
+                                // data loss 
 
 //-----------------------------------------------------------------------------
 // WDFDRIVER Events
@@ -61,6 +118,23 @@ DRIVER_INITIALIZE DriverEntry;
 _IRQL_requires_max_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 EVT_WDF_DRIVER_UNLOAD IPv6ToBleEvtDriverUnload;
+
+//-----------------------------------------------------------------------------
+// Function to initialize global objects
+//-----------------------------------------------------------------------------
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+NTSTATUS
+IPv6ToBleDriverInitGlobalObjects();
+
+//-----------------------------------------------------------------------------
+// Timer event callback function to flush the runtime lists to the registry
+//-----------------------------------------------------------------------------
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+EVT_WDF_TIMER IPv6ToBleTimerCheckAndFlushLists;
 
 EXTERN_C_END
 
