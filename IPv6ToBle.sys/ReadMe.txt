@@ -123,7 +123,7 @@ Initialization
 1. Create driver object
 2. Create device object
 3. Initialize I/O queues
-4. Register callouts with the WFP filter engine
+4. Register callouts with the WFP filter engine (depending on state of lists)
 
 Running
 
@@ -174,7 +174,7 @@ Structures take the following form:
 DOMAIN_STRUCT_NAME
 
 Example: 
-- IPV6_TO_BLE_DEVICE_CONTEXT
+- WHITE_LIST_ENTRY
 
 //-----------------------------------------------------------------------------
 // SAL annotations
@@ -224,10 +224,6 @@ RuntimeList.c & RuntimeList.h
     Definitions and functionality for working with the runtime lists: the
     trusted external device white list and the list of devices in the BLE
     mesh network.
-
-Helpers_IPAddress.c & Helpers_IPAddress.h
-    Helper functions for validating IPv6 address strings and converting them
-    into their byte value.
 
 Helpers_NDIS.c & Helpers_NDIS.h
     Helper functions for allocating, populating, purging, and destroying NDIS
