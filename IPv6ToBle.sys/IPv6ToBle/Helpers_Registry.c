@@ -282,22 +282,31 @@ Return Value:
 	for (i = 0; i < count; i++)
 	{
 
-		// Get the string from the collection retrieved from the registry
+		// Get the string from the collection retrieved from the registry. It
+        // should be null-terminated already if it was stored there correctly
+        // in the first place.
 		DECLARE_UNICODE_STRING_SIZE(currentIpv6Address, INET6_ADDRSTRLEN);
 		WDFSTRING currentWdfString = (WDFSTRING)WdfCollectionGetItem(
-			                                whiteListAddresses,
-			                                i
-		                                );
+			                             whiteListAddresses,
+			                             i
+		                             );
 		WdfStringGetUnicodeString(currentWdfString, &currentIpv6Address);
 
+        // Defensively null-terminate the string
+        currentIpv6Address.Length = min(currentIpv6Address.Length,
+                                        currentIpv6Address.MaximumLength - sizeof(WCHAR)
+                                        );
+        currentIpv6Address.Buffer[currentIpv6Address.Length / sizeof(WCHAR)] = UNICODE_NULL;
+
         // Convert the string to its 16-byte value
-        UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(
-            currentIpv6Address.Buffer,
-            &ipv6AddressStorage.u.Byte[0]
-        );
+        PWSTR terminator;
+        status = RtlIpv6StringToAddressW(currentIpv6Address.Buffer,
+                                         &terminator,
+                                         &ipv6AddressStorage
+                                         );
 
         // Create the list entry and add it
-        if (conversionStatus == NO_ERROR)
+        if (NT_SUCCESS(status))
 		{
 
 			// Using non-paged pool because the list may be accessed at
@@ -322,6 +331,7 @@ Return Value:
 		}
         else
         {
+            TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
             goto Exit;
         }
 
@@ -456,30 +466,39 @@ Return Value:
 	for (i = 0; i < count; i++)
 	{
 
-		// Get the string from the collection retrieved from the registry
-		DECLARE_UNICODE_STRING_SIZE(currentIpv6Address, INET6_ADDRSTRLEN);
-		WDFSTRING currentWdfString = (WDFSTRING)WdfCollectionGetItem(
-			meshListAddresses,
-			i
-		);
-		WdfStringGetUnicodeString(currentWdfString, &currentIpv6Address);
+        // Get the string from the collection retrieved from the registry. It
+        // should be null-terminated already if it was stored there correctly
+        // in the first place.
+        DECLARE_UNICODE_STRING_SIZE(currentIpv6Address, INET6_ADDRSTRLEN);
+        WDFSTRING currentWdfString = (WDFSTRING)WdfCollectionGetItem(
+                                         meshListAddresses,
+                                         i
+                                     );
+        WdfStringGetUnicodeString(currentWdfString, &currentIpv6Address);
 
-		// Convert the string to its 16-byte value
-        UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(
-            currentIpv6Address.Buffer,
-            &ipv6AddressStorage.u.Byte[0]
-        );
+        // Defensively null-terminate the string
+        currentIpv6Address.Length = min(currentIpv6Address.Length,
+                                        currentIpv6Address.MaximumLength - sizeof(WCHAR)
+                                        );
+        currentIpv6Address.Buffer[currentIpv6Address.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-		// Create the list entry and add it
-		if (conversionStatus == NO_ERROR)
+        // Convert the string to its 16-byte value
+        PWSTR terminator;
+        status = RtlIpv6StringToAddressW(currentIpv6Address.Buffer,
+                                         &terminator,
+                                         &ipv6AddressStorage
+                                         );
+
+        // Create the list entry and add it
+        if (NT_SUCCESS(status))
 		{
             // Using non-paged pool because the list may be accessed at
             // IRQL = DISPATCH_LEVEL
 			PMESH_LIST_ENTRY entry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-				NonPagedPoolNx,
-				sizeof(MESH_LIST_ENTRY),
-				IPV6_TO_BLE_MESH_LIST_TAG
-			);
+				                        NonPagedPoolNx,
+				                        sizeof(MESH_LIST_ENTRY),
+				                        IPV6_TO_BLE_MESH_LIST_TAG
+			                         );
 			if (!entry)
 			{
 				status = STATUS_INSUFFICIENT_RESOURCES;
@@ -633,9 +652,20 @@ Return Value:
                                         );
 
             // Convert the address to a string (function null-terminates it)
-            RtlIpv6AddressToStringW(&addressStorage,
-                                    currentIpv6AddressString.Buffer
-                                    );
+            ULONG currentIpv6AddressStringLength;
+            status = RtlIpv6AddressToStringExW(&addressStorage,
+                                               0,
+                                               0,
+                                               (PWSTR)currentIpv6AddressString.Buffer,
+                                               &currentIpv6AddressStringLength
+                                               );
+            if (!NT_SUCCESS(status))
+            {
+                TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
+                goto Exit;
+            }
+            currentIpv6AddressString.Length = (USHORT)currentIpv6AddressStringLength;
+            currentIpv6AddressString.MaximumLength = (USHORT)currentIpv6AddressStringLength + 2;
 
             // Initialize and create the WDF string object from the Unicode string
             WDFSTRING currentIpv6AddressWdfString;
@@ -801,7 +831,7 @@ Return Value:
                                                            );
 
         // Retrieve the IPv6 address in byte form and store it in the struct
-        RtlCopyMemory(addressStorage.u.Byte,
+        RtlCopyMemory(&addressStorage.u.Byte[0],
                       &meshListEntry->ipv6Address,
                       IPV6_ADDRESS_LENGTH
                       );
@@ -811,15 +841,21 @@ Return Value:
                                     INET6_ADDRSTRLEN
                                     );
 
-        // Convert the address to a string
-        RtlIpv6AddressToStringW(&addressStorage,
-                                currentIpv6AddressString.Buffer
-                                );
+        // Convert the address to a string (function null-terminates it)
+        ULONG currentIpv6AddressStringLength;
+        status = RtlIpv6AddressToStringExW(&addressStorage,
+                                           0,
+                                           0,
+                                           (PWSTR)currentIpv6AddressString.Buffer,
+                                           &currentIpv6AddressStringLength
+                                           );
         if (!NT_SUCCESS(status))
         {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
+            TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
             goto Exit;
         }
+        currentIpv6AddressString.Length = (USHORT)currentIpv6AddressStringLength;
+        currentIpv6AddressString.MaximumLength = (USHORT)currentIpv6AddressStringLength + 2;
 
         // Initialize and create the WDF string object from the Unicode string
         WDFSTRING currentIpv6AddressWdfString;

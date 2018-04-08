@@ -63,36 +63,50 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    PCWSTR desiredAddress;
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
-                                           &inputBuffer, 
+                                           &inputBuffer,
                                            &receivedSize
                                            );
     if (!NT_SUCCESS(status))
     {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input bufer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
-    desiredAddress = (PCWSTR)inputBuffer;
+
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
 
     //
     // Step 2
     // Validate the received address and get its 16 byte value form
     //
+
+    // Defensively null-terminate the string
+    PWSTR terminator;
     IN6_ADDR ipv6AddressStorage;
 
-    UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-                                    &ipv6AddressStorage.u.Byte[0]
-                               );
-    if (conversionStatus != NO_ERROR)
+    desiredAddress.Length = min(desiredAddress.Length,
+                                desiredAddress.MaximumLength - sizeof(WCHAR)
+                                );
+    desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
+
+    // Convert the string. This function validates that it is a valid IPv6
+    // address for us.
+    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
+                                     &terminator,
+                                     &ipv6AddressStorage
+                                     );
+    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
     {
-        status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
 
     //
-    // Step 4
+    // Step 3
     // Verify the entry isn't already in the list
     // 
     PLIST_ENTRY entry = gWhiteListHead->Flink;
@@ -107,8 +121,7 @@ Return Value:
                                                                 WHITE_LIST_ENTRY,
                                                                 listEntry
                                                                 );
-            // Compare the memory (byte arrays). Bug checks if memory isn't
-            // resident with: page fault in nonpaged area.
+            // Compare the memory (byte arrays)
             if (RtlCompareMemory(&whiteListEntry->ipv6Address,
                                  &ipv6AddressStorage.u.Byte[0],
                                  IPV6_ADDRESS_LENGTH))
@@ -124,7 +137,7 @@ Return Value:
     }    
 
     //
-    // Step 5
+    // Step 4
     // Assuming it is not a duplicate, add the entry to the list
     //
     PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
@@ -146,11 +159,8 @@ Return Value:
     newWhiteListEntry->ipv6Address = (UINT8*)(&ipv6AddressStorage.u.Byte[0]);
 
     //
-    // Step 6
-    // Update the boolean in the device context that the list has been modified
-    // by acquiring the spinlock. This raises us to DISPATCH_LEVEL so we aren't
-    // interrupted by the timer callback that flushes the list to the registry
-    // if the list has been updated
+    // Step 5
+    // Update the boolean that the list has been modified
     //
     WdfSpinLockAcquire(gWhiteListModifiedLock);
     gWhiteListModified = TRUE;
@@ -159,7 +169,7 @@ Return Value:
     NT_ASSERT(irql == KeGetCurrentIrql());
 
     //
-    // Step 7
+    // Step 6
     // Because the white list has had an entry successfully added, and the
     // callout filters are based on the white list, tear down and rebuild the
     // callouts IF the mesh list is also not empty. If we just added an entry
@@ -251,7 +261,7 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    PCWSTR desiredAddress;
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -259,22 +269,35 @@ Return Value:
                                            );
     if (!NT_SUCCESS(status))
     {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input bufer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
-    desiredAddress = (PCWSTR)inputBuffer;
+    
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
 
     //
-    // Step 2
+    // Step 3
     // Validate the received address and get its 16 byte value form
     //
+
+    // Defensively null-terminate the string
+    PWSTR terminator;
     IN6_ADDR ipv6AddressStorage;
-    UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-                                   &ipv6AddressStorage.u.Byte[0]
-                               );
-    if (conversionStatus != NO_ERROR)
+
+    desiredAddress.Length = min(desiredAddress.Length,
+                                desiredAddress.MaximumLength - sizeof(WCHAR)
+                                );
+    desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
+
+    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
+                                     &terminator,
+                                     &ipv6AddressStorage
+                                     );
+    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
     {
-        status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
 
@@ -292,8 +315,8 @@ Return Value:
                                                    listEntry
                                                    );
         // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(entry->ipv6Address,
-                             (UINT8*)&ipv6AddressStorage.u.Byte[0],
+        if (RtlCompareMemory(&entry->ipv6Address,
+                             &ipv6AddressStorage.u.Byte[0],
                              IPV6_ADDRESS_LENGTH))
         {
             // Found it
@@ -311,12 +334,12 @@ Return Value:
     //
     // Using non-paged pool because the list may be accessed at
     // IRQL = DISPATCH_LEVEL
-    PMESH_LIST_ENTRY newEntry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-                                    NonPagedPoolNx,
-                                    sizeof(MESH_LIST_ENTRY),
-                                    IPV6_TO_BLE_MESH_LIST_TAG
-                                );
-    if (!newEntry)
+    PMESH_LIST_ENTRY newMeshListEntry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
+                                            NonPagedPoolNx,
+                                            sizeof(MESH_LIST_ENTRY),
+                                            IPV6_TO_BLE_MESH_LIST_TAG
+                                        );
+    if (!newMeshListEntry)
     {
         status = STATUS_INSUFFICIENT_RESOURCES;
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "New mesh list entry allocation failed %!STATUS!", status);
@@ -324,17 +347,14 @@ Return Value:
     }
 
     // Add the entry to the list
-    InsertHeadList(gMeshListHead, &newEntry->listEntry);
+    InsertHeadList(gMeshListHead, &newMeshListEntry->listEntry);
 
     // Insert the address into the entry
-    newEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
+    newMeshListEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
 
     //
     // Step 6
-    // Update the boolean in the device context that the list has been modified
-    // by acquiring the spinlock. This raises us to DISPATCH_LEVEL so we aren't
-    // interrupted by the timer callback that flushes the list to the registry
-    // if the list has been updated
+    // Update the boolean that the list has been modified
     //
     WdfSpinLockAcquire(gMeshListModifiedLock);
     gMeshListModified = TRUE;
@@ -442,7 +462,7 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    PCWSTR desiredAddress;
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -450,22 +470,35 @@ Return Value:
                                            );
     if (!NT_SUCCESS(status))
     {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input bufer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
-    desiredAddress = (PCWSTR)inputBuffer;
+    
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
 
     //
     // Step 3
     // Validate the received address and get its 16 byte value form
     //
+
+    // Defensively null-terminate the string
+    PWSTR terminator;
     IN6_ADDR ipv6AddressStorage;
-    UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-                                   &ipv6AddressStorage.u.Byte[0]
-                               );
-    if (conversionStatus != NO_ERROR)
+
+    desiredAddress.Length = min(desiredAddress.Length, 
+                                desiredAddress.MaximumLength - sizeof(WCHAR)
+                                );
+    desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
+
+    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
+                                     &terminator,
+                                     &ipv6AddressStorage
+                                     );
+    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
     {
-        status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
 
@@ -623,7 +656,7 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    PCWSTR desiredAddress;
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                           sizeof(WCHAR) * 3,
                                           &inputBuffer,
@@ -631,20 +664,33 @@ Return Value:
                                           );
     if (!NT_SUCCESS(status))
     {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input bufer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Retrieving input buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
     }
-    desiredAddress = (PCWSTR)inputBuffer;
+    
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
 
     //
     // Step 3
     // Validate the received address and get its 16 byte value form
     //
+
+    // Defensively null-terminate the string
+    PWSTR terminator;
     IN6_ADDR ipv6AddressStorage;
-    UINT32 conversionStatus = IPv6ToBleIPAddressV6StringToValue(desiredAddress,
-        &ipv6AddressStorage.u.Byte[0]
-    );
-    if (conversionStatus != NO_ERROR)
+
+    desiredAddress.Length = min(desiredAddress.Length,
+                                desiredAddress.MaximumLength - sizeof(WCHAR)
+                                );
+    desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
+
+    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
+                                     &terminator,
+                                     &ipv6AddressStorage
+                                     );
+    if (!NT_SUCCESS(status)  || terminator != UNICODE_NULL)
     {
         status = STATUS_INVALID_PARAMETER;
         goto Exit;
@@ -666,8 +712,8 @@ Return Value:
                                                            );
         // Compare the memory (byte arrays)        
         if (RtlCompareMemory(meshListEntry->ipv6Address,
-            (UINT8*)&ipv6AddressStorage.u.Byte[0],
-            IPV6_ADDRESS_LENGTH))
+                            &ipv6AddressStorage.u.Byte[0],
+                            IPV6_ADDRESS_LENGTH))
         {
             // Found it, now remove it
             isInList = TRUE;
