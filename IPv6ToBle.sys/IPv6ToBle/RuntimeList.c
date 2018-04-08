@@ -63,7 +63,7 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
+    
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -83,19 +83,21 @@ Return Value:
         goto Exit;
     }
 
-    desiredAddress.Buffer = (PWCH)inputBuffer;
-    desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
-
     //
     // Step 2
+    // Assign the retrieved string to a UNICODE_STRING structure
+    //
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+
+    //
+    // Step 3
     // Validate the received address and get its 16 byte value form
     //
 
     // Defensively null-terminate the string
     PWSTR terminator;
-    IN6_ADDR ipv6AddressStorage;
-
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
@@ -105,8 +107,9 @@ Return Value:
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-    // Convert the string. This function validates that it is a valid IPv6
-    // address for us.
+    // Convert the string to its network byte order binary form. This function 
+    // validates that it is a valid IPv6 address for us.
+    IN6_ADDR ipv6AddressStorage;
     status = RtlIpv6StringToAddressW((PWSTR)desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
@@ -118,7 +121,7 @@ Return Value:
     }
 
     //
-    // Step 3
+    // Step 4
     // Verify the entry isn't already in the list
     // 
     PLIST_ENTRY entry = gWhiteListHead->Flink;
@@ -272,8 +275,7 @@ Return Value:
     // form of a string representation of the IPv6 address. Technically, an
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
-    // 
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
+    //     
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -293,9 +295,13 @@ Return Value:
         goto Exit;
     }
 
+    //
+    // Step 2
+    // Assign the retrieved string to a UNICODE_STRING structure
+    //
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 3
@@ -304,8 +310,6 @@ Return Value:
 
     // Defensively null-terminate the string
     PWSTR terminator;
-    IN6_ADDR ipv6AddressStorage;
-
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
@@ -315,6 +319,9 @@ Return Value:
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
+    // Convert the string to its network byte order binary form. This function 
+    // validates that it is a valid IPv6 address for us.
+    IN6_ADDR ipv6AddressStorage;
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
@@ -486,7 +493,6 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -506,19 +512,22 @@ Return Value:
         goto Exit;
     }
 
+    //
+    // Step 3
+    // Assign the retrieved string to a UNICODE_STRING structure
+    //
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
     desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
-    // Step 3
+    // Step 4
     // Validate the received address and get its 16 byte value form
     //
 
     // Defensively null-terminate the string
     PWSTR terminator;
-    IN6_ADDR ipv6AddressStorage;
-
     desiredAddress.Length = min(desiredAddress.Length, 
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
@@ -527,7 +536,10 @@ Return Value:
     // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
-
+    
+    // Convert the string to its network byte order binary form. This function 
+    // validates that it is a valid IPv6 address for us.
+    IN6_ADDR ipv6AddressStorage;
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
@@ -539,7 +551,7 @@ Return Value:
     }
 
     //
-    // Step 4
+    // Step 5
     // Traverse the list and remove the entry if we find it
     //
     PLIST_ENTRY entry = gWhiteListHead->Flink;
@@ -577,7 +589,7 @@ Return Value:
     }  
 
     //
-    // Step 5
+    // Step 6
     // Exit if we didn't find the entry, otherwise mark that we modified the
     // list by acquiring the appropriate spinlock
     //
@@ -595,7 +607,7 @@ Return Value:
     }
 
     //
-    // Step 6
+    // Step 7
     // If the white list is *now* empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the mesh list.
     //
@@ -692,7 +704,6 @@ Return Value:
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
     // 
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     status = WdfRequestRetrieveInputBuffer(Request,
                                           sizeof(WCHAR) * 3,
                                           &inputBuffer,
@@ -712,19 +723,21 @@ Return Value:
         goto Exit;
     }
 
-    desiredAddress.Buffer = (PWCH)inputBuffer;
-    desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
-
     //
     // Step 3
+    // Assign the retrieved string to a UNICODE_STRING structure
+    //
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);  // Power of 2
+    desiredAddress.Buffer = (PWCH)inputBuffer;
+    desiredAddress.Length = (USHORT)receivedSize;
+
+    //
+    // Step 4
     // Validate the received address and get its 16 byte value form
     //
 
     // Defensively null-terminate the string
     PWSTR terminator;
-    IN6_ADDR ipv6AddressStorage;
-
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
@@ -734,6 +747,9 @@ Return Value:
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
+    // Convert the string to its network byte order binary form. This function 
+    // validates that it is a valid IPv6 address for us.
+    IN6_ADDR ipv6AddressStorage;
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
@@ -745,7 +761,7 @@ Return Value:
     }
 
     //
-    // Step 4
+    // Step 5
     // Traverse the list and remove the entry if we find it
     //
     PLIST_ENTRY entry = gMeshListHead->Flink;
@@ -760,8 +776,8 @@ Return Value:
                                                            );
         // Compare the memory (byte arrays)        
         if (RtlCompareMemory(&meshListEntry->ipv6Address,
-                            &ipv6AddressStorage,
-                            sizeof(IN6_ADDR)))
+                             &ipv6AddressStorage,
+                             sizeof(IN6_ADDR)))
         {
             // Found it, now remove it
             isInList = TRUE;
@@ -781,7 +797,7 @@ Return Value:
     }
 
     //
-    // Step 5
+    // Step 6
     // Exit if we didn't find the entry, otherwise mark that we modified the
     // list by acquiring the appropriate spinlock
     //
@@ -799,7 +815,7 @@ Return Value:
     }
 
     //
-    // Step 6
+    // Step 7
     // If the mesh list is *now* empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the mesh list.
     //
