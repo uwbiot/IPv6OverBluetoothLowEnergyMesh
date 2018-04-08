@@ -329,7 +329,7 @@ namespace IPv6ToBleMeshManager
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String whiteListAddress = "fe80::71c4:225:d048:9476%11";
+            String whiteListAddress = "fe80::71c4:225:d048:9476";
             int bytesReturned = 0;
 
             // Send the IOCTL
@@ -393,7 +393,7 @@ namespace IPv6ToBleMeshManager
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String whiteListAddress = "fe80::71c4:225:d048:9476%11";
+            String whiteListAddress = "fe80::71c4:225:d048:9476";
             int bytesReturned = 0;
 
             // Send the IOCTL
@@ -472,7 +472,7 @@ namespace IPv6ToBleMeshManager
 
             //
             // Step 2
-            // Send the supplied IPv6 address for the white list to the driver
+            // Send the IOCTL
             //
 
             // Hard-coded for testing, would normally acquire from an
