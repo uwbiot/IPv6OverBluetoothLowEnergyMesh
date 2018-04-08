@@ -378,7 +378,16 @@ Return Value:
         // It is sent by the usermode GUI app in the event that the app needs
         // to reset the white list and re-send it. This is in the event that
         // the white list in the driver is corrupted and the GUI app needs to
-        // start it over.
+        // start it over, or they are somehow out of sync. This assumes that
+        // the GUI provisioning app is the authority on keeping a correct list.
+        //
+        // This is a bit of a misnomer, since the actual PurgeList() function
+        // doesn't clear the registry key; it only frees the runtime list
+        // memory. Tthis is because PurgeList() is always called to free memory
+        // upon driver unload, but we want the registry key to be non-volatile.
+        // But, this IOCTL specifically clears the registry key to start over 
+        // on the assumption that new white list addresses will follow to 
+        // re-build both the runtime list and the permanently stored list.
         //
         // This IOCTL is ONLY used on the border router device.
         //
@@ -426,7 +435,16 @@ Return Value:
         // It is sent by the usermode GUI app in the event that the app needs
         // to reset the mesh list and re-send it. This is in the event that
         // the mesh list in the driver is corrupted and the GUI app needs to
-        // start it over.
+        // start it over, or they are somehow out of sync. This assumes that
+        // the GUI provisioning app is the authority on keeping a correct list.
+        //
+        // This is a bit of a misnomer, since the actual PurgeList() function
+        // doesn't clear the registry key; it only frees the runtime list
+        // memory. This is because PurgeList() is always called to free memory
+        // upon driver unload, but we want the registry key to be non-volatile.
+        // But, this IOCTL specifically clears the registry key to start over 
+        // on the assumption that new mesh list addresses will follow to 
+        // re-build both the runtime list and the permanently stored list.
         //
         // This IOCTL is ONLY used on the border router device.
         //

@@ -56,7 +56,6 @@ EXTERN_C_START
 #include "Helpers_NDIS.h"		// Helpers for kernel mode networking
 #include "Helpers_NetBuffer.h"	// Helpers for user <-> kernel translation
 #include "Helpers_Registry.h"	// Helpers for working with the registry
-#include "Helpers_IPAddress.h"  // Helpers to validate/translate IPv6 addresses
 
 EXTERN_C_END
 

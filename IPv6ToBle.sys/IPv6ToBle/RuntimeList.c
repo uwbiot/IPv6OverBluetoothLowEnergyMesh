@@ -75,9 +75,17 @@ Return Value:
         goto Exit;
     }
 
+    // Check for buffer overrun
+    if (receivedSize >= INET6_ADDRSTRLEN)
+    {
+        status = STATUS_BUFFER_OVERFLOW;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Input buffer larger than an IPv6 address string during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
+
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
+    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 2
@@ -91,15 +99,19 @@ Return Value:
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
+
+    // Suppressing buffer overrun warning because we previously verified the
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+#pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     // Convert the string. This function validates that it is a valid IPv6
     // address for us.
-    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
+    status = RtlIpv6StringToAddressW((PWSTR)desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
                                      );
-    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
+    if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
@@ -123,8 +135,8 @@ Return Value:
                                                                 );
             // Compare the memory (byte arrays)
             if (RtlCompareMemory(&whiteListEntry->ipv6Address,
-                                 &ipv6AddressStorage.u.Byte[0],
-                                 IPV6_ADDRESS_LENGTH))
+                                 &ipv6AddressStorage,
+                                 sizeof(IN6_ADDR)))
             {
                 // Found it            
                 status = STATUS_INVALID_PARAMETER;
@@ -156,7 +168,7 @@ Return Value:
     InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);
 
     // Insert the address into the entry
-    newWhiteListEntry->ipv6Address = (UINT8*)(&ipv6AddressStorage.u.Byte[0]);
+    newWhiteListEntry->ipv6Address = ipv6AddressStorage;
 
     //
     // Step 5
@@ -273,9 +285,17 @@ Return Value:
         goto Exit;
     }
     
+    // Check for buffer overrun
+    if (receivedSize >= INET6_ADDRSTRLEN)
+    {
+        status = STATUS_BUFFER_OVERFLOW;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Input buffer larger than an IPv6 address string during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
+
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
+    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 3
@@ -289,13 +309,17 @@ Return Value:
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
+
+    // Suppressing buffer overrun warning because we previously verified the
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+#pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
                                      );
-    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
+    if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
@@ -316,8 +340,8 @@ Return Value:
                                                    );
         // Compare the memory (byte arrays)        
         if (RtlCompareMemory(&entry->ipv6Address,
-                             &ipv6AddressStorage.u.Byte[0],
-                             IPV6_ADDRESS_LENGTH))
+                             &ipv6AddressStorage,
+                             sizeof(IN6_ADDR)))
         {
             // Found it
             status = STATUS_INVALID_PARAMETER;
@@ -350,7 +374,7 @@ Return Value:
     InsertHeadList(gMeshListHead, &newMeshListEntry->listEntry);
 
     // Insert the address into the entry
-    newMeshListEntry->ipv6Address = (UINT8*)(ipv6AddressStorage.u.Byte[0]);
+    newMeshListEntry->ipv6Address = ipv6AddressStorage;
 
     //
     // Step 6
@@ -474,9 +498,17 @@ Return Value:
         goto Exit;
     }
     
+    // Check for buffer overrun
+    if (receivedSize >= INET6_ADDRSTRLEN)
+    {
+        status = STATUS_BUFFER_OVERFLOW;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Input buffer larger than an IPv6 address string during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
+
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
+    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 3
@@ -490,13 +522,17 @@ Return Value:
     desiredAddress.Length = min(desiredAddress.Length, 
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
+
+    // Suppressing buffer overrun warning because we previously verified the
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+#pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
                                      );
-    if (!NT_SUCCESS(status) || terminator != UNICODE_NULL)
+    if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
@@ -518,8 +554,8 @@ Return Value:
                                                             );
         // Compare the memory (byte arrays)        
         if (RtlCompareMemory(&whiteListEntry->ipv6Address,
-                             &ipv6AddressStorage.u.Byte[0],
-                             IPV6_ADDRESS_LENGTH))
+                             &ipv6AddressStorage,
+                             sizeof(IN6_ADDR)))
         {
             // Found it, now remove it
             isInList = TRUE;
@@ -668,9 +704,17 @@ Return Value:
         goto Exit;
     }
     
+    // Check for buffer overrun
+    if (receivedSize >= INET6_ADDRSTRLEN)
+    {
+        status = STATUS_BUFFER_OVERFLOW;
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Input buffer larger than an IPv6 address string during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
+
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = (USHORT)receivedSize + 2;
+    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 3
@@ -684,13 +728,17 @@ Return Value:
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
+
+    // Suppressing buffer overrun warning because we previously verified the
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+#pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
                                      &terminator,
                                      &ipv6AddressStorage
                                      );
-    if (!NT_SUCCESS(status)  || terminator != UNICODE_NULL)
+    if (!NT_SUCCESS(status))
     {
         status = STATUS_INVALID_PARAMETER;
         goto Exit;
@@ -711,9 +759,9 @@ Return Value:
                                                            listEntry
                                                            );
         // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(meshListEntry->ipv6Address,
-                            &ipv6AddressStorage.u.Byte[0],
-                            IPV6_ADDRESS_LENGTH))
+        if (RtlCompareMemory(&meshListEntry->ipv6Address,
+                            &ipv6AddressStorage,
+                            sizeof(IN6_ADDR)))
         {
             // Found it, now remove it
             isInList = TRUE;
@@ -821,7 +869,7 @@ Return Value:
     // Check for empty list
     if (IsListEmpty(gWhiteListHead))
     {
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "List is empty; nothing to purge.\n");
+        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "White list is empty; nothing to purge.\n");
         return;
     }
 
@@ -863,6 +911,13 @@ Return Value:
 --*/
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
+
+    // Check for empty list
+    if (IsListEmpty(gMeshListHead))
+    {
+        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "Mesh list is empty; nothing to purge.\n");
+        return;
+    }
 
     // Clean up the linked list
     while (!IsListEmpty(gMeshListHead))

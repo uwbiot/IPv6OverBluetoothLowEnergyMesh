@@ -38,7 +38,6 @@
     <ClCompile Include="callout.c" />
     <ClCompile Include="Device.c" />
     <ClCompile Include="Driver.c" />
-    <ClCompile Include="Helpers_IPAddress.c" />
     <ClCompile Include="Helpers_NetBuffer.c" />
     <ClCompile Include="Helpers_Registry.c" />
     <ClCompile Include="RuntimeList.c" />
@@ -49,7 +48,6 @@
     <ClInclude Include="callout.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="Driver.h" />
-    <ClInclude Include="Helpers_IPAddress.h" />
     <ClInclude Include="Helpers_NetBuffer.h" />
     <ClInclude Include="Helpers_Registry.h" />
     <ClInclude Include="Includes.h" />

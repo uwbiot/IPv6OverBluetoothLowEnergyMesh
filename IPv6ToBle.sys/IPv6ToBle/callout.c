@@ -1027,7 +1027,7 @@ Return Value:
                                                              WHITE_LIST_ENTRY,
                                                              listEntry
                                                              );
-        UINT8* remoteAddress = whiteListEntry->ipv6Address;
+        UINT8* remoteAddress = whiteListEntry->ipv6Address.u.Byte;
 
         // Add the filter
         status = IPv6ToBleCalloutFilterAdd(L"Inbound IPv6 packet filter",
@@ -1167,7 +1167,7 @@ Return Value:
                                                           MESH_LIST_ENTRY,
                                                           listEntry
                                                           );
-        UINT8* destinationAddress = meshListEntry->ipv6Address;
+        UINT8* destinationAddress = meshListEntry->ipv6Address.u.Byte;
 
         // Add the filter
         status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
