@@ -419,7 +419,7 @@ Return Value:
         {
             IPv6ToBleCalloutsUnregister();
             status = IPv6ToBleCalloutsRegister();
-            if (NT_SUCCESS(status))
+            if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
@@ -427,7 +427,7 @@ Return Value:
         else
         {
             status = IPv6ToBleCalloutsRegister();
-            if (NT_SUCCESS(status))
+            if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Registering callouts during %!FUNC! failed with %!STATUS!", status);
             }
