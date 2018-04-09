@@ -458,7 +458,7 @@ namespace IPv6ToBleMeshManager
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String meshListAddress = "fe80::71c4:225:d048:9476%15";
+            String meshListAddress = "fe80::3515:de40:9fe2:caaf%3";
             int bytesReturned = 0;
 
             // Send the IOCTL
@@ -522,7 +522,7 @@ namespace IPv6ToBleMeshManager
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String meshListAddress = "fe80::71c4:225:d048:9476%15";
+            String meshListAddress = "fe80::3515:de40:9fe2:caaf%3";
             int bytesReturned = 0;
 
             // Send the IOCTL
@@ -618,7 +618,60 @@ namespace IPv6ToBleMeshManager
         /// <param name="e"></param>
         private unsafe void Button_9_Purge_Mesh_List_Click(object sender, RoutedEventArgs e)
         {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,  // synchronous
+                IntPtr.Zero
+            );
 
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the IOCTL
+            //
+
+            // Hard-coded for testing, would normally acquire from an
+            // authenticated service or other source
+            int bytesReturned = 0;
+
+            // Send the IOCTL
+            bool result = IPv6ToBleDriverInterface.DeviceIoControl(
+                                    driverHandle,
+                                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST,
+                                    "",
+                                    0,
+                                    "",
+                                    0,
+                                    out bytesReturned, // Not returning bytes
+                                    null
+                                    );
+            if (!result)
+            {
+                int error = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Purging mesh list failed with this " +
+                                    "error code: " + error.ToString());
+            }
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
         }
     }
 }
