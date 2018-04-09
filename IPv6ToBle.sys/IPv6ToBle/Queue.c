@@ -417,6 +417,17 @@ Return Value:
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
             }
 
+            // Since the white list is *now* empty, unregister the callouts
+            // if they were registered
+            if (IsListEmpty(gWhiteListHead))
+            {
+                // Unregister the callouts
+                if (gCalloutsRegistered)
+                {
+                    IPv6ToBleCalloutsUnregister();
+                }
+            }
+
         PurgeWhiteListError:
 
             if (parametersKeyOpened)
@@ -472,6 +483,17 @@ Return Value:
             if (!NT_SUCCESS(status))
             {
                 TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
+            }
+
+            // Since the mesh list is *now* empty, unregister the callouts
+            // if they were registered
+            if (IsListEmpty(gMeshListHead))
+            {
+                // Unregister the callouts
+                if (gCalloutsRegistered)
+                {
+                    IPv6ToBleCalloutsUnregister();
+                }
             }
 
         PurgeMeshListError:
