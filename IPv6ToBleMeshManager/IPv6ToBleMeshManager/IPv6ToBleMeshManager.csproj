@@ -18,7 +18,6 @@
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WindowsXamlEnableOverview>true</WindowsXamlEnableOverview>
     <PackageCertificateKeyFile>IPv6ToBleMeshManager_TemporaryKey.pfx</PackageCertificateKeyFile>
-
     <!-- Add the following property to make desktop APIs visible at compile time. -->
     <_NoWinAPIFamilyApp>true</_NoWinAPIFamilyApp>
   </PropertyGroup>
@@ -136,9 +135,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="IPv6ToBleInteropLibrary, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\IPv6ToBleInteropLibrary\IPv6ToBleInteropLibrary\bin\Release\IPv6ToBleInteropLibrary.dll</HintPath>
+    <Reference Include="IPv6ToBleDriverInterfaceForUWP">
+      <HintPath>..\..\IPv6ToBleInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>
     </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
