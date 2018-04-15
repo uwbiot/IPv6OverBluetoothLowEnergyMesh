@@ -135,8 +135,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="IPv6ToBleDriverInterfaceForUWP">
-      <HintPath>..\..\IPv6ToBleInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>
+    <Reference Include="IPv6ToBleDriverInterfaceForUWP, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\Libraries\DriverInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>
     </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">

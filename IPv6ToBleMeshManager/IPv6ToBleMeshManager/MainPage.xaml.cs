@@ -19,7 +19,6 @@ using IPv6ToBleInteropLibrary;
 using Microsoft.Win32.SafeHandles;      // Safe file handles
 using System.Threading;                 // Asynchronous I/O and thread pool
 using System.Runtime.InteropServices;   // Marhsalling interop calls
-using System.ComponentModel;
 using System.Diagnostics;
 
 namespace IPv6ToBleMeshManager
