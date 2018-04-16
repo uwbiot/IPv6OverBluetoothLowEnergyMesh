@@ -58,7 +58,51 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
             //
             // Step 2
-            // Connect to the  
+            // Spin up the GATT server service to listen for later replies
+            // over Bluetooth LE
+            //
+
+            //
+            // Step 3
+            // Send an initial batch of packet listening requests to the driver
+            //
+
+
+            // TODO: figure out where I need to code with the overlapped I/O
+            // to take the received packet and continue on
+
+            //
+            // Step 
+            // With a packet in hand, enumerate all nearby Bluetooth LE devices
+            // with a device watcher
+            //
+
+            //
+            // Step 
+            // Stop the watcher
+            //
+
+            //
+            // Step
+            // Connect to the devices
+            //
+
+            //
+            // Step
+            // Enumerate supported services. Only proceed if the device has
+            // both the IPSP service and our packet write GATT service
+            //
+
+            //
+            // Step
+            // Enumerate supported characteristics for the packet write GATT
+            // service
+            //
+            
+            //
+            // Step
+            // Write the packet to the characteristic on the remote device
+            //
 
         }
 
