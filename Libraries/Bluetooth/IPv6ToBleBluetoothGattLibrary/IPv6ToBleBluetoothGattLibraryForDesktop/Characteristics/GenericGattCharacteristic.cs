@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-// Our helper functions
+// Helpers
 using IPv6ToBleBluetoothGattLibraryForDesktop.Helpers;
 
 // UWP namespaces from .NET Core
@@ -24,7 +24,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
     /// This class is based off the GenericGattCharacteristic class in the
     /// GattServicesLibrary sample from Microsoft.
     /// </summary>
-    public abstract class IPv6ToBleGattCharacteristic : INotifyPropertyChanged
+    public abstract class GenericGattCharacteristic : INotifyPropertyChanged
     {
         //---------------------------------------------------------------------
         // Requirements for property changed events
@@ -68,7 +68,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
         }
 
         // Getter for this characteristic's parent service
-        public IPv6ToBleGattService ParentService
+        public GenericGattService ParentService
         {
             get;
             private set;
@@ -99,9 +99,9 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
         // Constructor
         //---------------------------------------------------------------------
 
-        public IPv6ToBleGattCharacteristic(
-            GattLocalCharacteristic characteristic, 
-            IPv6ToBleGattService service
+        public GenericGattCharacteristic(
+            GattLocalCharacteristic     characteristic, 
+            GenericGattService service
         )
         {
             Characteristic = characteristic;
