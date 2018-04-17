@@ -12,6 +12,9 @@ using Windows.Storage.Streams;
 
 namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
 {
+    /// <summary>
+    /// Utility functions for generic byte array operations, etc.
+    /// </summary>
     public class Utilities
     {
         /// <summary>
@@ -23,7 +26,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
 
             for(int i = 0; i < array.Length; i++)
             {
-                builder.Append($"{array[i]}");
+                builder.Append($"{array[i]:X2}");
                 if(i < array.Length - 1)
                 {
                     builder.Append(" ");
@@ -31,36 +34,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
             }
 
             return builder.ToString();
-        }
-
-        /// <summary>
-        /// Converts an IPv6 packet (byte array) to a buffer for Bluetooth
-        /// operations.
-        /// </summary>
-        /// <param name="packet">The IPv6 packet in byte array form.</param>
-        /// <returns></returns>
-        public static IBuffer ConvertPacketToBuffer(byte[] packet)
-        {
-            DataWriter writer = new DataWriter();
-            writer.WriteBytes(packet);
-            return writer.DetachBuffer();
-        }
-
-        /// <summary>
-        /// Converts a Bluetooth buffer into a byte array (IPv6 packet).
-        /// </summary>
-        /// <param name="buffer">The buffer received via Bluetooth.</param>
-        /// <returns></returns>
-        public static byte[] ConvertBufferToPacket(IBuffer buffer)
-        {
-            uint bufferLength = buffer.Length;
-            byte[] packet = new byte[bufferLength];
-
-            DataReader reader = DataReader.FromBuffer(buffer);
-            reader.ReadBytes(packet);
-
-            return packet;
-        }
+        }        
 
         /// <summary>
         /// Compares two byte arrays, i.e. packets, for equality
@@ -86,26 +60,6 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// Gets a characteristic from the characteristics result object
-        /// </summary>
-        /// <param name="result">A GATT characteristics result</param>
-        /// <param name="characteristic">The GATT characteristic to get</param>
-        public static void GetCharacteristicFromResult(
-            GattLocalCharacteristicResult   result,
-            ref GattLocalCharacteristic     characteristic
-        )
-        {
-            if(result.Error == BluetoothError.Success)
-            {
-                characteristic = result.Characteristic;
-            }
-            else
-            {
-                Debug.WriteLine(result.Error.ToString());
-            }
-        }
+        }        
     }
 }

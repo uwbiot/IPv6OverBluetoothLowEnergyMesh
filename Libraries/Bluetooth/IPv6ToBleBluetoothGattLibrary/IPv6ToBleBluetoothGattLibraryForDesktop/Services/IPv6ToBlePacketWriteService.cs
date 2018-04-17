@@ -27,7 +27,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
     public class IPv6ToBlePacketWriteService : GenericGattService
     {
         //---------------------------------------------------------------------
-        // Name of the service and identifying GUIDs/UUIDs
+        // Name of the service
         //---------------------------------------------------------------------
 
         // The name of the service
@@ -76,7 +76,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
             // Step 1
             // Prepare the packet write characteristic
             //
-            GattLocalCharacteristicParameters writeParams = Constants.packetWriteParameters;
+            GattLocalCharacteristicParameters writeParams = GattHelpers.packetWriteParameters;
             writeParams.UserDescription = "IPv6 to BLE packet write characteristic";
 
             //
@@ -93,15 +93,15 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
             // Step 3
             // Assign the created characteristic to this service's internal one
             //
-            Utilities.GetCharacteristicFromResult(characteristicResult,
-                                                  ref createdPacketWriteCharacteristic
-                                                  );
+            GattHelpers.GetCharacteristicFromResult(characteristicResult,
+                                                    ref createdPacketWriteCharacteristic
+                                                   );
             if(createdPacketWriteCharacteristic != null)
             {
                 PacketWriteCharacteristic = new IPv6ToBlePacketWriteCharacteristic(
-                                                    createdPacketWriteCharacteristic,
-                                                    this
-                                                );
+                                                createdPacketWriteCharacteristic,
+                                                this
+                                            );
             }
 
             characteristicResult = null;

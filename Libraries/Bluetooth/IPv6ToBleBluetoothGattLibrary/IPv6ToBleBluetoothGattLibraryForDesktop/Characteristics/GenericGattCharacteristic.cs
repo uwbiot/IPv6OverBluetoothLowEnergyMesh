@@ -39,7 +39,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
         protected void OnPropertyChanged(PropertyChangedEventArgs args)
         {
             PropertyChanged?.Invoke(this, args);
-        }
+        }        
 
         //---------------------------------------------------------------------
         // Objects and methods for the underlying GATT characteristic and

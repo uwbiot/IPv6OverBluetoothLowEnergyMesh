@@ -50,12 +50,14 @@
   <ItemGroup>
     <Compile Include="Characteristics\GenericGattCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBlePacketWriteCharacteristic.cs" />
-    <Compile Include="Constants.cs" />
+    <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\CreateServiceException.cs" />
+    <Compile Include="Helpers\GattHelpers.cs" />
     <Compile Include="Helpers\Utilities.cs" />
     <Compile Include="IPv6ToBleGattClient.cs" />
     <Compile Include="Services\GenericGattService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\InternetProtocolSupportService.cs" />
     <Compile Include="Services\IPv6ToBlePacketWriteService.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

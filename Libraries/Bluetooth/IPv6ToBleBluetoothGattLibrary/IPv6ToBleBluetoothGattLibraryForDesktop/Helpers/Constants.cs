@@ -12,24 +12,11 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
     /// Constant definitions for the IPv6ToBle packet writing service
     /// </summary>
     public class Constants
-    {
+    {    
         //---------------------------------------------------------------------
-        // Generic helper parameters for characteristics
+        // UUIDs for custom services and characteristics
         //---------------------------------------------------------------------
 
-
-        // GATT local characteristics parameter for Write parameters
-        public static readonly GattLocalCharacteristicParameters packetWriteParameters = new GattLocalCharacteristicParameters
-        {
-            CharacteristicProperties = GattCharacteristicProperties.Write | GattCharacteristicProperties.WriteWithoutResponse,
-            WriteProtectionLevel = GattProtectionLevel.Plain,
-            UserDescription = "IPv6 packet writing characteristic"
-        };
-
-        //---------------------------------------------------------------------
-        // UUIDs for services and characteristics
-        //---------------------------------------------------------------------
-        
         // UUID for the IPv6ToBlePacketService
         public static readonly Guid IPv6ToBlePacketWriteServiceUuid = Guid.Parse("93898DDB-AEAB-4434-997E-B0D2617E3033");
 

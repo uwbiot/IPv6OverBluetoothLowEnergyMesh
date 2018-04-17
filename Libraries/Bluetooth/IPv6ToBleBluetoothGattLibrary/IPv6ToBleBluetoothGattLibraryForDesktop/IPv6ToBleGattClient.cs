@@ -16,31 +16,49 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
 
     /// <summary>
-    /// This class represents generic GATT client functionality for our custom
-    /// service for transferring byte arrays (packets) over Bluetooth LE.
+    /// This class represents generic GATT client functionality for the
+    /// IPv6 Over Bluetooth Low Energy Mesh system. Multiple components in the
+    /// system, the GUI provisioning agent app and the background packet
+    /// processing app, utilize this class for GATT client behavior. Business
+    /// logic is left to each application, while shared GATT calls are defined
+    /// here.
     /// 
-    /// See https://docs.microsoft.com/windows/uwp/devices-sensors/gatt-client
-    /// for more details.
+    /// This includes functions to:
+    /// 
+    /// - Find devices
+    /// - Enumerate services
+    /// - Filter out devices that do not support the Internet Protocol Support 
+    ///     Service (IPSS) and our IPv6ToBle Packet Service
+    /// - Enumerate characteristics
+    /// - Perform read or write operations on a characteristic
     /// </summary>
     public class IPv6ToBleGattClient
     {
         //---------------------------------------------------------------------
-        // Local variables
+        // Constructor (empty)
+        //---------------------------------------------------------------------
+
+        public IPv6ToBleGattClient() { }
+
+        #region Device Discovery
+        //---------------------------------------------------------------------
+        // Local variables for device discovery
         //---------------------------------------------------------------------
 
         // List to store found devices
-        private List<DeviceInformation> FoundDevices = new List<DeviceInformation>();
+        private List<DeviceInformation> foundDevices = new List<DeviceInformation>();
 
-        // Getter for count of found devices
-        public int NumFoundDevices
+        // Getter for list of found devices for caller
+        public List<DeviceInformation> FoundDevices
         {
             get
             {
-                return FoundDevices.Count;
+                return foundDevices;
             }
+            private set { }
         }
 
-        // Bool to track if enumeration is complete
+        // Bool to track if enumeration is complete for caller
         private bool isEnumerationComplete = false;
 
         // Getter for isEnumerationComplete
@@ -50,6 +68,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             {
                 return isEnumerationComplete;
             }
+            private set { }
         }
 
         // Counter for number of found devices
@@ -57,12 +76,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
         // Device watcher to enumerate nearby devices
         private DeviceWatcher deviceWatcher;
-
-        //---------------------------------------------------------------------
-        // Constructor (empty)
-        //---------------------------------------------------------------------
-
-        public IPv6ToBleGattClient() { }
+        
 
         //---------------------------------------------------------------------
         // Methods for device discovery
@@ -87,7 +101,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                 "System.Devices.Aep.Bluetooth.Le.IsConnectable"
             };
 
-            // Query string for the type of device to scan for
+            // Query string for the type of device to scan for (BLE protocol)
             string aqsAllBluetoothLeDevices = "(System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\")";
 
             //
@@ -110,9 +124,9 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
             //
             // Step 4
-            // Clear the collection of devices
+            // Clear the collection of devices from last time
             //
-            FoundDevices.Clear();
+            foundDevices.Clear();
 
             //
             // Step 5
@@ -160,9 +174,9 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             if(sender == deviceWatcher)
             {
                 // Make sure the device isn't already in the list
-                if(!FoundDevices.Contains(deviceInfo))
+                if(!foundDevices.Contains(deviceInfo))
                 {
-                    FoundDevices[count] = deviceInfo;
+                    foundDevices[count] = deviceInfo;
                     count++;
                 }
             }
@@ -181,14 +195,14 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                 int newCount = 0;
 
                 // Find the device and update it if it was the one that got updated
-                foreach (DeviceInformation device in FoundDevices)
+                foreach (DeviceInformation device in foundDevices)
                 {
                     if (newCount < count)
                     {
-                        if (FoundDevices[newCount].Id == deviceInfoUpdate.Id)
+                        if (foundDevices[newCount].Id == deviceInfoUpdate.Id)
                         {
                             // Update the device
-                            FoundDevices[newCount].Update(deviceInfoUpdate);
+                            foundDevices[newCount].Update(deviceInfoUpdate);
                         }
                     }
 
@@ -212,14 +226,14 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                 int newCount = 0;
 
                 // Find the device and remove it
-                foreach (DeviceInformation device in FoundDevices)
+                foreach (DeviceInformation device in foundDevices)
                 {
                     if (newCount < count)
                     {
-                        if (FoundDevices[newCount].Id == deviceInfoUpdate.Id)
+                        if (foundDevices[newCount].Id == deviceInfoUpdate.Id)
                         {
                             // Remove the device
-                            FoundDevices.RemoveAt(newCount);
+                            foundDevices.RemoveAt(newCount);
                         }
                     }
                     newCount++;
@@ -238,11 +252,34 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             isEnumerationComplete = true;
             Debug.WriteLine("Enumeration complete.");
         }
+        #endregion
+
+        #region Enumerate GATT services and filter out incompatible devices
+        //---------------------------------------------------------------------
+        // Local variables for enumerating GATT services
+        //---------------------------------------------------------------------
+
+        // List of Bluetooth LE device objects to match found device information
+        private List<BluetoothLEDevice> bluetoothLEDevices = new List<BluetoothLEDevice>();
 
         //---------------------------------------------------------------------
-        // Methods for device connection after discovery
+        // Methods for device connection after discovery (service and
+        // characteristic enumeration)
         //---------------------------------------------------------------------
 
+        // Connects to each found device and enumerates available GATT
+        // services, then This method is called after the initial device discovery
+        // phase and 
+        public async void PopulateIPv6ToBleSupportedDevices()
+        {
+            // Check for empty list
+            if(foundDevices.Count == 0)
+            {
+                return;
+            }
 
+
+        }
+        #endregion
     }
 }
