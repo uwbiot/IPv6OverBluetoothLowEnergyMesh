@@ -14,7 +14,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
 {
     /// <summary>
     /// Helper class for working with GATT aspects like characteristics and
-    /// UUIDs.oft.
+    /// UUIDs.
     /// </summary>
     public static class GattHelpers
     {
@@ -28,6 +28,14 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
             CharacteristicProperties = GattCharacteristicProperties.Write | GattCharacteristicProperties.WriteWithoutResponse,
             WriteProtectionLevel = GattProtectionLevel.Plain,
             UserDescription = "IPv6 packet writing characteristic"
+        };
+
+        // GATT local characteristics parameter for Read parameters
+        public static readonly GattLocalCharacteristicParameters ipv6AddressReadParameters = new GattLocalCharacteristicParameters
+        {
+            CharacteristicProperties = GattCharacteristicProperties.Read,
+            ReadProtectionLevel = GattProtectionLevel.Plain,
+            UserDescription = "IPv6 address reading characteristic"
         };
 
         //---------------------------------------------------------------------
@@ -61,12 +69,12 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
         /// Converts an IPv6 packet (byte array) to a buffer for Bluetooth
         /// operations.
         /// </summary>
-        /// <param name="packet">The IPv6 packet in byte array form.</param>
+        /// <param name="bytes">The IPv6 packet in byte array form.</param>
         /// <returns></returns>
-        public static IBuffer ConvertPacketToBuffer(byte[] packet)
+        public static IBuffer ConvertByteArrayToBuffer(byte[] bytes)
         {
             DataWriter writer = new DataWriter();
-            writer.WriteBytes(packet);
+            writer.WriteBytes(bytes);
             return writer.DetachBuffer();
         }
 
@@ -75,15 +83,15 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
         /// </summary>
         /// <param name="buffer">The buffer received via Bluetooth.</param>
         /// <returns></returns>
-        public static byte[] ConvertBufferToPacket(IBuffer buffer)
+        public static byte[] ConvertBufferToByteArray(IBuffer buffer)
         {
             uint bufferLength = buffer.Length;
-            byte[] packet = new byte[bufferLength];
+            byte[] bytes = new byte[bufferLength];
 
             DataReader reader = DataReader.FromBuffer(buffer);
-            reader.ReadBytes(packet);
+            reader.ReadBytes(bytes);
 
-            return packet;
+            return bytes;
         }
 
         //---------------------------------------------------------------------

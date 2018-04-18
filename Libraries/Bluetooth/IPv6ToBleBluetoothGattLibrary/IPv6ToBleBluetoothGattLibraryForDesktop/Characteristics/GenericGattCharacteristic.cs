@@ -100,8 +100,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
         //---------------------------------------------------------------------
 
         public GenericGattCharacteristic(
-            GattLocalCharacteristic     characteristic, 
-            GenericGattService service
+            GattLocalCharacteristic characteristic, 
+            GenericGattService      service
         )
         {
             Characteristic = characteristic;

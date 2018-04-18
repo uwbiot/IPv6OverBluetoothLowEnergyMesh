@@ -4,15 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Net;
 
 namespace IPv6ToBleBluetoothGattLibraryForDesktop
-{    
+{
+    //
+    // Namespaces in this project
+    //
+    using IPv6ToBleBluetoothGattLibraryForDesktop.Helpers;
+
     //
     // Bluetooth and device enumeration namespaces
     //
     using Windows.Devices.Bluetooth;
     using Windows.Devices.Bluetooth.GenericAttributeProfile;
     using Windows.Devices.Enumeration;
+    using Windows.Storage.Streams;
 
 
     /// <summary>
@@ -40,23 +47,13 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
         public IPv6ToBleGattClient() { }
 
-        #region Device Discovery
+        #region Local Variables
         //---------------------------------------------------------------------
         // Local variables for device discovery
         //---------------------------------------------------------------------
 
         // List to store found devices
         private List<DeviceInformation> foundDevices = new List<DeviceInformation>();
-
-        // Getter for list of found devices for caller
-        public List<DeviceInformation> FoundDevices
-        {
-            get
-            {
-                return foundDevices;
-            }
-            private set { }
-        }
 
         // Bool to track if enumeration is complete for caller
         private bool isEnumerationComplete = false;
@@ -76,8 +73,36 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
         // Device watcher to enumerate nearby devices
         private DeviceWatcher deviceWatcher;
-        
 
+        //---------------------------------------------------------------------
+        // Local variables for enumerating GATT services
+        //---------------------------------------------------------------------
+
+        // Dictionary of Bluetooth LE device objects and their IP addresses to 
+        // match found device information
+        private Dictionary<DeviceInformation, IPAddress> supportedBleDevices = new Dictionary<DeviceInformation, IPAddress>();
+
+        // Getter and setter for list of supported BLE devices (available to
+        // caller)
+        public Dictionary<DeviceInformation, IPAddress> SupportedBleDevices
+        {
+            get
+            {
+                return supportedBleDevices;
+            }
+
+            private set
+            {
+                if(supportedBleDevices != value)
+                {
+                    supportedBleDevices = value;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Device Discovery
         //---------------------------------------------------------------------
         // Methods for device discovery
         //---------------------------------------------------------------------
@@ -254,32 +279,189 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         }
         #endregion
 
-        #region Enumerate GATT services and filter out incompatible devices
+        #region Filter devices and get IPv6 addresses
         //---------------------------------------------------------------------
-        // Local variables for enumerating GATT services
-        //---------------------------------------------------------------------
-
-        // List of Bluetooth LE device objects to match found device information
-        private List<BluetoothLEDevice> bluetoothLEDevices = new List<BluetoothLEDevice>();
-
-        //---------------------------------------------------------------------
-        // Methods for device connection after discovery (service and
-        // characteristic enumeration)
+        // Methods for device connection after discovery. Enumerate services
+        // on each discovered device and add supported devices to a dictionary
+        // that maps devices to their link-local IPv6 addresses.
         //---------------------------------------------------------------------
 
         // Connects to each found device and enumerates available GATT
-        // services, then This method is called after the initial device discovery
-        // phase and 
-        public async void PopulateIPv6ToBleSupportedDevices()
+        // services, then only adds devices to the list that support both the
+        // IPSSS and our IPv6ToBle packet writing service. This method is 
+        // called after the initial device discovery phase.
+        public async void PopulateSupportedDevices()
         {
-            // Check for empty list
-            if(foundDevices.Count == 0)
+            //
+            // Step 1
+            // Check for empty list in case we couldn't find anything
+            //
+            if (foundDevices.Count == 0)
             {
                 return;
             }
 
+            //
+            // Step 2
+            // Connect to each previously found device and enumerate its
+            // services. If it supports both IPSS and IPv6ToBle Packet Writing
+            // Service, add it to the list.
+            //
+            foreach (DeviceInformation deviceInfo in foundDevices)
+            {
+                BluetoothLEDevice currentDevice = null;
+                GattDeviceService ipv6ToBlePacketProcessingService = null;
+                GattCharacteristic ipv6AddressCharacteristic = null;
+                IPAddress ipv6Address = null;
 
+                bool hasInternetProtocolSupportService = false;
+                bool hasIPv6ToBlePacketWriteService = false;
+
+                try
+                {
+                    // Connect. This is recommended to do on a UI thread
+                    // normally because it may prompt for consent, but for our
+                    // purposes in this application it will auto-accept and we
+                    // don't have to use a UI thread.
+                    currentDevice = await BluetoothLEDevice.FromIdAsync(deviceInfo.Id);
+
+                    if (currentDevice == null)
+                    {
+                        Debug.WriteLine($"Failed to connect to device {deviceInfo.Id}");
+                    }
+                }
+                catch (Exception e) when (e.HResult == Constants.E_DEVICE_NOT_AVAILABLE)
+                {
+                    Debug.WriteLine("Bluetooth radio is not on.");
+                }
+
+                // Enumerate the GATT services with GetGattServicesAsync
+                if (currentDevice != null)
+                {
+                    // Retrieve the list of services from the device (uncached)
+                    GattDeviceServicesResult servicesResult = await currentDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+
+                    if (servicesResult.Status == GattCommunicationStatus.Success)
+                    {
+                        var services = servicesResult.Services;
+                        Debug.WriteLine($"Found {services.Count} services for" +
+                                        $"device {deviceInfo.Id}"
+                                        );
+
+                        // Iterate through the list of services and check if
+                        // both services we require are there
+                        foreach (GattDeviceService service in services)
+                        {
+                            Guid uuid = service.Uuid;
+
+                            // Check for IPSS
+                            ushort shortId = GattHelpers.ConvertUuidToShortId(uuid);
+                            if (shortId == (ushort)GattHelpers.SigAssignedGattNativeUuid.InternetProtocolSupport)
+                            {
+                                hasInternetProtocolSupportService = true;
+                            }
+
+                            // Check for IPv6ToBle Packet Write Service
+                            if (uuid == Constants.IPv6ToBlePacketProcessingServiceUuid)
+                            {
+                                hasIPv6ToBlePacketWriteService = true;
+                                ipv6ToBlePacketProcessingService = service;
+                            }
+                        }
+                    }
+                }
+
+                // Query the device's IP address - enumerate characteristics
+                // for the IPv6ToBlePacketProcessingService and read from the
+                // IPv6 address characteristic to map devices to their
+                // addresses
+                if (hasInternetProtocolSupportService &&
+                   hasIPv6ToBlePacketWriteService &&
+                   ipv6ToBlePacketProcessingService != null)
+                {
+                    IReadOnlyList<GattCharacteristic> characteristics = null;
+
+                    try
+                    {
+                        // Verify we can access the device's packet processing service
+                        DeviceAccessStatus accessStatus = await ipv6ToBlePacketProcessingService.RequestAccessAsync();
+                        if (accessStatus == DeviceAccessStatus.Allowed)
+                        {
+                            // Enumerate the characteristics
+                            GattCharacteristicsResult characteristicsResult =
+                                await ipv6ToBlePacketProcessingService.GetCharacteristicsAsync(BluetoothCacheMode.Uncached);
+
+                            if (characteristicsResult.Status == GattCommunicationStatus.Success)
+                            {
+                                characteristics = characteristicsResult.Characteristics;
+                            }
+                            else
+                            {
+                                Debug.WriteLine("Could not access the packet" +
+                                                "processing service."
+                                                );
+                                // On error, act as if there were no characteristics
+                                characteristics = new List<GattCharacteristic>();
+                            }
+                        }
+                        else
+                        {
+                            // Not granted access
+                            Debug.WriteLine("Could not access the packet" +
+                                            "processing service."
+                                            );
+                            // On error, act as if there were no characteristics
+                            characteristics = new List<GattCharacteristic>();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("Could not read characteristics due to" +
+                                        "permissions issues. " + e.Message
+                                        );
+                        // On error, act as if there were no characteristics
+                        characteristics = new List<GattCharacteristic>();
+                    }
+
+                    // Find the IPv6 address characteristic
+                    foreach (GattCharacteristic characteristic in characteristics)
+                    {
+                        if (characteristic.Uuid == Constants.IPv6ToBleIPv6AddressCharacteristicUuid)
+                        {
+                            ipv6AddressCharacteristic = characteristic;
+                            break;
+                        }
+                    }
+
+                    // Get the IPv6 address from the characteristic
+                    if (ipv6AddressCharacteristic != null)
+                    {
+                        GattReadResult readResult = await ipv6AddressCharacteristic.ReadValueAsync();
+                        if (readResult.Status == GattCommunicationStatus.Success)
+                        {
+                            ipv6Address = new IPAddress(GattHelpers.ConvertBufferToByteArray(readResult.Value));
+                        }
+                    }
+
+                    // Finally, add the deviceInfo/IP address pair to the
+                    // dictionary
+                    if (ipv6Address != null)
+                    {
+                        supportedBleDevices.Add(deviceInfo, ipv6Address);
+                    }
+                }
+            }
         }
+        #endregion
+
+        #region Write an IPv6 packet
+        //---------------------------------------------------------------------
+        // Method to write an IPv6 packet to a remote device, given a
+        // packet and a destination IPv6 address
+        //---------------------------------------------------------------------
+
+        
+
         #endregion
     }
 }

@@ -14,6 +14,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
     /// This class is based on the CreateServiceException class in the 
     /// GattServicesLibrary sample from Microsoft.
     /// </summary>
+    [Serializable]
     public class CreateServiceException : Exception
     {
         public GattServiceProviderResult CreateServiceExceptionResult { get; }

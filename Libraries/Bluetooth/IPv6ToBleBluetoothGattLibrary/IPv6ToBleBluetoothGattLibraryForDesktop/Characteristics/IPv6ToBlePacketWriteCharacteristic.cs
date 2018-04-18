@@ -71,7 +71,9 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
 
             // Set the packet byte array to the received value for others to
             // read or retrieve
-            Packet = GattHelpers.ConvertBufferToPacket(Value);
+            Packet = GattHelpers.ConvertBufferToByteArray(Value);
+
+            // Caller does something with the packet after this
         }
     }
 }
