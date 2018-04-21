@@ -41,11 +41,6 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
     /// </summary>
     public class IPv6ToBleGattClient
     {
-        //---------------------------------------------------------------------
-        // Constructor (empty)
-        //---------------------------------------------------------------------
-
-        public IPv6ToBleGattClient() { }
 
         #region Local Variables
         //---------------------------------------------------------------------
@@ -102,7 +97,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
         #endregion
 
-        #region Device Discovery
+        #region Device Discovery for Pairing
         //---------------------------------------------------------------------
         // Methods for device discovery
         //---------------------------------------------------------------------
@@ -279,7 +274,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         }
         #endregion
 
-        #region Filter devices and get IPv6 addresses
+        #region Filter Discovered Devices
         //---------------------------------------------------------------------
         // Methods for device connection after discovery. Enumerate services
         // on each discovered device and add supported devices to a dictionary
@@ -460,7 +455,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         // packet and a destination IPv6 address
         //---------------------------------------------------------------------
 
-        
+
 
         #endregion
     }
