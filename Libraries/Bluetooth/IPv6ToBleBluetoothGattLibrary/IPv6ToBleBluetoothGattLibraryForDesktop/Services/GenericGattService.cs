@@ -93,7 +93,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         // Method to initialize this class
         //---------------------------------------------------------------------
 
-        public abstract Task Init();
+        public abstract Task InitAsync();
 
         //---------------------------------------------------------------------
         // Method to create the GATT service provider

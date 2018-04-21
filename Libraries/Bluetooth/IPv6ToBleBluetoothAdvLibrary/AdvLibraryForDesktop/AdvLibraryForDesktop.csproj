@@ -30,6 +30,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="IPv6ToBleBluetoothGattLibraryForDesktop">
+      <HintPath>..\..\IPv6ToBleBluetoothGattLibrary\IPv6ToBleBluetoothGattLibraryForDesktop\bin\Release\IPv6ToBleBluetoothGattLibraryForDesktop.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Runtime.WindowsRuntime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
@@ -47,8 +50,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IPv6ToBleAdvertisementPublisher.cs" />
-    <Compile Include="IPv6ToBleAdvertisementWatcher.cs" />
+    <Compile Include="IPv6ToBleAdvPublisherPacketReceive.cs" />
+    <Compile Include="IPv6ToBleAdvWatcherPacketWrite.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

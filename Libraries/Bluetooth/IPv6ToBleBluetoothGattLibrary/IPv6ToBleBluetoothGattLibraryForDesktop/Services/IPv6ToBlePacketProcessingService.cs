@@ -88,7 +88,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
         // Asynchronous initialization
         //---------------------------------------------------------------------
 
-        public override async Task Init()
+        public override async Task InitAsync()
         {
             await CreateServiceProvider(Constants.IPv6ToBlePacketProcessingServiceUuid);
 

@@ -23,23 +23,10 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
 
     /// <summary>
-    /// This class represents generic GATT client functionality for the
-    /// IPv6 Over Bluetooth Low Energy Mesh system. Multiple components in the
-    /// system, the GUI provisioning agent app and the background packet
-    /// processing app, utilize this class for GATT client behavior. Business
-    /// logic is left to each application, while shared GATT calls are defined
-    /// here.
-    /// 
-    /// This includes functions to:
-    /// 
-    /// - Find devices
-    /// - Enumerate services
-    /// - Filter out devices that do not support the Internet Protocol Support 
-    ///     Service (IPSS) and our IPv6ToBle Packet Service
-    /// - Enumerate characteristics
-    /// - Perform read or write operations on a characteristic
+    /// This class represents GATT client functionality for non-advertisement
+    /// needs. Primarily, this would be used by the GUI provisioning agent app.
     /// </summary>
-    public class IPv6ToBleGattClient
+    public class IPv6ToBleGattPairing
     {
 
         #region Local Variables
@@ -354,6 +341,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                             if (shortId == (ushort)GattHelpers.SigAssignedGattNativeUuid.InternetProtocolSupport)
                             {
                                 hasInternetProtocolSupportService = true;
+                                continue;
                             }
 
                             // Check for IPv6ToBle Packet Write Service
@@ -361,6 +349,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                             {
                                 hasIPv6ToBlePacketWriteService = true;
                                 ipv6ToBlePacketProcessingService = service;
+                                continue;
                             }
                         }
                     }
@@ -371,8 +360,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                 // IPv6 address characteristic to map devices to their
                 // addresses
                 if (hasInternetProtocolSupportService &&
-                   hasIPv6ToBlePacketWriteService &&
-                   ipv6ToBlePacketProcessingService != null)
+                    hasIPv6ToBlePacketWriteService &&
+                    ipv6ToBlePacketProcessingService != null)
                 {
                     IReadOnlyList<GattCharacteristic> characteristics = null;
 
@@ -447,16 +436,6 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
                 }
             }
         }
-        #endregion
-
-        #region Write an IPv6 packet
-        //---------------------------------------------------------------------
-        // Method to write an IPv6 packet to a remote device, given a
-        // packet and a destination IPv6 address
-        //---------------------------------------------------------------------
-
-
-
         #endregion
     }
 }

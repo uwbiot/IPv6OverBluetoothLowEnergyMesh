@@ -27,8 +27,13 @@ namespace AdvLibraryForDesktop
     /// instead of having to go out of our way to create background task
     /// workers. In a normal foreground app, to run a publisher in the
     /// background would require registering a background task.
+    /// 
+    /// The behavior of the IPv6 Over Bluetooth Low Energy project is such that
+    /// a server/recipient of a packet will publish advertisements that it is
+    /// ready, and a client/sender will watch for those advertisements when it
+    /// has a packet.
     /// </summary>
-    public class IPv6ToBleAdvertisementPublisher
+    public class IPv6ToBleAdvPublisherPacketReceive
     {
         //---------------------------------------------------------------------
         // Local variables
@@ -38,11 +43,11 @@ namespace AdvLibraryForDesktop
         private BluetoothLEAdvertisementPublisher publisher;
 
         //---------------------------------------------------------------------
-        // Constructor and destructor
+        // Init and ShutDown
         //---------------------------------------------------------------------
 
-        // Constructs and begins publishing advertisements
-        public IPv6ToBleAdvertisementPublisher()
+        // Initializes the publisher and begins publishing advertisements
+        public void Start()
         {
             //
             // Step 1
@@ -77,8 +82,8 @@ namespace AdvLibraryForDesktop
             publisher.Start();
         }
 
-        // Destroys the object and stops publishing advertisements
-        ~IPv6ToBleAdvertisementPublisher()
+        // Stops publishing advertisements
+        public void Stop()
         {
             // Stop the publisher
             publisher.Stop();
@@ -88,7 +93,7 @@ namespace AdvLibraryForDesktop
         }
 
         //---------------------------------------------------------------------
-        // Methods to handle if/when the publisher's status changes
+        // Method to handle if/when the publisher's status changes
         //---------------------------------------------------------------------
 
         // Event callback for when the status of the publisher changes. This
@@ -102,28 +107,6 @@ namespace AdvLibraryForDesktop
             {
                 publisher.Start();
             }
-        }
-
-        //---------------------------------------------------------------------
-        // Stop and start routines, just in case a caller needs this? Of note
-        // is that you normally also add and remove the event handler during
-        // normal operations with Bluetooth Advertisements, such as when the
-        // app is suspending or resuming. But, since we always run these from
-        // a continuously-running, automatically-starting background service/
-        // IoT app, we only set up and tear down the handlers when we create
-        // or destroy the class instance. But we still provide these helpers
-        // to start or stop the publisher for completeness, if the caller needs
-        // them.
-        //---------------------------------------------------------------------
-
-        public void Start()
-        {
-            publisher.Start();
-        }
-
-        public void Stop()
-        {
-            publisher.Stop();
         }
     }
 }

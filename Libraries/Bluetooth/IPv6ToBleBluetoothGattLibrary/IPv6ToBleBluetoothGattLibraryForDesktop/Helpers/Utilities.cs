@@ -5,11 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-// UWP namespaces
-using Windows.Devices.Bluetooth;
-using Windows.Devices.Bluetooth.GenericAttributeProfile;
-using Windows.Storage.Streams;
-
 namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
 {
     /// <summary>
@@ -60,6 +55,6 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
             }
 
             return true;
-        }        
+        }
     }
 }

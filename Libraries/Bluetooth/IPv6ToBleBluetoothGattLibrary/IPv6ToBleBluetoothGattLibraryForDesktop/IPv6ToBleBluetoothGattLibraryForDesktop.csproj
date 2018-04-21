@@ -51,11 +51,12 @@
     <Compile Include="Characteristics\GenericGattCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBleIPv6AddressCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBlePacketWriteCharacteristic.cs" />
+    <Compile Include="Helpers\BluetoothRoleSupport.cs" />
     <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\CreateServiceException.cs" />
     <Compile Include="Helpers\GattHelpers.cs" />
     <Compile Include="Helpers\Utilities.cs" />
-    <Compile Include="IPv6ToBleGattClient.cs" />
+    <Compile Include="IPv6ToBleGattPairing.cs" />
     <Compile Include="IPv6ToBleGattServer.cs" />
     <Compile Include="Services\GenericGattService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

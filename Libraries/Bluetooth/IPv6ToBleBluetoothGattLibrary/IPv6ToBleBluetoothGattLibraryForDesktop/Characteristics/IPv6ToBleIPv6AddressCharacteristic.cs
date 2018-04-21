@@ -37,7 +37,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
             }
             set
             {
-                if(ipv6Address != value)
+                if(!IPAddress.Equals(ipv6Address, value))
                 {
                     ipv6Address = value;
                     OnPropertyChanged(new PropertyChangedEventArgs("Ipv6Address"));

@@ -35,7 +35,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
         // Asynchronous initialization
         //---------------------------------------------------------------------
 
-        public override async Task Init()
+        public override async Task InitAsync()
         {
             //
             // Create the long UUID for the IPSP by combining its short form
