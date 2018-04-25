@@ -43,7 +43,7 @@ namespace IPv6ToBleSixLowPanLibraryForDesktop
         /// because I'm terrible at bitwise operations so I don't use them.
         /// </summary>
         /// <returns></returns>
-        public static async Task<IPAddress> Generate()
+        public static async Task<IPAddress> GenerateAsync()
         {
             //
             // Step 1

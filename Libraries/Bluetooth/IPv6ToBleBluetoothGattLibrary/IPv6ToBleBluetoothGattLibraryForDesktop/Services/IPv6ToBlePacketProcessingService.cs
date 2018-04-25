@@ -129,7 +129,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
             //
 
             // Generate the device's link-local IPv6 address
-            IPAddress address = await IPv6AddressFromBluetoothAddress.Generate();
+            IPAddress address = await IPv6AddressFromBluetoothAddress.GenerateAsync();
             if(address == null)
             {
                 Debug.WriteLine("Could not generate a link-local IPv6 address" +
@@ -160,8 +160,6 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
                                                 address
                                             );
             }
-
-            characteristicResult = null;
         }
     }
 }
