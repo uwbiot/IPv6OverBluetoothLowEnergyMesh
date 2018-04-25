@@ -5,8 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Net;
+using System.Diagnostics;
 
 // Namespaces for our project
+using IPv6ToBleSixLowPanLibraryForDesktop;
 using IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics;
 using IPv6ToBleBluetoothGattLibraryForDesktop.Helpers;
 
@@ -126,11 +128,17 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Services
             // Create the IPv6 address read characteristic
             //
 
-            // TODO: Generate the device's link-local IPv6 address here to
-            // give to the characteristic's constructor. Use dummy for now.
-            byte[] dummy = new byte[16];
-            IPAddress address = new IPAddress(dummy);
+            // Generate the device's link-local IPv6 address
+            IPAddress address = await IPv6AddressFromBluetoothAddress.Generate();
+            if(address == null)
+            {
+                Debug.WriteLine("Could not generate a link-local IPv6 address" +
+                                " from the Bluetooth address."
+                                );
+                return;
+            }
 
+            // Create the characteristic
             GattLocalCharacteristic createdIPv6AddressReadCharacteristic = null;
             characteristicResult = await ServiceProvider.Service.CreateCharacteristicAsync(
                                             Constants.IPv6ToBleIPv6AddressCharacteristicUuid,
