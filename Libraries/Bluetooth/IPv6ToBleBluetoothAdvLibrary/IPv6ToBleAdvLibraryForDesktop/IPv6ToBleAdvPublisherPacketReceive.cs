@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Storage.Streams;
 
-namespace AdvLibraryForDesktop
+namespace IPv6ToBleAdvLibraryForDesktop
 {
     /// <summary>
     /// A class to register and publish Bluetooth advertisements.

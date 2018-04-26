@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A0B876EE-01C1-4B9E-898C-9A577E0D553B}</ProjectGuid>
+    <ProjectGuid>{835FA158-639B-493A-98B6-2FC865DB2C4E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AdvLibraryForUWP</RootNamespace>
-    <AssemblyName>AdvLibraryForUWP</AssemblyName>
+    <RootNamespace>IPv6ToBleAdvLibraryForUWP</RootNamespace>
+    <AssemblyName>IPv6ToBleAdvLibraryForUWP</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.16299.0</TargetPlatformVersion>
@@ -107,7 +107,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="Properties\AdvLibraryForUWP.rd.xml" />
+    <EmbeddedResource Include="Properties\IPv6ToBleAdvLibraryForUWP.rd.xml" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">

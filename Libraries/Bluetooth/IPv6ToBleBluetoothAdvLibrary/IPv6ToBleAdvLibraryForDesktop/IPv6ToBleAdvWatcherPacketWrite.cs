@@ -17,7 +17,7 @@ using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
 using Windows.Storage.Streams;
 
-namespace AdvLibraryForDesktop
+namespace IPv6ToBleAdvLibraryForDesktop
 {
     /// <summary>
     /// A class to watch for Bluetooth advertisements from publishers who are
