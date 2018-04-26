@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace IPv6ToBlePacketProcessingForDesktop
 {
-    static class Program
+    static class ServiceMain
     {
         /// <summary>
         /// The main entry point for the application.
