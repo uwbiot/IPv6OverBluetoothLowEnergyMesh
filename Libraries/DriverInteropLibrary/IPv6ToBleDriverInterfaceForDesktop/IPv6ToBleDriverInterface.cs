@@ -223,5 +223,24 @@ namespace IPv6ToBleDriverInterfaceForDesktop
             out int lpBytesReturned,
             NativeOverlapped* lpOverlapped
         );
+
+        /// <summary>
+        /// GetOverlappedResultEx() is used to monitor an asynchronous operation
+        /// from a previous call to DeviceIoControl() using Overlapped I/O.
+        /// </summary>
+        /// <param name="hFile"></param>
+        /// <param name="lpOverlapped"></param>
+        /// <param name="lpNumberOfBytesTransferred"></param>
+        /// <param name="bWait"></param>
+        /// <returns></returns>
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode,
+            SetLastError = true)]
+        public unsafe static extern bool GetOverlappedResultEx(
+            SafeFileHandle hFile,
+            NativeOverlapped* lpOverlapped,
+            out int lpNumberOfBytesTransferred,
+            int dwMilliseconds,
+            bool bAlertable
+        );
     }
 }
