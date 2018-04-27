@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Net;
+using System.ComponentModel;
 
 // Our GATT library
 using IPv6ToBleBluetoothGattLibraryForDesktop;
@@ -61,7 +62,16 @@ namespace IPv6ToBleAdvLibraryForDesktop
         // upon receiving an advertisement from a nearby node/server
         private bool transmittedSuccessfully = false;
 
-        // Getter for transmittedSuccessfully so the caller can check this
+        // Event handler and getter for callers to know when this bool has
+        // changed.
+
+        public event PropertyChangedEventHandler TransmittedSuccessfullyChanged;
+
+        protected virtual void OnTransmittedSuccessfullyChanged(PropertyChangedEventArgs args)
+        {
+            TransmittedSuccessfullyChanged?.Invoke(this, args);
+        }
+
         public bool TransmittedSuccessfully
         {
             get
@@ -71,10 +81,14 @@ namespace IPv6ToBleAdvLibraryForDesktop
 
             private set
             {
-                if(transmittedSuccessfully != value)
+                lock(this)
                 {
-                    transmittedSuccessfully = value;
-                }
+                    if (transmittedSuccessfully != value)
+                    {
+                        transmittedSuccessfully = value;
+                    }
+                    OnTransmittedSuccessfullyChanged(new PropertyChangedEventArgs("TransmittedSuccessfully"));
+                }                
             }
         }
 
