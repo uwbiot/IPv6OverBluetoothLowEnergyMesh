@@ -57,7 +57,12 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
         // A boolean to signal the worker thread to stop, if we're shutting
         // down or otherwise stopping the service
-        private volatile bool shouldStop;
+        private volatile bool shouldStop = false;
+
+        // Booleans to track whether the packet has finished transmitting, and
+        // whether it was successful
+        private bool packetTransmitted = false;
+        private bool packetTransmittedSuccessfully = false;
 
         #endregion
 
@@ -71,7 +76,6 @@ namespace IPv6ToBlePacketProcessingForDesktop
         )
         {
             ParentService = parentService;
-            shouldStop = false;
         }
         #endregion
 
@@ -117,30 +121,35 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
             //
             // Step 3
-            // Send an initial batch of packet listening requests to the driver
+            // Load the static routing table
+            // 
             //
-            for (int i = 0; i < 10; i++)
-            {
-                SendListenRequestToDriver();
 
-                // Wait 1 millisecond to give the driver a chance to pend the
-                // request before sending it another one
-                Thread.Sleep(1);
-            }
 
             //
             // Step 4
-            // Load the static routing table
-            //
-
-
-            //
-            // Step 5
             // Set up a Bluetooth advertiser to let neighbors know we can
-            // receive a packet if need be
+            // receive a packet if need be. For testing, this is always on.
             //
+            IPv6ToBleAdvPublisherPacketReceive packetReceiver = new IPv6ToBleAdvPublisherPacketReceive();
+            packetReceiver.Start();
 
-            
+            //
+            // Step 6
+            // Indefinitely run in a cycle of sending listening requests to the
+            // driver/waiting for a packet/receiving a packet/sending a packet/
+            // sending another listening request...
+            //
+            while (!shouldStop)
+            {
+                SendListenRequestToDriverAndSendReceivedPacketAsync();
+            }
+
+            //
+            // Step 7
+            // Shut down Bluetooth resources upon exit
+            //
+            packetReceiver.Stop();            
         }
 
         // Method to signal the thread to stop
@@ -150,7 +159,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
         }
         #endregion
 
-        #region Driver interaction
+        #region Packet operations
 
         /// <summary>
         /// Verifies that the driver is present. Does not do anything else.
@@ -187,7 +196,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
         /// Sends the IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 control code to the
         /// driver to ask the driver to listen for a packet.
         /// </summary>
-        private unsafe void SendListenRequestToDriver()
+        private unsafe void SendListenRequestToDriverAndSendReceivedPacketAsync()
         {
             //
             // Step 1
@@ -237,7 +246,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             // The Pack() method packs the current managed Overlapped structure
             // into a native one, specifies a delegate callback for when the 
             // asynchronous operation completes, and specifies a managed object
-            // (the packet) that serves as a the buffer.
+            // (the packet) that serves as the buffer.
             Overlapped overlapped = new Overlapped();
             NativeOverlapped* nativeOverlapped = overlapped.Pack(IPv6ToBleListenCompletionCallback,
                                                                  packet
@@ -277,7 +286,8 @@ namespace IPv6ToBlePacketProcessingForDesktop
             {
                 // Operation completed synchronously for some reason
                 Debug.WriteLine("DeviceIoControl executed synchronously " +
-                    "despite overlapped I/O flag.\n");
+                                "despite overlapped I/O flag."
+                                );
                 Overlapped.Unpack(nativeOverlapped);
                 Overlapped.Free(nativeOverlapped);
             }
@@ -294,9 +304,74 @@ namespace IPv6ToBlePacketProcessingForDesktop
                     Overlapped.Unpack(nativeOverlapped);
                     Overlapped.Free(nativeOverlapped);
                 }
+                else
+                {
+                    // Wait for a packet to arrive. We do this by trying to get
+                    // the overlapped result for 10 seconds, then aborting this
+                    // attempt if it fails. This is so we can return control
+                    // to the while loop in the DoWork() function, giving
+                    // the thread a chance to see if it has been requested to
+                    // stop.
+
+                    listenResult = IPv6ToBleDriverInterface.GetOverlappedResultEx(
+                                       driverHandle,
+                                       nativeOverlapped,
+                                       out bytesReceived,
+                                       10000,  // 10 seconds
+                                       false   // don't block forever
+                                   );
+
+                    // We have a packet. Send it out over Bluetooth.
+                    if(listenResult)
+                    {
+                        // Fire up the Bluetooth Advertisement packet write
+                        // watcher
+                        IPv6ToBleAdvWatcherPacketWrite watcher = new IPv6ToBleAdvWatcherPacketWrite();
+
+                        // Start the watcher. This causes it to write the
+                        // packet when it finds a suitable recipient.
+
+                        // START: need the destination address, packet, and routing table
+
+                        // Wait for the watcher to signal the event that the
+                        // packet has transmitted. This should happen after the
+                        // watcher receives an advertisement OR a timeout of
+                        // 10 seconds occurs (arbitrary number).
+                        Stopwatch stopwatch = new Stopwatch();
+                        stopwatch.Start();
+                        while (!packetTransmitted || 
+                                stopwatch.Elapsed < TimeSpan.FromSeconds(10)
+                                ) ;
+                        stopwatch.Stop();
+
+                        // Check transmission status
+                        if(!packetTransmittedSuccessfully)
+                        {
+                            Debug.WriteLine("Could not transmit the packet" +
+                                            " over Bluetooth LE successfully."
+                                            );
+                        }
+
+                        // Stop the watcher
+                        watcher.Stop();
+                    }
+                    else
+                    {
+                        // We waited 10 seconds for a packet from the driver
+                        // and got nothing, so log the error, free the 
+                        // NativeOverlapped structure, and continue
+                        error = Marshal.GetLastWin32Error();
+                        Debug.WriteLine("Did not receive a packet in the time" +
+                                        " interval. Trying again. Error code: " +
+                                        error
+                                        );
+                        Overlapped.Unpack(nativeOverlapped);
+                        Overlapped.Free(nativeOverlapped);
+                    }
+                }
             }
 
-            // Close the driver handle
+            // Close the driver handle, implicitly canceling outstanding I/O
             IPv6ToBleDriverInterface.CloseHandle(driverHandle);
         }
 
@@ -304,10 +379,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
         /// Delegate callback function for handling asynchronous I/O
         /// completion events.
         /// 
-        /// The main job of this function is to get the packet that we have
-        /// now received and sent it out over Bluetooth Low Energy.
-        /// 
-        /// This function also cleans up the NativeOverlapped structure by 
+        /// This function cleans up the NativeOverlapped structure by 
         /// unpacking and freeing it.
         /// 
         /// For more info on this function, see
@@ -319,14 +391,11 @@ namespace IPv6ToBlePacketProcessingForDesktop
             NativeOverlapped* nativeOverlapped
         )
         {
-            //
-            // Step 1
             // Verify the operation succeeded, catch an exception if it did
             // not, and finally free the NativeOverlapped structure
-            //
             try
             {
-                if(errorCode != 0 || numBytes == 0)
+                if(errorCode != 0)
                 {
                     
                     throw new Win32Exception((int)errorCode);
@@ -335,33 +404,42 @@ namespace IPv6ToBlePacketProcessingForDesktop
                 {
                     Overlapped.Unpack(nativeOverlapped);
                 }
-
-                // Now that we have the packet in hand, let's send it out
-                // over Bluetooth
-
             } catch (Exception e)
             {
-                Debug.WriteLine("Receiving a packet from the driver" +
-                                " failed with this error: " + e.Message
+                Debug.WriteLine("Asynchronous Overlapped I/O failed with this" +
+                                " error: " + e.Message
                                 );
             }
             finally
             {
                 Overlapped.Free(nativeOverlapped);
             }
-
-            //
-            // Step 2
-            // Send another request to the driver to replace this one
-            //
-            SendListenRequestToDriver();
         }
 
         #endregion
 
-        #region Bluetooth interaction
+        #region Private helpers
 
+        /// <summary>
+        /// Awaits the asynchronous packet transmission operations by listening
+        /// for the event from the Adv watcher that signals whether the packet
+        /// transmitted successfully.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        /// <returns></returns>
+        private void PacketTransmissionWatcher(
+            IPv6ToBleAdvWatcherPacketWrite sender,
+            PropertyChangedEventArgs eventArgs
+        )
+        {
+            if(eventArgs.PropertyName == "TransmittedSuccessfully")
+            {
+                packetTransmitted = true;
+                packetTransmittedSuccessfully = sender.TransmittedSuccessfully;
+            }
 
+        }
 
         #endregion
     }
