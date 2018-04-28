@@ -9,7 +9,7 @@ using System.Diagnostics;
 // UWP namespaces
 using Windows.Devices.Bluetooth;
 
-namespace IPv6ToBleSixLowPanLibraryForDesktop
+namespace IPv6ToBleSixLowPanLibraryForUWP
 {
     /// <summary>
     /// A class to construct a 128-bit link local IPv6 address from the local

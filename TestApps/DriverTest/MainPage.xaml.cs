@@ -21,7 +21,7 @@ using System.Threading;                 // Asynchronous I/O and thread pool
 using System.Runtime.InteropServices;   // Marhsalling interop calls
 using System.Diagnostics;
 
-namespace IPv6ToBleMeshManager
+namespace DriverTest
 {
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
@@ -73,8 +73,8 @@ namespace IPv6ToBleMeshManager
                 IPv6ToBleDriverInterface.FILE_FLAG_OVERLAPPED,  // async
                 IntPtr.Zero
             );
-            
-            if(driverHandle.IsInvalid)
+
+            if (driverHandle.IsInvalid)
             {
                 int code = Marshal.GetLastWin32Error();
 
@@ -93,7 +93,7 @@ namespace IPv6ToBleMeshManager
             // binding the handle to an I/O completion port owned by the thread
             // pool.
             bool handleBound = ThreadPool.BindHandle(driverHandle);
-            if(!handleBound)
+            if (!handleBound)
             {
                 Debug.WriteLine("Could not bind driver handle to a thread " +
                     "pool I/O completion port.\n");
@@ -101,14 +101,14 @@ namespace IPv6ToBleMeshManager
 
             // Set up the byte array to hold a packet (always use 1280 bytes
             // to make sure we can receive the maximum Bluetooth packet size)
-            byte[] packet = new byte[1280];            
+            byte[] packet = new byte[1280];
             int bytesReceived = 0;
 
             // Create a NativeOverlapped pointer to pass to DeviceIoControl().
             // Using NULL for the second parameter in Pack() because we pass
             // data in the DeviceIoControl parameters instead.
             Overlapped overlapped = new Overlapped();
-            NativeOverlapped* nativeOverlapped = overlapped.Pack(IPv6ToBleListenCompletionCallback, 
+            NativeOverlapped* nativeOverlapped = overlapped.Pack(IPv6ToBleListenCompletionCallback,
                                                                 null
                                                                 );
 
@@ -142,7 +142,7 @@ namespace IPv6ToBleMeshManager
                                     out bytesReceived,
                                     nativeOverlapped
                                     );
-            if(listenResult)
+            if (listenResult)
             {
                 // Operation completed synchronously for some reason
                 Debug.WriteLine("DeviceIoControl executed synchronously " +
@@ -154,7 +154,7 @@ namespace IPv6ToBleMeshManager
             {
                 int error = Marshal.GetLastWin32Error();
 
-                if(error != ErrorIoPending)
+                if (error != ErrorIoPending)
                 {
                     // Failed to execute DeviceIoControl with overlapped I/O
                     Debug.WriteLine("Failed to execute " +

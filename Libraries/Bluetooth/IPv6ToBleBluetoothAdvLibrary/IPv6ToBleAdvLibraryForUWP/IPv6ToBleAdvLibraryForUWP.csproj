@@ -106,6 +106,8 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="IPv6ToBleAdvPublisherPacketReceive.cs" />
+    <Compile Include="IPv6ToBleAdvWatcherPacketWrite.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\IPv6ToBleAdvLibraryForUWP.rd.xml" />
   </ItemGroup>
@@ -113,6 +115,11 @@
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
       <Version>6.0.8</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="IPv6ToBleBluetoothGattLibraryForUWP">
+      <HintPath>..\..\IPv6ToBleBluetoothGattLibrary\IPv6ToBleBluetoothGattLibraryForUWP\bin\Release\IPv6ToBleBluetoothGattLibraryForUWP.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

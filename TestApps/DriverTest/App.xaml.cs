@@ -18,7 +18,7 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
-namespace IPv6ToBleMeshManager
+namespace DriverTest
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.

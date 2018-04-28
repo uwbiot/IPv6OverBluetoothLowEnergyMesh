@@ -1,0 +1,15 @@
+﻿<Page
+    x:Class="IPv6AddressPrinterForIoTCore.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:IPv6AddressPrinterForIoTCore"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Button x:Name="generate_button" Content="Generate IPv6 Address" HorizontalAlignment="Center" VerticalAlignment="Center" Height="290" Width="588" FontSize="36" Click="generate_button_Click"/>
+        <TextBox x:Name="addressTextBox" HorizontalAlignment="Center" Margin="131,700,0,0" Text="TextBox" VerticalAlignment="Center" FontSize="36" Width="1256" IsReadOnly="True"/>
+
+    </Grid>
+</Page>

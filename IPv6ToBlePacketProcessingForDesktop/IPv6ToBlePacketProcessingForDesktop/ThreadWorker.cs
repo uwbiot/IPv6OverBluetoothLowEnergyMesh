@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Net;
 
 //
 // Namespaces for driver interaction
@@ -64,6 +65,9 @@ namespace IPv6ToBlePacketProcessingForDesktop
         private bool packetTransmitted = false;
         private bool packetTransmittedSuccessfully = false;
 
+        // Temporary hard-coded routing table
+        private Dictionary<IPAddress, List<IPAddress>> staticRoutingTable;
+
         #endregion
 
         #region Constructor
@@ -76,6 +80,10 @@ namespace IPv6ToBlePacketProcessingForDesktop
         )
         {
             ParentService = parentService;
+
+            // TEMP: hard code the routing table
+            staticRoutingTable = new Dictionary<IPAddress, List<IPAddress>>();
+
         }
         #endregion
 
