@@ -336,11 +336,11 @@ namespace IPv6ToBlePacketProcessingForDesktop
                         // Wait for the watcher to signal the event that the
                         // packet has transmitted. This should happen after the
                         // watcher receives an advertisement OR a timeout of
-                        // 10 seconds occurs (arbitrary number).
+                        // 5 seconds occurs.
                         Stopwatch stopwatch = new Stopwatch();
                         stopwatch.Start();
                         while (!packetTransmitted || 
-                                stopwatch.Elapsed < TimeSpan.FromSeconds(10)
+                                stopwatch.Elapsed < TimeSpan.FromSeconds(5)
                                 ) ;
                         stopwatch.Stop();
 

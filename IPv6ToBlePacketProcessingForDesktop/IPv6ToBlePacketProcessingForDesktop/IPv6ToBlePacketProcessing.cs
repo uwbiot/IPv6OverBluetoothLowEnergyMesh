@@ -46,9 +46,9 @@ namespace IPv6ToBlePacketProcessingForDesktop
             // Stop the worker object
             worker.RequestStop();
 
-            // Try to stop the worker thread; if it doesn't stop after 11
+            // Try to stop the worker thread; if it doesn't stop after 15
             // seconds, abort it
-            if (!workerThread.Join(TimeSpan.FromSeconds(11)))
+            if (!workerThread.Join(TimeSpan.FromSeconds(15)))
             {
                 workerThread.Abort();
             }
