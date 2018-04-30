@@ -19,6 +19,7 @@ using System.Runtime.InteropServices;   // Marhsalling interop calls
 // Namespaces for Bluetooth
 //
 using IPv6ToBleBluetoothGattLibraryForDesktop;
+using IPv6ToBleBluetoothGattLibraryForDesktop.Helpers;
 using IPv6ToBleAdvLibraryForDesktop;
 using System.IO;
 
@@ -62,7 +63,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
         // Booleans to track whether the packet has finished transmitting, and
         // whether it was successful
-        private bool packetTransmitted = false;
+        private bool packetTransmissionFinished = false;
         private bool packetTransmittedSuccessfully = false;
 
         // Temporary hard-coded routing table
@@ -81,8 +82,36 @@ namespace IPv6ToBlePacketProcessingForDesktop
         {
             ParentService = parentService;
 
-            // TEMP: hard code the routing table
+            // TEMP: hard code the routing table. It is in the format:
+            // Node RouteToNodeFromBorderRouter
             staticRoutingTable = new Dictionary<IPAddress, List<IPAddress>>();
+
+            // Parse the known device addresses
+            bool parsed = false;
+            IPAddress borderRouterAddress = null;
+            IPAddress pi1Address = null;
+            IPAddress pi2Address = null;
+
+            // No error checking because these are known good addresses verified
+            // here: http://v6decode.com/#address=fe80%3A%3A71c4%3A225%3Ad048%3A9476%2511
+            // Also, constructors can't fail
+            parsed = IPAddress.TryParse("fe80::1458:7dde:8afe:efb7%7", out borderRouterAddress);
+            parsed = IPAddress.TryParse("fe80::291:a8ff:feeb:27b8", out pi1Address);
+            parsed = IPAddress.TryParse("fe80::3ff8:d2ff:feeb:27b8", out pi2Address);
+
+            // Configuration is:
+            // Border Router -> Pi 1 -> Pi 2
+            //
+            // Route 1: To Pi 1
+            staticRoutingTable.Add(pi1Address, new List<IPAddress>());
+            staticRoutingTable[pi1Address].Add(borderRouterAddress);
+            staticRoutingTable[pi1Address].Add(pi1Address);
+
+            // Route 2: To Pi 2
+            staticRoutingTable.Add(pi2Address, new List<IPAddress>());
+            staticRoutingTable[pi2Address].Add(borderRouterAddress);
+            staticRoutingTable[pi2Address].Add(pi1Address);
+            staticRoutingTable[pi2Address].Add(pi2Address);
 
         }
         #endregion
@@ -129,13 +158,6 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
             //
             // Step 3
-            // Load the static routing table
-            // 
-            //
-
-
-            //
-            // Step 4
             // Set up a Bluetooth advertiser to let neighbors know we can
             // receive a packet if need be. For testing, this is always on.
             //
@@ -143,10 +165,10 @@ namespace IPv6ToBlePacketProcessingForDesktop
             packetReceiver.Start();
 
             //
-            // Step 6
+            // Step 4
             // Indefinitely run in a cycle of sending listening requests to the
-            // driver/waiting for a packet/receiving a packet/sending a packet/
-            // sending another listening request...
+            // driver, waiting for a packet, receiving a packet from the driver,
+            //sending a received packet over Bluetooth LE, etc.
             //
             while (!shouldStop)
             {
@@ -192,8 +214,8 @@ namespace IPv6ToBlePacketProcessingForDesktop
                 int code = Marshal.GetLastWin32Error();
 
                 Debug.WriteLine("Could not open a handle to the driver, " +
-                                    "error code: " + code.ToString()
-                                    );
+                                "error code: " + code.ToString()
+                                );
                 isDriverReachable = false;
             }
 
@@ -225,8 +247,8 @@ namespace IPv6ToBlePacketProcessingForDesktop
                 int code = Marshal.GetLastWin32Error();
 
                 Debug.WriteLine("Could not open a handle to the driver, " +
-                                    "error code: " + code.ToString()
-                                    );
+                                "error code: " + code.ToString()
+                                );
                 return;
             }
 
@@ -242,7 +264,8 @@ namespace IPv6ToBlePacketProcessingForDesktop
             if (!handleBound)
             {
                 Debug.WriteLine("Could not bind driver handle to a thread " +
-                    "pool I/O completion port.\n");
+                                "pool I/O completion port."
+                                );
             }
 
             // Set up the byte array to hold a packet (always use 1280 bytes
@@ -332,24 +355,38 @@ namespace IPv6ToBlePacketProcessingForDesktop
                     // We have a packet. Send it out over Bluetooth.
                     if(listenResult)
                     {
+                        // Get the destination IPv6 address from the packet.
+                        // The destination address is the last 16 bytes of the
+                        // 40-byte long IPv6 header, so it is bytes 23-39
+                        byte[] destinationAddressBytes = new byte[16];
+                        Array.ConstrainedCopy(packet, 
+                                              23, 
+                                              destinationAddressBytes, 
+                                              0, 
+                                              16
+                                              );
+                        IPAddress destinationAddress = new IPAddress(destinationAddressBytes);
+
                         // Fire up the Bluetooth Advertisement packet write
                         // watcher
-                        IPv6ToBleAdvWatcherPacketWrite watcher = new IPv6ToBleAdvWatcherPacketWrite();
+                        IPv6ToBleAdvWatcherPacketWrite packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
 
                         // Start the watcher. This causes it to write the
                         // packet when it finds a suitable recipient.
-
-                        // START: need the destination address, packet, and routing table
+                        packetWriter.Start(packet,
+                                           destinationAddress,
+                                           staticRoutingTable
+                                           );
 
                         // Wait for the watcher to signal the event that the
                         // packet has transmitted. This should happen after the
                         // watcher receives an advertisement OR a timeout of
-                        // 5 seconds occurs.
+                        // 9 seconds occurs.
                         Stopwatch stopwatch = new Stopwatch();
                         stopwatch.Start();
-                        while (!packetTransmitted || 
-                                stopwatch.Elapsed < TimeSpan.FromSeconds(5)
-                                ) ;
+                        while (!packetTransmissionFinished || 
+                                stopwatch.Elapsed < TimeSpan.FromSeconds(9)
+                                );
                         stopwatch.Stop();
 
                         // Check transmission status
@@ -359,9 +396,18 @@ namespace IPv6ToBlePacketProcessingForDesktop
                                             " over Bluetooth LE successfully."
                                             );
                         }
+                        else
+                        {
+                            // We successfully transmitted the packet!
+                            Debug.WriteLine("Successfully transmitted this " +
+                                            "packet:\n" + Utilities.BytesToString(packet) +
+                                            "\n" + "to this address:\n" +
+                                            destinationAddress.ToString()
+                                            );
+                        }
 
                         // Stop the watcher
-                        watcher.Stop();
+                        packetWriter.Stop();
                     }
                     else
                     {
@@ -436,14 +482,14 @@ namespace IPv6ToBlePacketProcessingForDesktop
         /// <param name="sender"></param>
         /// <param name="eventArgs"></param>
         /// <returns></returns>
-        private void PacketTransmissionWatcher(
+        private void WatchPacketTransmission(
             IPv6ToBleAdvWatcherPacketWrite sender,
             PropertyChangedEventArgs eventArgs
         )
         {
             if(eventArgs.PropertyName == "TransmittedSuccessfully")
             {
-                packetTransmitted = true;
+                packetTransmissionFinished = true;
                 packetTransmittedSuccessfully = sender.TransmittedSuccessfully;
             }
 
