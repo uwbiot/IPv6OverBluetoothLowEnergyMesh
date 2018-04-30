@@ -7,11 +7,11 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="1d99f76c-e695-4d71-a5ed-7748bc443c00"
+    Name="c6018c15-5f71-4cba-b63e-b0bc03ef17e0"
     Publisher="CN=Duncan"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="1d99f76c-e695-4d71-a5ed-7748bc443c00" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="c6018c15-5f71-4cba-b63e-b0bc03ef17e0" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>DriverTest</DisplayName>

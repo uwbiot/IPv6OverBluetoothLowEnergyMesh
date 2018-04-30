@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-    <ProjectGuid>{7B3B42C2-7A7E-43E4-80A7-C3F661C07814}</ProjectGuid>
+    <ProjectGuid>{6EDB347D-52B5-4792-9604-52E32E4E6DBA}</ProjectGuid>
     <OutputType>AppContainerExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>DriverTest</RootNamespace>
