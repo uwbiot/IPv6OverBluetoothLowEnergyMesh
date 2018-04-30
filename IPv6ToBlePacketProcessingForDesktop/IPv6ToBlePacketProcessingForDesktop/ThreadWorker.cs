@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Net;
+using System.IO;
 
 //
 // Namespaces for driver interaction
@@ -20,8 +21,14 @@ using System.Runtime.InteropServices;   // Marhsalling interop calls
 //
 using IPv6ToBleBluetoothGattLibraryForDesktop;
 using IPv6ToBleBluetoothGattLibraryForDesktop.Helpers;
+using IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics;
 using IPv6ToBleAdvLibraryForDesktop;
-using System.IO;
+
+//
+// Other UWP namespaces
+//
+using Windows.Networking;
+using Windows.Networking.Connectivity;
 
 namespace IPv6ToBlePacketProcessingForDesktop
 {
@@ -69,6 +76,9 @@ namespace IPv6ToBlePacketProcessingForDesktop
         // Temporary hard-coded routing table
         private Dictionary<IPAddress, List<IPAddress>> staticRoutingTable;
 
+        // This device's link-local IPv6 address
+        private IPAddress localAddress = null;
+
         #endregion
 
         #region Constructor
@@ -80,9 +90,10 @@ namespace IPv6ToBlePacketProcessingForDesktop
             IPv6ToBlePacketProcessing parentService
         )
         {
-            ParentService = parentService;
+            ParentService = parentService;            
 
-            // TEMP: hard code the routing table. It is in the format:
+            // TEMP: hard code the routing table. Each line is in the format:
+            //
             // Node RouteToNodeFromBorderRouter
             staticRoutingTable = new Dictionary<IPAddress, List<IPAddress>>();
 
@@ -95,11 +106,11 @@ namespace IPv6ToBlePacketProcessingForDesktop
             // No error checking because these are known good addresses verified
             // here: http://v6decode.com/#address=fe80%3A%3A71c4%3A225%3Ad048%3A9476%2511
             // Also, constructors can't fail
-            parsed = IPAddress.TryParse("fe80::1458:7dde:8afe:efb7%7", out borderRouterAddress);
+            parsed = IPAddress.TryParse("fe80::b826:1c8b:ccbb:32f0%10", out borderRouterAddress);
             parsed = IPAddress.TryParse("fe80::291:a8ff:feeb:27b8", out pi1Address);
             parsed = IPAddress.TryParse("fe80::3ff8:d2ff:feeb:27b8", out pi2Address);
 
-            // Configuration is:
+            // Test configuration is:
             // Border Router -> Pi 1 -> Pi 2
             //
             // Route 1: To Pi 1
@@ -121,14 +132,32 @@ namespace IPv6ToBlePacketProcessingForDesktop
         // Main business logic for doing work and stopping
         //---------------------------------------------------------------------
 
-
-        // Method that is called when the thread is started. Prepares for 
-        // Driver and Bluetooth operations, then spins if it has nothing to do
-        // (i.e. we're waiting for an incoming packet).
+        /// <summary>
+        /// Method that is called when the thread is started. Prepares for 
+        /// Driver and Bluetooth operations, then spins if it has nothing to do
+        /// (i.e. we're waiting for an incoming packet). 
+        /// 
+        /// This is the main looping method of this thread.
+        /// </summary>
         public void DoWork()
         {
             //
             // Step 1
+            // On border router, acquire the local IPv6 address to use with
+            // comparisons against packets' destination addresses
+            //
+            bool acquiredLocalV6Addr = IPAddress.TryParse(LocalIPv6Address(), out localAddress);
+            if (!acquiredLocalV6Addr)
+            {
+                Debug.WriteLine("Could not acquire the local IPv6 address.");
+                ParentService.ExitCode = -1;
+                ParentService.Stop();
+                throw new Exception();
+            }
+            // else acquire the generated address on a node within the subnet
+
+            //
+            // Step 2
             // Verify we can open a handle to the driver. If we can't, we fail
             // starting the service.
             //
@@ -142,7 +171,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             }
 
             //
-            // Step 2
+            // Step 3
             // Spin up the GATT server service to listen for later replies
             // over Bluetooth LE
             //
@@ -157,7 +186,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             }
 
             //
-            // Step 3
+            // Step 4
             // Set up a Bluetooth advertiser to let neighbors know we can
             // receive a packet if need be. For testing, this is always on.
             //
@@ -165,7 +194,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             packetReceiver.Start();
 
             //
-            // Step 4
+            // Step 5
             // Indefinitely run in a cycle of sending listening requests to the
             // driver, waiting for a packet, receiving a packet from the driver,
             //sending a received packet over Bluetooth LE, etc.
@@ -176,7 +205,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             }
 
             //
-            // Step 7
+            // Step 6
             // Shut down Bluetooth resources upon exit
             //
             packetReceiver.Stop();            
@@ -189,7 +218,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
         }
         #endregion
 
-        #region Packet operations
+        #region Driver packet operations
 
         /// <summary>
         /// Verifies that the driver is present. Does not do anything else.
@@ -352,62 +381,15 @@ namespace IPv6ToBlePacketProcessingForDesktop
                                        false   // don't block forever
                                    );
 
-                    // We have a packet. Send it out over Bluetooth.
+                    // We have a packet. Send it out over Bluetooth. The very
+                    // act of receiving a packet from the driver MUST mean that
+                    // the packet was not meant for the border router, as the
+                    // driver would have permitted that packet up the stack and
+                    // not passed it here.
                     if(listenResult)
                     {
-                        // Get the destination IPv6 address from the packet.
-                        // The destination address is the last 16 bytes of the
-                        // 40-byte long IPv6 header, so it is bytes 23-39
-                        byte[] destinationAddressBytes = new byte[16];
-                        Array.ConstrainedCopy(packet, 
-                                              23, 
-                                              destinationAddressBytes, 
-                                              0, 
-                                              16
-                                              );
-                        IPAddress destinationAddress = new IPAddress(destinationAddressBytes);
-
-                        // Fire up the Bluetooth Advertisement packet write
-                        // watcher
-                        IPv6ToBleAdvWatcherPacketWrite packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
-
-                        // Start the watcher. This causes it to write the
-                        // packet when it finds a suitable recipient.
-                        packetWriter.Start(packet,
-                                           destinationAddress,
-                                           staticRoutingTable
-                                           );
-
-                        // Wait for the watcher to signal the event that the
-                        // packet has transmitted. This should happen after the
-                        // watcher receives an advertisement OR a timeout of
-                        // 9 seconds occurs.
-                        Stopwatch stopwatch = new Stopwatch();
-                        stopwatch.Start();
-                        while (!packetTransmissionFinished || 
-                                stopwatch.Elapsed < TimeSpan.FromSeconds(9)
-                                );
-                        stopwatch.Stop();
-
-                        // Check transmission status
-                        if(!packetTransmittedSuccessfully)
-                        {
-                            Debug.WriteLine("Could not transmit the packet" +
-                                            " over Bluetooth LE successfully."
-                                            );
-                        }
-                        else
-                        {
-                            // We successfully transmitted the packet!
-                            Debug.WriteLine("Successfully transmitted this " +
-                                            "packet:\n" + Utilities.BytesToString(packet) +
-                                            "\n" + "to this address:\n" +
-                                            destinationAddress.ToString()
-                                            );
-                        }
-
-                        // Stop the watcher
-                        packetWriter.Stop();
+                        IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
+                        SendPacketOverBluetoothLE(packet, destinationAddress);
                     }
                     else
                     {
@@ -472,17 +454,24 @@ namespace IPv6ToBlePacketProcessingForDesktop
 
         #endregion
 
-        #region Private helpers
+        #region Packet event listeners
+
+        //---------------------------------------------------------------------
+        // Listeners for when packets are transmitted or received
+        //---------------------------------------------------------------------
 
         /// <summary>
         /// Awaits the asynchronous packet transmission operations by listening
         /// for the event from the Adv watcher that signals whether the packet
         /// transmitted successfully.
+        /// 
+        /// This is so a client can know when the packet has finished the
+        /// transmission process.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="eventArgs"></param>
         /// <returns></returns>
-        private void WatchPacketTransmission(
+        private void WatchForPacketTransmission(
             IPv6ToBleAdvWatcherPacketWrite sender,
             PropertyChangedEventArgs eventArgs
         )
@@ -493,6 +482,151 @@ namespace IPv6ToBlePacketProcessingForDesktop
                 packetTransmittedSuccessfully = sender.TransmittedSuccessfully;
             }
 
+        }
+
+        /// <summary>
+        /// Awaits the reception of a packet on the packet write characteristic
+        /// of the packet write service of the local GATT server.
+        /// 
+        /// This is so a server can know when a packet has been received and
+        /// deal with it accordingly.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        private void WatchForPacketReception(
+            IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic,
+            PropertyChangedEventArgs eventArgs
+        )
+        {
+            if(eventArgs.PropertyName == "Packet")
+            {
+                // Only send it back out if this device is not the destination;
+                // in other words, if this device is a middle router in the
+                // subnet
+                IPAddress destinationAddress = GetDestinationAddressFromPacket(
+                                                    localPacketWriteCharacteristic.Packet
+                                                );
+                if(IPAddress.Equals(destinationAddress, localAddress))
+                {
+                    SendPacketOverBluetoothLE(localPacketWriteCharacteristic.Packet, 
+                                              destinationAddress
+                                              );
+                }
+
+                
+            }
+        }
+        #endregion
+
+        #region Packet transmission
+
+        /// <summary>
+        /// Sends a packet out over Bluetooth Low Energy. Spins up a watcher
+        /// for advertisements from nearby servers who can receive the packet.
+        /// </summary>
+        /// <param name="packet"></param>
+        private void SendPacketOverBluetoothLE(
+            byte[]      packet,
+            IPAddress   destinationAddress
+        )
+        {
+            // Fire up the Bluetooth Advertisement packet write
+            // watcher
+            IPv6ToBleAdvWatcherPacketWrite packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
+
+            // Start the watcher. This causes it to write the
+            // packet when it finds a suitable recipient.
+            packetWriter.Start(packet,
+                               destinationAddress,
+                               staticRoutingTable
+                               );
+
+            // Wait for the watcher to signal the event that the
+            // packet has transmitted. This should happen after the
+            // watcher receives an advertisement OR a timeout of
+            // 9 seconds occurs.
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            while (!packetTransmissionFinished ||
+                    stopwatch.Elapsed < TimeSpan.FromSeconds(9)
+                    ) ;
+            stopwatch.Stop();
+
+            // Check transmission status
+            if (!packetTransmittedSuccessfully)
+            {
+                Debug.WriteLine("Could not transmit the packet" +
+                                " over Bluetooth LE successfully."
+                                );
+            }
+            else
+            {
+                // We successfully transmitted the packet! Cue fireworks.
+                Debug.WriteLine("Successfully transmitted this " +
+                                "packet:\n" + Utilities.BytesToString(packet) +
+                                "\n" + "to this address:\n" +
+                                destinationAddress.ToString()
+                                );
+            }
+
+            // Stop the watcher
+            packetWriter.Stop();
+
+            // Reset the packet booleans for next time
+            packetTransmissionFinished = false;
+            packetTransmittedSuccessfully = false;
+        }
+
+        #endregion
+
+        #region Helpers
+
+        /// <summary>
+        /// Gets the local IPv6 address. This will retrieve the link-local
+        /// IPv6 address from the FIRST device if there is more than one
+        /// adapter installed. For most devices with one internet-connected
+        /// adapter, this is fine. But if you switch, the address retrieved
+        /// by this method will change depending on the adapter, so be careful
+        /// with relying on knowing the address ahead of time.
+        /// 
+        /// This method is modified from the accepted answer on this post on 
+        /// Stack Overflow:
+        /// 
+        /// https://stackoverflow.com/questions/11411486/how-to-get-ipv4-and-ipv6-address-of-local-machine
+        /// 
+        /// NOTE: This method is for the border router only, as the other
+        /// devices in the subnet use their generated IPv6 address that is
+        /// based on the Bluetooth radio ID.
+        /// </summary>
+        /// <returns></returns>
+        private string LocalIPv6Address()
+        {
+            string hostNameString = Dns.GetHostName();
+            IPHostEntry ipEntry = Dns.GetHostEntry(hostNameString);
+            IPAddress[] addresses = ipEntry.AddressList;
+            if (addresses[0].AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                return addresses[0].ToString();
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        private IPAddress GetDestinationAddressFromPacket(byte[] packet)
+        {
+            // Get the destination IPv6 address from the packet.
+            // The destination address is the last 16 bytes of the
+            // 40-byte long IPv6 header, so it is bytes 23-39
+            byte[] destinationAddressBytes = new byte[16];
+            Array.ConstrainedCopy(packet,
+                                  23,
+                                  destinationAddressBytes,
+                                  0,
+                                  16
+                                  );
+            return new IPAddress(destinationAddressBytes);
         }
 
         #endregion
