@@ -202,7 +202,7 @@ Return Value:
                                                           );
 
         // Compare the extracted address to this entry's address
-        if (RtlCompareMemory(extractedAddress,
+        if (RtlEqualMemory(extractedAddress,
             &meshListEntry->ipv6Address,
             IPV6_ADDRESS_LENGTH))
         {
@@ -552,7 +552,7 @@ Return Value:
             listEntry
         );
         // Compare the extracted address to this entry's address
-        if (RtlCompareMemory(extractedAddress,
+        if (RtlEqualMemory(extractedAddress,
             &meshListEntry->ipv6Address,
             IPV6_ADDRESS_LENGTH))
         {

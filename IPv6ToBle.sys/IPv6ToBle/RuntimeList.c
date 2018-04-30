@@ -137,7 +137,7 @@ Return Value:
                                                                 listEntry
                                                                 );
             // Compare the memory (byte arrays)
-            if (RtlCompareMemory(&whiteListEntry->ipv6Address,
+            if (RtlEqualMemory(&whiteListEntry->ipv6Address,
                                  &ipv6AddressStorage,
                                  sizeof(IN6_ADDR)))
             {
@@ -346,7 +346,7 @@ Return Value:
                                                    listEntry
                                                    );
         // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(&entry->ipv6Address,
+        if (RtlEqualMemory(&entry->ipv6Address,
                              &ipv6AddressStorage,
                              sizeof(IN6_ADDR)))
         {
@@ -565,7 +565,7 @@ Return Value:
                                                             listEntry
                                                             );
         // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(&whiteListEntry->ipv6Address,
+        if (RtlEqualMemory(&whiteListEntry->ipv6Address,
                              &ipv6AddressStorage,
                              sizeof(IN6_ADDR)))
         {
@@ -775,7 +775,7 @@ Return Value:
                                                            listEntry
                                                            );
         // Compare the memory (byte arrays)        
-        if (RtlCompareMemory(&meshListEntry->ipv6Address,
+        if (RtlEqualMemory(&meshListEntry->ipv6Address,
                              &ipv6AddressStorage,
                              sizeof(IN6_ADDR)))
         {

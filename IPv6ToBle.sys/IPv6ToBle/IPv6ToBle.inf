@@ -27,7 +27,7 @@
 
 [DefaultInstall.Services]
     AddService = %IPv6ToBleServiceName%,,IPv6ToBle.Service
-    StartType = 0                               ; SERVICE_BOOT_START
+    StartType = 2                               ; SERVICE_AUTO_START
 
 [DefaultUninstall]
     DelFiles = IPv6ToBle.DriverFiles
@@ -42,7 +42,7 @@
     DisplayName    = %IPv6ToBleServiceName%
     Description    = %IPv6ToBleServiceDesc%
     ServiceType    = 1                          ; SERVICE_KERNEL_DRIVER
-    StartType      = 3                          ; SERVICE_DEMAND_START
+    StartType      = 2                          ; SERVICE_AUTO_START
     ErrorControl   = 1                          ; SERVICE_ERROR_NORMAL
     ServiceBinary  = %12%\IPv6ToBle.sys         ; %WinDir%\System32\Drivers\IPv6ToBle.sys
 
