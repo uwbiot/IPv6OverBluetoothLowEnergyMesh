@@ -15,7 +15,8 @@ using Windows.UI.Xaml.Navigation;
 using System.Threading.Tasks;
 using System.Net;
 
-using IPv6ToBleSixLowPanLibraryForUWP;
+using Windows.Networking;
+using Windows.Networking.Connectivity;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -33,8 +34,27 @@ namespace IPv6AddressPrinterForIoTCore
 
         private void generate_button_Click(object sender, RoutedEventArgs e)
         {
-            IPAddress address = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
-            addressTextBox.Text = address.ToString();
+            // Generated address
+            //IPAddress address = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
+            //addressTextBox.Text = address.ToString();
+
+            // True local address (only for border router)
+            addressTextBox.Text = LocalIPv6Address();
+        }
+
+        private string LocalIPv6Address()
+        {
+            string hostNameString = Dns.GetHostName();
+            IPHostEntry ipEntry = Dns.GetHostEntry(hostNameString);
+            IPAddress[] addresses = ipEntry.AddressList;
+            if (addresses[0].AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                return addresses[0].ToString();
+            }
+            else
+            {
+                return string.Empty;
+            }
         }
     }
 }
