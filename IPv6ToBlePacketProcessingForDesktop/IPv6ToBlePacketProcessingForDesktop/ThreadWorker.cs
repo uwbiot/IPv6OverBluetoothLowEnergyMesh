@@ -146,7 +146,7 @@ namespace IPv6ToBlePacketProcessingForDesktop
             // On border router, acquire the local IPv6 address to use with
             // comparisons against packets' destination addresses
             //
-            bool acquiredLocalV6Addr = IPAddress.TryParse(LocalIPv6Address(), out localAddress);
+            bool acquiredLocalV6Addr = IPAddress.TryParse(GetLocalIPv6Address(), out localAddress);
             if (!acquiredLocalV6Addr)
             {
                 Debug.WriteLine("Could not acquire the local IPv6 address.");
@@ -544,11 +544,11 @@ namespace IPv6ToBlePacketProcessingForDesktop
             // Wait for the watcher to signal the event that the
             // packet has transmitted. This should happen after the
             // watcher receives an advertisement OR a timeout of
-            // 9 seconds occurs.
+            // 5 seconds occurs.
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             while (!packetTransmissionFinished ||
-                    stopwatch.Elapsed < TimeSpan.FromSeconds(9)
+                    stopwatch.Elapsed < TimeSpan.FromSeconds(5)
                     ) ;
             stopwatch.Stop();
 
@@ -599,14 +599,14 @@ namespace IPv6ToBlePacketProcessingForDesktop
         /// based on the Bluetooth radio ID.
         /// </summary>
         /// <returns></returns>
-        private string LocalIPv6Address()
+        private string GetLocalIPv6Address()
         {
             string hostNameString = Dns.GetHostName();
             IPHostEntry ipEntry = Dns.GetHostEntry(hostNameString);
             IPAddress[] addresses = ipEntry.AddressList;
             if (addresses[0].AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
-                return addresses[0].ToString();
+                return addresses[0].ToString(); // Can modify this array index if more than one adapter
             }
             else
             {
