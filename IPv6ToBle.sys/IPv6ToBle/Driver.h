@@ -25,7 +25,7 @@ Environment:
 // chipsets.
 //-----------------------------------------------------------------------------
 
-#define BORDER_ROUTER
+//#define BORDER_ROUTER
 
 //-----------------------------------------------------------------------------
 // Custom structures
@@ -40,7 +40,7 @@ typedef struct _NDIS_POOL_DATA {
     HANDLE	ndisHandle;		// NDIS_HANDLE
     HANDLE	nblPoolHandle;	// NDIS_HANDLE
     HANDLE	nbPoolHandle;	// NDIS_HANDLE
-}NDIS_POOL_DATA, *PNDIS_POOL_DATA;
+} NDIS_POOL_DATA, *PNDIS_POOL_DATA;
 
 //
 // Structures to contain entries for runtime versions of the lists: the list
