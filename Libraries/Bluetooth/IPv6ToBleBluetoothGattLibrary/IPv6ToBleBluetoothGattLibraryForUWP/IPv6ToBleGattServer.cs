@@ -54,11 +54,11 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             // Step 1
             // Verify the local Bluetooth radio supports the peripheral role
             // 
-            isPeripheralRoleSupported = await BluetoothRoleSupport.CheckPeripheralSupportAsync();
-            if(!isPeripheralRoleSupported)
-            {
-                return false;
-            }
+            //isPeripheralRoleSupported = await BluetoothRoleSupport.CheckPeripheralSupportAsync();
+            //if(!isPeripheralRoleSupported)
+            //{
+            //    return false;
+            //}
 
             //
             // Step 2
