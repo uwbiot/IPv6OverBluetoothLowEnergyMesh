@@ -8,7 +8,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{08477B7F-3354-436C-A21F-7286FB4BF8AC}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>IPv6ToBlePacketProcessingForDesktop</RootNamespace>
     <AssemblyName>IPv6ToBlePacketProcessingForDesktop</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
@@ -37,7 +37,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject />
+    <StartupObject>IPv6ToBlePacketProcessingForDesktop.ServiceMain</StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="IPv6ToBleAdvLibraryForDesktop">

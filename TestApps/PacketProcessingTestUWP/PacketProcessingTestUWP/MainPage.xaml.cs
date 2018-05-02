@@ -1,21 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Net.Http;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Net;
 using System.Diagnostics;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.ComponentModel;
 
-//
-// UWP namespaces
-//
-using Windows.ApplicationModel.Background;
+using Windows.Foundation;
+using Windows.Foundation.Collections;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
+using Windows.UI.Xaml.Data;
+using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Navigation;
 
 //
 // Namespaces for this project
@@ -27,15 +31,13 @@ using IPv6ToBleBluetoothGattLibraryForUWP.Characteristics;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using IPv6ToBleSixLowPanLibraryForUWP;
 
-
-// The Background Application template is documented at http://go.microsoft.com/fwlink/?LinkID=533884&clcid=0x409
-
-namespace IPv6ToBlePacketProcessingForIoTCore
+namespace PacketProcessingTestUWP
 {
-    public sealed class StartupTask : IBackgroundTask
+    /// <summary>
+    /// An empty page that can be used on its own or navigated to within a Frame.
+    /// </summary>
+    public sealed partial class MainPage : Page
     {
-        #region Local variables
-
         //---------------------------------------------------------------------
         // Local variables
         //---------------------------------------------------------------------
@@ -63,29 +65,28 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         // device to which to send a packet
         private IPv6ToBleAdvWatcherPacketWrite packetWriter = null;
 
-        // A background task deferral to run forever
-        private BackgroundTaskDeferral mainDeferral = null;
-
-        #endregion
-
-        #region Main, initialization, and stop
-
-        //---------------------------------------------------------------------
-        // Run(), the entry point
-        //---------------------------------------------------------------------
-
-        /// <summary>
-        /// The main method entry point of the IoT application.
-        /// </summary>
-        /// <param name="taskInstance"></param>
-        public void Run(IBackgroundTaskInstance taskInstance)
+        public MainPage()
         {
-            mainDeferral = taskInstance.GetDeferral();
-            taskInstance.Canceled += TaskInstance_Canceled;
+            this.InitializeComponent();
+        }
 
+        private void startButton_Click(object sender, RoutedEventArgs e)
+        {
             Init();
 
-            DoWork();
+            //DoWork();
+        }
+
+        private void stopButton_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Shut down Bluetooth resources upon exit
+            //
+            packetReceiver.Stop();
+            packetWriter.Stop();
+
+            overallStatusBox.Text = "Stopped";
         }
 
         //---------------------------------------------------------------------
@@ -97,6 +98,8 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         /// </summary>
         private void Init()
         {
+            overallStatusBox.Text = "Starting...";
+
             //
             // Step 1
             // Acquire this device's IPv6 address from the local Bluetooth radio
@@ -104,21 +107,28 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             localAddress = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
             if (localAddress == null)
             {
-                Debug.WriteLine("Could not acquire the local IPv6 address.");
+                overallStatusBox.Text = "Could not acquire the local IPv6 address.";
                 throw new Exception();
             }
+
+            //bool acquiredLocalAddress = IPAddress.TryParse(GetLocalIPv6Address(), out localAddress);
+            //if(!acquiredLocalAddress)
+            //{
+            //    overallStatusBox.Text = "Could not acquire the local IPv6 address.";
+            //    throw new Exception();
+            //}
 
             //
             // Step 2
             // Verify we can open a handle to the driver. If we can't, we fail
             // starting the service.
             //
-            bool isDriverReachable = TryOpenHandleToDriver();
-            if (!isDriverReachable)
-            {
-                Debug.WriteLine("Could not open a handle to the driver.");
-                throw new FileNotFoundException();
-            }
+            //bool isDriverReachable = TryOpenHandleToDriver();
+            //if (!isDriverReachable)
+            //{
+            //    overallStatusBox.Text = "Could not open a handle to the driver.";
+            //    throw new FileNotFoundException();
+            //}
 
             //
             // Step 3
@@ -126,10 +136,20 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // over Bluetooth LE
             //
             gattServer = new IPv6ToBleGattServer();
-            bool gattServerStarted = Task.Run(gattServer.StartAsync).Result;
+            bool gattServerStarted = false;
+            try
+            {
+                gattServerStarted = Task.Run(gattServer.StartAsync).Result;
+            }
+            catch (Exception e)
+            {
+                overallStatusBox.Text = "Error starting GATT server with this" +
+                                        "message: " + e.Message;
+            }
+
             if (!gattServerStarted)
             {
-                Debug.WriteLine("Could not start the GATT server.");
+                overallStatusBox.Text = "Could not start the GATT server.";
                 throw new Exception();
             }
 
@@ -183,51 +203,16 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             staticRoutingTable[pi2Address].Add(pi2Address);
         }
 
-        /// <summary>
-        /// Invoked as a cancellation callback when the background task is
-        /// cancelled for any reason, for a graceful exit.
-        /// 
-        /// We don't care about the particular reason (i.e. the app was
-        /// aborted, system shutdown, etc.) so we don't need to do different
-        /// behavior depending on the reason.
-        /// </summary>
-        /// <param name="sender">The background task instance.</param>
-        /// <param name="reason">The reason for thread cancellation.</param>
-        private void TaskInstance_Canceled(
-            IBackgroundTaskInstance sender,
-            BackgroundTaskCancellationReason reason
-        )
-        {
-            //
-            // Step 1
-            // Shut down Bluetooth resources upon exit
-            //
-            packetReceiver.Stop();
-            packetWriter.Stop();
-
-            //
-            // Step 2
-            // Complete the deferral
-            mainDeferral.Complete();
-        }
-
-        #endregion
-
-        #region Business logic
         private void DoWork()
-        {     
+        {
             // Indefinitely run in a cycle of sending listening requests to the
             // driver, waiting for a packet, receiving a packet from the driver,
             //sending a received packet over Bluetooth LE, etc.
             while (true)
             {
                 SendListenRequestToDriverAndSendReceivedPacketAsync();
-            }            
+            }
         }
-
-        #endregion
-
-        #region Driver packet operations
 
         /// <summary>
         /// Verifies that the driver is present. Does not do anything else.
@@ -252,8 +237,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                 int code = Marshal.GetLastWin32Error();
 
                 Debug.WriteLine("Could not open a handle to the driver, " +
-                                "error code: " + code.ToString()
-                                );
+                                "error code: " + code.ToString());
                 isDriverReachable = false;
             }
 
@@ -285,8 +269,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                 int code = Marshal.GetLastWin32Error();
 
                 Debug.WriteLine("Could not open a handle to the driver, " +
-                                "error code: " + code.ToString()
-                                );
+                                "error code: " + code.ToString());
                 return;
             }
 
@@ -302,8 +285,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             if (!handleBound)
             {
                 Debug.WriteLine("Could not bind driver handle to a thread " +
-                                "pool I/O completion port."
-                                );
+                                "pool I/O completion port.");
             }
 
             // Set up the byte array to hold a packet (always use 1280 bytes
@@ -355,8 +337,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             {
                 // Operation completed synchronously for some reason
                 Debug.WriteLine("DeviceIoControl executed synchronously " +
-                                "despite overlapped I/O flag."
-                                );
+                                "despite overlapped I/O flag.");
                 Overlapped.Unpack(nativeOverlapped);
                 Overlapped.Free(nativeOverlapped);
             }
@@ -406,10 +387,9 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                         error = Marshal.GetLastWin32Error();
                         Debug.WriteLine("Did not receive a packet in the time" +
                                         " interval. Trying again. Error code: " +
-                                        error
-                                        );
-                        Overlapped.Unpack(nativeOverlapped);
-                        Overlapped.Free(nativeOverlapped);
+                                        error.ToString());
+                        //Overlapped.Unpack(nativeOverlapped);
+                        //Overlapped.Free(nativeOverlapped);
                     }
                 }
             }
@@ -451,18 +431,13 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             catch (Exception e)
             {
                 Debug.WriteLine("Asynchronous Overlapped I/O failed with this" +
-                                " error: " + e.Message
-                                );
+                                " error: " + e.Message);
             }
             finally
             {
                 Overlapped.Free(nativeOverlapped);
             }
         }
-
-        #endregion
-
-        #region Packet event listeners
 
         //---------------------------------------------------------------------
         // Listeners for when packets are transmitted or received
@@ -522,13 +497,11 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                 }
                 else
                 {
-                    // display the packet if this were a test GUI app
+                    // DISPLAY THE PACKET!!
+                    packetContentBox.Text = Utilities.BytesToString(localPacketWriteCharacteristic.Packet);
                 }
             }
         }
-        #endregion
-
-        #region Packet transmission
 
         /// <summary>
         /// Sends a packet out over Bluetooth Low Energy. Spins up a watcher
@@ -561,18 +534,26 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Check transmission status
             if (!packetTransmittedSuccessfully)
             {
-                Debug.WriteLine("Could not transmit the packet" +
-                                " over Bluetooth LE successfully."
-                                );
+                //Debug.WriteLine("Could not transmit the packet" +
+                //                " over Bluetooth LE successfully."
+                //                );
+                transmissionStatusBox.Text = "Could not transmit this packet: " +
+                                            Utilities.BytesToString(packet) +
+                                            " to this address: " +
+                                            destinationAddress.ToString();
             }
             else
             {
                 // We successfully transmitted the packet! Cue fireworks.
-                Debug.WriteLine("Successfully transmitted this " +
-                                "packet:\n" + Utilities.BytesToString(packet) +
-                                "\n" + "to this address:\n" +
-                                destinationAddress.ToString()
-                                );
+                //Debug.WriteLine("Successfully transmitted this " +
+                //                "packet:\n" + Utilities.BytesToString(packet) +
+                //                "\n" + "to this address:\n" +
+                //                destinationAddress.ToString()
+                //                );
+                transmissionStatusBox.Text = "Successfully transmitted this " +
+                               "packet:" + Utilities.BytesToString(packet) +
+                                "to this address:" +
+                                destinationAddress.ToString();
             }
 
             // Stop the watcher
@@ -583,9 +564,39 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             packetTransmittedSuccessfully = false;
         }
 
-        #endregion
+        /// <summary>
+        /// Gets the local IPv6 address. This will retrieve the link-local
+        /// IPv6 address from the FIRST device if there is more than one
+        /// adapter installed. For most devices with one internet-connected
+        /// adapter, this is fine. But if you switch, the address retrieved
+        /// by this method will change depending on the adapter, so be careful
+        /// with relying on knowing the address ahead of time.
+        /// 
+        /// This method is modified from the accepted answer on this post on 
+        /// Stack Overflow:
+        /// 
+        /// https://stackoverflow.com/questions/11411486/how-to-get-ipv4-and-ipv6-address-of-local-machine
+        /// 
+        /// NOTE: This method is for the border router only, as the other
+        /// devices in the subnet use their generated IPv6 address that is
+        /// based on the Bluetooth radio ID.
+        /// </summary>
+        /// <returns></returns>
+        private string GetLocalIPv6Address()
+        {
+            string hostNameString = Dns.GetHostName();
+            IPHostEntry ipEntry = Dns.GetHostEntry(hostNameString);
+            IPAddress[] addresses = ipEntry.AddressList;
+            if (addresses[0].AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                return addresses[0].ToString(); // Can modify this array index if more than one adapter
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
 
-        #region Helpers
         private IPAddress GetDestinationAddressFromPacket(byte[] packet)
         {
             // Get the destination IPv6 address from the packet.
@@ -600,7 +611,5 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                                   );
             return new IPAddress(destinationAddressBytes);
         }
-
-        #endregion
     }
 }
