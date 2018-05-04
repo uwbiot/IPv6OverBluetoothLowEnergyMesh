@@ -647,7 +647,7 @@ Return Value:
             // Convert the address to a string (function null-terminates it)
             ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
             status = RtlIpv6AddressToStringExW(&whiteListEntry->ipv6Address,
-                                               0,
+                                               whiteListEntry->scopeId,
                                                0,
                                                (PWSTR)currentIpv6AddressString.Buffer,
                                                &currentIpv6AddressStringLength
@@ -662,9 +662,9 @@ Return Value:
             // structure. Unicode characters are 2 bytes each and the
             // conversion function reported the total number of CHARACTERS
             // written to the buffer, so that is the length. Also, the max
-            // length must be a power of 2 accordingly.
+            // length must be a power of 2 accordingly, which is why
+            // INET6_ADDRSTRLEN is defined as 65 (64 + null terminator).
             currentIpv6AddressString.Length = (sizeof(BYTE) * 2) * (USHORT)currentIpv6AddressStringLength;
-            currentIpv6AddressString.MaximumLength = INET6_ADDRSTRLEN - 1;
 
             // Initialize and create the WDF string object from the Unicode string
             WDFSTRING currentIpv6AddressWdfString;
@@ -833,7 +833,7 @@ Return Value:
         // Convert the address to a string (function null-terminates it)
         ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
         status = RtlIpv6AddressToStringExW(&meshListEntry->ipv6Address,
-                                           0,
+                                           meshListEntry->scopeId,
                                            0,
                                            (PWSTR)currentIpv6AddressString.Buffer,
                                            &currentIpv6AddressStringLength
@@ -848,9 +848,9 @@ Return Value:
         // structure. Unicode characters are 2 bytes each and the
         // conversion function reported the total number of CHARACTERS
         // written to the buffer, so that is the length. Also, the max
-        // length must be a power of 2 accordingly.
+        // length must be a power of 2 accordingly, which is why
+        // INET6_ADDRSTRLEN is defined as 65 (64 + null terminator).
         currentIpv6AddressString.Length = (sizeof(BYTE) * 2) * (USHORT)currentIpv6AddressStringLength;
-        currentIpv6AddressString.MaximumLength = INET6_ADDRSTRLEN - 1;
 
         // Initialize and create the WDF string object from the Unicode string
         WDFSTRING currentIpv6AddressWdfString;

@@ -87,7 +87,7 @@ Return Value:
     // Step 2
     // Assign the retrieved string to a UNICODE_STRING structure
     //
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
 
@@ -97,23 +97,25 @@ Return Value:
     //
 
     // Defensively null-terminate the string
-    PWSTR terminator;
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
 
     // Suppressing buffer overrun warning because we previously verified the
-    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 1)
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     // Convert the string to its network byte order binary form. This function 
     // validates that it is a valid IPv6 address for us.
-    IN6_ADDR ipv6AddressStorage;
-    status = RtlIpv6StringToAddressW((PWSTR)desiredAddress.Buffer,
-                                     &terminator,
-                                     &ipv6AddressStorage
-                                     );
+    IN6_ADDR ipv6AddressStorage = { 0 };
+    ULONG scopeId = 0;
+    USHORT port = 0;
+    status = RtlIpv6StringToAddressExW((PWSTR)desiredAddress.Buffer,
+                                       &ipv6AddressStorage,
+                                       &scopeId,
+                                       &port  // not used, will be 0
+                                       );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
@@ -138,8 +140,11 @@ Return Value:
                                                                 );
             // Compare the memory (byte arrays)
             if (RtlEqualMemory(&whiteListEntry->ipv6Address,
-                                 &ipv6AddressStorage,
-                                 sizeof(IN6_ADDR)))
+                               &ipv6AddressStorage,
+                               sizeof(IN6_ADDR)) &&
+                RtlEqualMemory(&whiteListEntry->scopeId,
+                               &scopeId,
+                               sizeof(ULONG)))
             {
                 // Found it            
                 status = STATUS_INVALID_PARAMETER;
@@ -172,6 +177,7 @@ Return Value:
 
     // Insert the address into the entry
     newWhiteListEntry->ipv6Address = ipv6AddressStorage;
+    newWhiteListEntry->scopeId = scopeId;
 
     //
     // Step 5
@@ -299,7 +305,7 @@ Return Value:
     // Step 2
     // Assign the retrieved string to a UNICODE_STRING structure
     //
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
 
@@ -309,23 +315,25 @@ Return Value:
     //
 
     // Defensively null-terminate the string
-    PWSTR terminator;
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
 
     // Suppressing buffer overrun warning because we previously verified the
-    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 1)
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     // Convert the string to its network byte order binary form. This function 
     // validates that it is a valid IPv6 address for us.
-    IN6_ADDR ipv6AddressStorage;
-    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
-                                     &terminator,
-                                     &ipv6AddressStorage
-                                     );
+    IN6_ADDR ipv6AddressStorage = { 0 };
+    ULONG scopeId = 0;
+    USHORT port = 0;
+    status = RtlIpv6StringToAddressExW((PWSTR)desiredAddress.Buffer,
+                                        &ipv6AddressStorage,
+                                        &scopeId,
+                                        &port  // not used, will be 0
+                                        );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
@@ -336,19 +344,22 @@ Return Value:
     // Step 4
     // Verify the entry isn't already in the list
     // 
-    PLIST_ENTRY meshListEntry = gMeshListHead->Flink;
+    PLIST_ENTRY entry = gMeshListHead->Flink;
 
-    NT_ASSERT(meshListEntry);
-    while (meshListEntry != gMeshListHead)
+    NT_ASSERT(entry);
+    while (entry != gMeshListHead)
     {
-        PMESH_LIST_ENTRY entry = CONTAINING_RECORD(meshListEntry,
-                                                   MESH_LIST_ENTRY,
-                                                   listEntry
-                                                   );
+        PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
+                                                           MESH_LIST_ENTRY,
+                                                           listEntry
+                                                           );
         // Compare the memory (byte arrays)        
-        if (RtlEqualMemory(&entry->ipv6Address,
-                             &ipv6AddressStorage,
-                             sizeof(IN6_ADDR)))
+        if (RtlEqualMemory(&meshListEntry->ipv6Address,
+                           &ipv6AddressStorage,
+                           sizeof(IN6_ADDR)) &&
+            RtlEqualMemory(&meshListEntry->scopeId,
+                           &scopeId,
+                           sizeof(ULONG)))
         {
             // Found it
             status = STATUS_INVALID_PARAMETER;
@@ -356,7 +367,7 @@ Return Value:
             goto Exit;
         }
 
-        meshListEntry = meshListEntry->Flink;
+        entry = entry->Flink;
     }
 
     //
@@ -382,6 +393,7 @@ Return Value:
 
     // Insert the address into the entry
     newMeshListEntry->ipv6Address = ipv6AddressStorage;
+    newMeshListEntry->scopeId = scopeId;
 
     //
     // Step 6
@@ -519,7 +531,6 @@ Return Value:
     DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
-    desiredAddress.MaximumLength = INET6_ADDRSTRLEN - 1;    // Power of 2
 
     //
     // Step 4
@@ -527,23 +538,25 @@ Return Value:
     //
 
     // Defensively null-terminate the string
-    PWSTR terminator;
     desiredAddress.Length = min(desiredAddress.Length, 
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
 
     // Suppressing buffer overrun warning because we previously verified the
-    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 1)
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
     
     // Convert the string to its network byte order binary form. This function 
     // validates that it is a valid IPv6 address for us.
-    IN6_ADDR ipv6AddressStorage;
-    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
-                                     &terminator,
-                                     &ipv6AddressStorage
-                                     );
+    IN6_ADDR ipv6AddressStorage = { 0 };
+    ULONG scopeId = 0;
+    USHORT port = 0;
+    status = RtlIpv6StringToAddressExW((PWSTR)desiredAddress.Buffer,
+                                        &ipv6AddressStorage,
+                                        &scopeId,
+                                        &port  // not used, will be 0
+                                        );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Converting IPv6 string to address failed during %!FUNC! with %!STATUS!", status);
@@ -566,8 +579,11 @@ Return Value:
                                                             );
         // Compare the memory (byte arrays)        
         if (RtlEqualMemory(&whiteListEntry->ipv6Address,
-                             &ipv6AddressStorage,
-                             sizeof(IN6_ADDR)))
+                           &ipv6AddressStorage,
+                           sizeof(IN6_ADDR)) &&
+            RtlEqualMemory(&whiteListEntry->scopeId,
+                           &scopeId,
+                           sizeof(ULONG)))
         {
             // Found it, now remove it
             isInList = TRUE;
@@ -727,7 +743,7 @@ Return Value:
     // Step 3
     // Assign the retrieved string to a UNICODE_STRING structure
     //
-    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN - 1);  // Power of 2
+    DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
     desiredAddress.Buffer = (PWCH)inputBuffer;
     desiredAddress.Length = (USHORT)receivedSize;
 
@@ -737,23 +753,25 @@ Return Value:
     //
 
     // Defensively null-terminate the string
-    PWSTR terminator;
     desiredAddress.Length = min(desiredAddress.Length,
                                 desiredAddress.MaximumLength - sizeof(WCHAR)
                                 );
 
     // Suppressing buffer overrun warning because we previously verified the
-    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 2)
+    // received size and set the length to be *at most* (INET6_ADDRSTRLEN - 1)
 #pragma warning(suppress: 6386)
     desiredAddress.Buffer[desiredAddress.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
     // Convert the string to its network byte order binary form. This function 
     // validates that it is a valid IPv6 address for us.
-    IN6_ADDR ipv6AddressStorage;
-    status = RtlIpv6StringToAddressW(desiredAddress.Buffer,
-                                     &terminator,
-                                     &ipv6AddressStorage
-                                     );
+    IN6_ADDR ipv6AddressStorage = { 0 };
+    ULONG scopeId = 0;
+    USHORT port = 0;
+    status = RtlIpv6StringToAddressExW((PWSTR)desiredAddress.Buffer,
+                                        &ipv6AddressStorage,
+                                        &scopeId,
+                                        &port  // not used, will be 0
+                                        );
     if (!NT_SUCCESS(status))
     {
         status = STATUS_INVALID_PARAMETER;
@@ -776,8 +794,11 @@ Return Value:
                                                            );
         // Compare the memory (byte arrays)        
         if (RtlEqualMemory(&meshListEntry->ipv6Address,
-                             &ipv6AddressStorage,
-                             sizeof(IN6_ADDR)))
+                           &ipv6AddressStorage,
+                           sizeof(IN6_ADDR)) &&
+            RtlEqualMemory(&meshListEntry->scopeId,
+                           &scopeId,
+                           sizeof(ULONG)))
         {
             // Found it, now remove it
             isInList = TRUE;
@@ -897,7 +918,7 @@ Return Value:
                                                              WHITE_LIST_ENTRY,
                                                              listEntry
                                                              );
-        
+        entry = 0;
         ExFreePoolWithTag(whiteListEntry, IPV6_TO_BLE_WHITE_LIST_TAG); // free white list entry memory
         whiteListEntry = 0;       
     }
@@ -938,12 +959,11 @@ Return Value:
     // Clean up the linked list
     while (!IsListEmpty(gMeshListHead))
     {
-        PLIST_ENTRY entry = gMeshListHead->Flink;
+        PLIST_ENTRY entry = RemoveHeadList(gMeshListHead); // remove from list
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
                                                            MESH_LIST_ENTRY,
                                                            listEntry
                                                            );
-        entry = RemoveHeadList(gMeshListHead); // remove from list
         entry = 0;
         ExFreePoolWithTag(meshListEntry, IPV6_TO_BLE_MESH_LIST_TAG); // free memory
         meshListEntry = 0;  // free pointer        
