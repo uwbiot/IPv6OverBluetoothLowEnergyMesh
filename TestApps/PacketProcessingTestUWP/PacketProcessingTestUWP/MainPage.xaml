@@ -8,11 +8,11 @@
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-        <TextBox x:Name="packetContentBox" HorizontalAlignment="Center" Text="Received packet contents" VerticalAlignment="Center" Height="219" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,333,52,448"/>
+        <TextBox x:Name="packetContentBox" HorizontalAlignment="Center" Text="Received packet contents" VerticalAlignment="Center" Height="123" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,333,52,544"/>
         <Button x:Name="startButton" Content="Start" HorizontalAlignment="Left" Margin="282,108,0,0" VerticalAlignment="Top" Height="165" Width="335" FontSize="36" Click="startButton_Click"/>
         <Button x:Name="stopButton" Content="Stop" HorizontalAlignment="Left" Margin="899,108,0,0" VerticalAlignment="Top" Height="165" Width="335" FontSize="36" Click="stopButton_Click"/>
-        <TextBox x:Name="transmissionStatusBox" HorizontalAlignment="Center" Text="Packet transmission status" VerticalAlignment="Center" Height="219" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,585,52,196"/>
-        <TextBox x:Name="overallStatusBox" HorizontalAlignment="Center" Text="Overall status" VerticalAlignment="Center" Height="128" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,834,52,38"/>
+        <TextBox x:Name="transmissionStatusBox" HorizontalAlignment="Center" Text="Packet transmission status" VerticalAlignment="Center" Height="123" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,510,52,367"/>
+        <TextBox x:Name="overallStatusBox" HorizontalAlignment="Center" Text="Overall status" VerticalAlignment="Center" Height="241" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,667,52,92"/>
 
     </Grid>
 </Page>

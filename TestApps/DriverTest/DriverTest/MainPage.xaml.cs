@@ -328,7 +328,7 @@ namespace DriverTest
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String whiteListAddress = "fe80::71c4:225:d048:9476%13";
+            String whiteListAddress = "fe80::a057:e629:1319:40c3%19";
             int bytesReturned = 0;
 
             // Send the IOCTL
