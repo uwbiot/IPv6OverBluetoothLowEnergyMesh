@@ -132,25 +132,6 @@ namespace IPv6ToBleAdvLibraryForDesktop
             }
         }
 
-        // The static routing table of the host
-        private Dictionary<IPAddress, List<IPAddress>> staticRoutingTable = new Dictionary<IPAddress, List<IPAddress>>();
-
-        // Setter for the static routing table (provided by caller)
-        public Dictionary<IPAddress, List<IPAddress>> StaticRoutingTable
-        {
-            private get
-            {
-                return staticRoutingTable;
-            }
-            set
-            {
-                if(!Equals(staticRoutingTable, value))
-                {
-                    staticRoutingTable = value;
-                }
-            }
-        }
-
         #endregion
 
         #region Init, shut down, and start/stop
@@ -167,8 +148,7 @@ namespace IPv6ToBleAdvLibraryForDesktop
         /// <param name="staticRoutingTable">The local host's static routing table of devices in the subnet.</param>
         public void Start(
             byte[]                                  packet,
-            IPAddress                               destinationAddress,
-            Dictionary<IPAddress, List<IPAddress>>  staticRoutingTable
+            IPAddress                               destinationAddress
         )
         {
             //
@@ -177,7 +157,6 @@ namespace IPv6ToBleAdvLibraryForDesktop
             //
             Packet = packet;
             DestinationAddress = destinationAddress;
-            StaticRoutingTable = staticRoutingTable;
 
             //
             // Step 2
@@ -484,20 +463,6 @@ namespace IPv6ToBleAdvLibraryForDesktop
                 }
             }
 
-            // Check if the device is either the destination itself or in the
-            // path to the destination
-            if(!IsDeviceTheDestinationOrInPathToDestination(deviceAddress,
-                                                            DestinationAddress,
-                                                            StaticRoutingTable
-                                                            ))
-            {
-                status = BluetoothError.NotSupported;
-                Debug.WriteLine("The device was not the destination, nor was" +
-                                " it the in the path to the destination."
-                                );
-                goto Exit;
-            }
-
             //
             // Step 5
             // Write the packet now that we have verified that the device is
@@ -540,68 +505,6 @@ namespace IPv6ToBleAdvLibraryForDesktop
             {
                 Debug.WriteLine("Watcher has been stopped.");
             }
-        }
-        #endregion
-
-        #region Private helpers
-        //---------------------------------------------------------------------
-        // Helpers for finding the shortest path to a destination
-        //---------------------------------------------------------------------
-
-        /// <summary>
-        /// Method to determine if a device's IPv6 address is part of a path
-        /// to a given destination IPv6 address. This is used on router devices,
-        /// including the border router, 
-        ///
-        /// For now, the static routing table is simply a dictionary that maps
-        /// a given address and the complete path to get there from the border
-        /// router.
-        /// </summary>
-        /// <returns>Returns true if the destination is either a neighbor or is
-        /// in the path to the destination. False otherwise.</returns>
-        private bool IsDeviceTheDestinationOrInPathToDestination(
-            IPAddress                               deviceAddress,
-            IPAddress                               destinationAddress,
-            Dictionary<IPAddress, List<IPAddress>>  staticRoutingTable
-        )
-        {
-            //
-            // Step 1
-            // Return true if this device is the destination
-            //
-            if(IPAddress.Equals(deviceAddress, destinationAddress))
-            {
-                return true;
-            }
-
-            //
-            // Step 2
-            // Otherwise, check if the device is in the path to the destination
-            //            
-
-            // Check for malformed input - the destination address must be in
-            // the routing table
-
-            if(!staticRoutingTable.ContainsKey(destinationAddress))
-            {
-                Debug.WriteLine("Malformed input; destination address does" +
-                                "not exist in the static routing table."
-                                );
-                return false;
-            }
-
-            // Check if the device is in the path to the destination
-            bool isInPath = false;
-            foreach (IPAddress address in staticRoutingTable[destinationAddress])
-            {
-                if(IPAddress.Equals(address, deviceAddress))
-                {
-                    isInPath = true;
-                    break;
-                }
-            }
-
-            return isInPath;
         }
         #endregion
     }
