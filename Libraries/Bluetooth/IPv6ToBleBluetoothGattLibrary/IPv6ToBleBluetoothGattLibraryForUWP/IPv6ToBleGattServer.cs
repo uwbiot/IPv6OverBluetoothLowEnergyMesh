@@ -32,9 +32,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
         // Local variables
         //---------------------------------------------------------------------
 
-        // Boolean tracker to verify the GATT server device's radio supports
-        // the peripheral role (it should)
+        // Boolean trackers to verify the GATT server device's radio supports
+        // the GAP peripheral and central roles
         private bool isPeripheralRoleSupported;
+        private bool isCentralRoleSupported;
 
         // Our two services
         InternetProtocolSupportService internetProtocolSupportService = new InternetProtocolSupportService();
@@ -53,12 +54,18 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             //
             // Step 1
             // Verify the local Bluetooth radio supports the peripheral role
+            // and/or the central role
             // 
-            //isPeripheralRoleSupported = await BluetoothRoleSupport.CheckPeripheralSupportAsync();
-            //if(!isPeripheralRoleSupported)
-            //{
-            //    return false;
-            //}
+            isPeripheralRoleSupported = await BluetoothRoleSupport.CheckPeripheralSupportAsync();
+
+            // Only return false if neither are supported; this way, if at
+            // least one is supported the device can act as a GATT server
+            // and its functionality then depends on whether it is connectable
+            // or not.
+            if (!isPeripheralRoleSupported)
+            {
+                return false;
+            }
 
             //
             // Step 2
@@ -90,8 +97,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             // Step 4
             // Start advertising the services
             //
-            internetProtocolSupportService.Start(true);
-            packetProcessingService.Start(true);
+            internetProtocolSupportService.Start(isPeripheralRoleSupported);
+            packetProcessingService.Start(isPeripheralRoleSupported);
 
             return true;
         }
