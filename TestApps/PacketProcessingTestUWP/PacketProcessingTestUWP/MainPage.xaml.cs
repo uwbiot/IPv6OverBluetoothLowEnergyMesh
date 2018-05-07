@@ -8,6 +8,9 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Threading;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+using Microsoft.Win32.SafeHandles;
 
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -18,6 +21,7 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using Windows.ApplicationModel.Background;
 
 //
 // Namespaces for this project
@@ -27,6 +31,7 @@ using IPv6ToBleAdvLibraryForUWP;
 using IPv6ToBleBluetoothGattLibraryForUWP.Characteristics;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using IPv6ToBleSixLowPanLibraryForUWP;
+using IPv6ToBleInteropLibrary;
 
 namespace PacketProcessingTestUWP
 {
@@ -67,11 +72,15 @@ namespace PacketProcessingTestUWP
         // A FIFO queue of recent messages/packets to use with managed flooding
         private Queue<byte[]> messageCache = null;
 
-        // A thread worker object to talk to the driver in the background
-        private DriverThreadWorker driverThreadWorker = null;
+        // A task worker object to talk to the driver in the background
+        private DriverTaskWorker driverTaskWorker = null;
 
-        // The thread to run the thread worker object above
-        private Thread driverThread = null;
+        // A cancellation token source if the driver worker task has to be canceled
+        private CancellationTokenSource cancellationTokenSource;
+        private CancellationToken cancellationToken;
+
+        // The task to run the task worker object above
+        private Task driverTask = null;
 
         #endregion
 
@@ -85,7 +94,7 @@ namespace PacketProcessingTestUWP
             this.InitializeComponent();
         }
 
-        private void startButton_Click(object sender, RoutedEventArgs e)
+        private async void startButton_Click(object sender, RoutedEventArgs e)
         {
             overallStatusBox.Text = "Starting...";
 
@@ -93,10 +102,10 @@ namespace PacketProcessingTestUWP
             // Step 1
             // Acquire this device's IPv6 address from the local Bluetooth radio
             //
-            generatedLocalIPv6AddressForNode = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
+            generatedLocalIPv6AddressForNode = await IPv6AddressFromBluetoothAddress.GenerateAsync(2);
             if (generatedLocalIPv6AddressForNode == null)
             {
-                overallStatusBox.Text = "Could not acquire the local IPv6 address.";
+                overallStatusBox.Text = "Could not generate the local IPv6 address.";
                 throw new Exception();
             }
 
@@ -155,11 +164,32 @@ namespace PacketProcessingTestUWP
             // Step 7
             // Signal the driver worker function to start
             //
-            //driverThreadWorker = new DriverThreadWorker(this);
-            //driverThread = new Thread(driverThreadWorker.DoWork);
-            //driverThread.Start();
+            cancellationTokenSource = new CancellationTokenSource();
+            cancellationToken = cancellationTokenSource.Token;
 
-            overallStatusBox.Text = "Finished starting";
+            driverTaskWorker = new DriverTaskWorker(this, 
+                                                    cancellationTokenSource,
+                                                    cancellationToken
+                                                    );
+
+            driverTask = new Task(driverTaskWorker.DoWork,
+                                  cancellationToken,
+                                  TaskCreationOptions.LongRunning
+                                  );
+            driverTask.Start();
+
+            // Check if the driver has run to completion already, faulted, or
+            // canceled
+            if(driverTask.IsCompleted)
+            {
+                overallStatusBox.Text = "Error with starting driver task. " +
+                                        "Finished starting.";
+            }
+            else
+            {
+                overallStatusBox.Text = "Started driver task succesfully. " +
+                                        "Finished starting.";
+            }
         }
 
         private void stopButton_Click(object sender, RoutedEventArgs e)
@@ -175,18 +205,26 @@ namespace PacketProcessingTestUWP
             
             //
             // Step 2
-            // Shut down the thread worker that is talking to the driver
+            // Shut down the task worker that is talking to the driver
             //
-            if(driverThreadWorker != null && driverThread.IsAlive)
+            if(driverTaskWorker != null && driverTask.Status == TaskStatus.Running)
             {
-                driverThreadWorker.RequestStop();
-                if(!driverThread.Join(TimeSpan.FromSeconds(16)))
+                cancellationTokenSource.Cancel();
+                if(!driverTask.Wait(TimeSpan.FromSeconds(16)))
                 {
-                    driverThread.Abort();
+                    overallStatusBox.Text = "Canceling the driver worker task" +
+                                            " failed. Stopped.";
+                }
+                else
+                {
+                    overallStatusBox.Text = "Successfully stopped the driver" +
+                                            " task. Stopped.";
                 }
             }
-
-            overallStatusBox.Text = "Stopped";
+            else
+            {
+                overallStatusBox.Text = "Driver task was not started. Stopped.";
+            }
         }
         #endregion
 
@@ -308,25 +346,29 @@ namespace PacketProcessingTestUWP
                     }
 
                     // DISPLAY THE PACKET!!
-                    packetContentBox.Text = Utilities.BytesToString(localPacketWriteCharacteristic.Packet);
+                    packetContentBox.Text = "Received this packet over " + 
+                                            "Bluetooth: " + Utilities.BytesToString(packet);
+
+                    // Send the packet to the driver for inbound injection
+                    SendPacketToDriverForInboundInjection(packet);
                 }
             }
         }
 
         /// <summary>
-        /// Function to watch for errors in the driver thread and report them
+        /// Function to watch for errors in the driver task and report them
         /// in the overall status box
         /// </summary>
         /// <param name="worker"></param>
         /// <param name="eventArgs"></param>
-        private void WatchForDriverThreadErrors(
-            DriverThreadWorker          worker,
+        private void WatchForDriverTaskErrors(
+            DriverTaskWorker          worker,
             PropertyChangedEventArgs    eventArgs
         )
         {
-            if(eventArgs.PropertyName == "DriverThreadError")
+            if(eventArgs.PropertyName == "DriverTaskError")
             {
-                overallStatusBox.Text = worker.DriverThreadError;
+                overallStatusBox.Text = worker.DriverTaskError;
             }
         }
         #endregion
@@ -455,6 +497,73 @@ namespace PacketProcessingTestUWP
                                   );
             return new IPAddress(destinationAddressBytes);
         }
+        #endregion
+
+        #region Driver helpers
+
+        private unsafe void SendPacketToDriverForInboundInjection(byte[] packet)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+                "\\\\.\\IPv6ToBle",
+                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
+                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                IPv6ToBleDriverInterface.OPEN_EXISTING,
+                0,                                          // synchronous
+                IntPtr.Zero
+            );
+
+            if (driverHandle.IsInvalid)
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                overallStatusBox.Text = "Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString();
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the given packet to the driver for inbound injection
+            //
+
+            int bytesReturned = 0;
+           
+            // Send the IOCTL
+            bool listenResult = IPv6ToBleDriverInterface.DeviceIoControl(
+                                    driverHandle,
+                                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6,
+                                    packet,
+                                    (sizeof(byte) * 1280),
+                                    null,
+                                    0,
+                                    out bytesReturned,
+                                    null    // synchronous
+                                    );
+            if (listenResult)
+            {
+                // Operation completed synchronously for some reason
+                //Debug.WriteLine("DeviceIoControl executed synchronously " +
+                //    "despite overlapped I/O flag.\n");
+                overallStatusBox.Text = "Successfully passed the packet to the" +
+                                         " driver for inbound injection.";
+            }
+            else
+            {
+                int error = Marshal.GetLastWin32Error();
+
+                overallStatusBox.Text = "DeviceIoControl failed with this " +
+                                        "error code: " + error.ToString();
+            }
+
+            // Close the driver handle
+            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
+        }
+
         #endregion
     }
 }

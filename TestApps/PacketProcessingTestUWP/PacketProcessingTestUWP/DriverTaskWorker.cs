@@ -7,54 +7,59 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
 using System.ComponentModel;
-
 using System.Runtime.InteropServices;
 
 using Microsoft.Win32.SafeHandles;
 
-using IPv6ToBleInteropLibrary;
+using Windows.ApplicationModel.Background;
 
+using IPv6ToBleInteropLibrary;
 
 namespace PacketProcessingTestUWP
 {
-    public class DriverThreadWorker
+    public sealed class DriverTaskWorker
     {
         //---------------------------------------------------------------------
         // Local variables
         //---------------------------------------------------------------------
 
-        // The parent app page that spawned this thread
+        // The parent app page that spawned this task
         private MainPage parentPage;
 
-        // Boolean to track whether the thread should stop
-        private bool shouldStop;
+        // A handle to the driver
+        SafeFileHandle driverHandle;
+
+        // A cancellation token source and token to manage when this task
+        // should be cancelled
+        private CancellationTokenSource cancellationTokenSource;
+        private CancellationToken cancellationToken;
 
         // String to record errors and report them to the parent page (which
         // listens for an event signaling that this has changed)
-        private string driverThreadError;
+        private string driverTaskError;
 
-        public event PropertyChangedEventHandler DriverThreadErrorChanged;
+        public event PropertyChangedEventHandler DriverTaskErrorChanged;
 
-        public void OnDriverThreadErrorChanged(PropertyChangedEventArgs args)
+        public void OnDriverTaskErrorChanged(PropertyChangedEventArgs args)
         {
-            DriverThreadErrorChanged?.Invoke(this, args);
+            DriverTaskErrorChanged?.Invoke(this, args);
         }
 
-        public string DriverThreadError
+        public string DriverTaskError
         {
             get
             {
-                return driverThreadError;
+                return driverTaskError;
             }
             private set
             {
                 lock(this)
                 {
-                    if(driverThreadError != value)
+                    if(driverTaskError != value)
                     {
-                        driverThreadError = value;
+                        driverTaskError = value;
                     }
-                    OnDriverThreadErrorChanged(new PropertyChangedEventArgs("DriverThreadError"));
+                    OnDriverTaskErrorChanged(new PropertyChangedEventArgs("DriverTaskError"));
                 }
             }
         }
@@ -63,10 +68,15 @@ namespace PacketProcessingTestUWP
         // Constructor
         //---------------------------------------------------------------------
 
-        public DriverThreadWorker(MainPage page)
+        public DriverTaskWorker(
+            MainPage                page, 
+            CancellationTokenSource tokenSource,
+            CancellationToken       token
+        )
         {
             parentPage = page;
-            shouldStop = false;
+            cancellationTokenSource = tokenSource;
+            cancellationToken = token;
         }
 
         //---------------------------------------------------------------------
@@ -74,25 +84,32 @@ namespace PacketProcessingTestUWP
         //---------------------------------------------------------------------
 
         /// <summary>
-        /// Main loop for this thread to run.
+        /// Main loop for this task to run.
         /// </summary>
         public void DoWork()
         {
+            //
+            // Step 1
             // Indefinitely run in a cycle of sending listening requests to the
             // driver, waiting for a packet, receiving a packet from the driver,
             //sending a received packet over Bluetooth LE, etc.
-            while (!shouldStop)
+            //
+            while (!cancellationToken.IsCancellationRequested)
             {
-                SendListenRequestToDriverAndSendReceivedPacketAsync();
+                try
+                {
+                    if (!TryOpenHandleToDriver())
+                    {
+                        cancellationTokenSource.Cancel();
+                        continue;
+                    }
+                    SendListenRequestToDriverAndSendReceivedPacketAsync();
+                }
+                catch (Exception ex)
+                {
+                    DriverTaskError = "Exception caught: " + ex.Message;
+                }  
             }
-        }
-
-        /// <summary>
-        /// Function to request this thread to stop
-        /// </summary>
-        public void RequestStop()
-        {
-            shouldStop = true;
         }
 
         //---------------------------------------------------------------------
@@ -107,7 +124,7 @@ namespace PacketProcessingTestUWP
         {
             bool isDriverReachable = true;
 
-            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+            driverHandle = IPv6ToBleDriverInterface.CreateFile(
                 "\\\\.\\IPv6ToBle",
                 IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
                 IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
@@ -123,7 +140,7 @@ namespace PacketProcessingTestUWP
 
                 //Debug.WriteLine("Could not open a handle to the driver, " +
                 //                "error code: " + code.ToString());
-                DriverThreadError = "Could not open a handle to the driver, " +
+                DriverTaskError = "Could not open a handle to the driver, " +
                                     "error code: " + code.ToString();
                 isDriverReachable = false;
             }
@@ -141,7 +158,7 @@ namespace PacketProcessingTestUWP
             // Step 1
             // Open the handle to the driver with Overlapped async I/O flagged
             //
-            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
+            driverHandle = IPv6ToBleDriverInterface.CreateFile(
                 "\\\\.\\IPv6ToBle",
                 IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
                 IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
@@ -157,7 +174,7 @@ namespace PacketProcessingTestUWP
 
                 //Debug.WriteLine("Could not open a handle to the driver, " +
                 //                "error code: " + code.ToString());
-                DriverThreadError = "Could not open a handle to the driver, " +
+                DriverTaskError = "Could not open a handle to the driver, " +
                                     "error code: " + code.ToString();
                 return;
             }
@@ -167,17 +184,18 @@ namespace PacketProcessingTestUWP
             // Prepare for asynchronous I/O
             //
 
-            // Bind the driver handle to the Windows Thread Pool. Really, we're
-            // binding the handle to an I/O completion port owned by the thread
+            // Bind the driver handle to the Windows Task Pool. Really, we're
+            // binding the handle to an I/O completion port owned by the task
             // pool.
             bool handleBound = ThreadPool.BindHandle(driverHandle);
             if (!handleBound)
             {
-                //Debug.WriteLine("Could not bind driver handle to a thread " +
+                //Debug.WriteLine("Could not bind driver handle to a task " +
                 //                "pool I/O completion port.");
-                DriverThreadError = "Could not bind driver handle to a thread " +
+                DriverTaskError = "Could not bind driver handle to a task " +
                                     "pool I/O completion port.";
-                goto Exit;
+                return;
+                //goto Exit;
             }
 
             // Set up the byte array to hold a packet (always use 1280 bytes
@@ -230,11 +248,10 @@ namespace PacketProcessingTestUWP
                 // Operation completed synchronously for some reason
                 //Debug.WriteLine("DeviceIoControl executed synchronously " +
                 //                "despite overlapped I/O flag.");
-                DriverThreadError = "DeviceIoControl executed synchronously " +
+                DriverTaskError = "DeviceIoControl executed synchronously " +
                                     "despire overlapped I/O flag.";
                 Overlapped.Unpack(nativeOverlapped);
                 Overlapped.Free(nativeOverlapped);
-                goto Exit;
             }
             else
             {
@@ -246,12 +263,11 @@ namespace PacketProcessingTestUWP
                     //Debug.WriteLine("Failed to execute " +
                     //    "DeviceIoControl asynchronously with error code" +
                     //    error + "\n");
-                    DriverThreadError = "Failed to execute DeviceIoControl " +
+                    DriverTaskError = "Failed to execute DeviceIoControl " +
                                         "asynchronously with error code: " +
                                         error.ToString();
                     Overlapped.Unpack(nativeOverlapped);
                     Overlapped.Free(nativeOverlapped);
-                    goto Exit;
                 }
                 else
                 {
@@ -259,7 +275,7 @@ namespace PacketProcessingTestUWP
                     // the overlapped result for 10 seconds, then aborting this
                     // attempt if it fails. This is so we can return control
                     // to the while loop in the DoWork() function, giving
-                    // the thread a chance to see if it has been requested to
+                    // the task a chance to see if it has been requested to
                     // stop.
 
                     listenResult = IPv6ToBleDriverInterface.GetOverlappedResultEx(
@@ -287,16 +303,13 @@ namespace PacketProcessingTestUWP
                         //Debug.WriteLine("Did not receive a packet in the time" +
                         //                " interval. Trying again. Error code: " +
                         //                error.ToString());
-                        DriverThreadError = "Did not receive a packet in the " +
+                        DriverTaskError = "Did not receive a packet in the " +
                                             "time interval, error code: " +
                                             error.ToString();
-                        //Overlapped.Unpack(nativeOverlapped);
-                        //Overlapped.Free(nativeOverlapped);
                     }
                 }
             }
 
-            Exit:
             // Close the driver handle, implicitly canceling outstanding I/O
             IPv6ToBleDriverInterface.CloseHandle(driverHandle);
         }
@@ -309,7 +322,7 @@ namespace PacketProcessingTestUWP
         /// unpacking and freeing it.
         /// 
         /// For more info on this function, see
-        /// https://msdn.microsoft.com/library/system.threading.iocompletioncallback
+        /// https://msdn.microsoft.com/library/system.tasking.iocompletioncallback
         /// </summary>
         private unsafe void IPv6ToBleListenCompletionCallback(
             uint errorCode,
@@ -324,22 +337,19 @@ namespace PacketProcessingTestUWP
                 if (errorCode != 0)
                 {
 
-                    throw new Win32Exception((int)errorCode);
-                }
-                else
-                {
-                    Overlapped.Unpack(nativeOverlapped);
+                    DriverTaskError = "Asynchronous overlapped I/O failed with " +
+                                      "this error code: " + errorCode.ToString();
                 }
             }
             catch (Exception e)
             {
-                //Debug.WriteLine("Asynchronous Overlapped I/O failed with this" +
-                //                " error: " + e.Message);
-                DriverThreadError = "Asynchronous overlapped I/O failed with " +
-                                    "this error code: " + e.Message;
+                Debug.WriteLine("Asynchronous Overlapped I/O failed with this" +
+                                " error: " + e.Message);
+
             }
             finally
             {
+                Overlapped.Unpack(nativeOverlapped);
                 Overlapped.Free(nativeOverlapped);
             }
         }
