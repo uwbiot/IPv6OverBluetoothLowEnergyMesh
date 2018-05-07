@@ -34,10 +34,10 @@ namespace IPv6AddressPrinterForIoTCore
             this.InitializeComponent();
         }
 
-        private void generate_button_Click(object sender, RoutedEventArgs e)
+        private async void generate_button_Click(object sender, RoutedEventArgs e)
         {
             // Generated address
-            IPAddress address = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
+            IPAddress address = await IPv6AddressFromBluetoothAddress.GenerateAsync(2);
             addressTextBox.Text = address.ToString();
 
             // True local address (only for border router)
