@@ -328,7 +328,7 @@ namespace DriverTest
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String whiteListAddress = "fe80::a057:e629:1319:40c3%19";
+            String whiteListAddress = "fe80::1458:7dde:8afe:efb7%7";
             int bytesReturned = 0;
 
             // Send the IOCTL
@@ -463,28 +463,9 @@ namespace DriverTest
 
             // Send the IOCTL
             // Bug: Trying to do more than once causes an error with displaying
-            // the error dialog box. Only leave one uncommented at a time.
+            // the error dialog box.
 
-            //meshListAddress = "fe80::291:a8ff:feeb:27b8";
-            //result = IPv6ToBleDriverInterface.DeviceIoControl(
-            //                    driverHandle,
-            //                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST,
-            //                    meshListAddress,
-            //                    sizeof(char) * meshListAddress.Length,
-            //                    "",
-            //                    0,
-            //                    out bytesReturned, // Not returning bytes
-            //                    null
-            //                    );
-            //if (!result)
-            //{
-            //    int error = Marshal.GetLastWin32Error();
-
-            //    DisplayErrorDialog("Adding to mesh list failed with this " +
-            //                        "error code: " + error.ToString());
-            //}
-
-            meshListAddress = "fe80::3ff8:d2ff:feeb:27b8";
+            meshListAddress = "fe80::291:a8ff:feeb:27b8%1";
             result = IPv6ToBleDriverInterface.DeviceIoControl(
                                 driverHandle,
                                 IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST,
