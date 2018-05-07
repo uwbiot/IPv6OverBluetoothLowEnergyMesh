@@ -41,7 +41,7 @@ namespace IPv6ToBleSixLowPanLibraryForDesktop
         /// because I'm terrible at bitwise operations so I don't use them.
         /// </summary>
         /// <returns></returns>
-        public static async Task<IPAddress> GenerateAsync()
+        public static async Task<IPAddress> GenerateAsync(int scopeId)
         {
             //
             // Step 1
@@ -102,7 +102,8 @@ namespace IPv6ToBleSixLowPanLibraryForDesktop
 
             //
             // Step 4
-            // Build the IPv6 address string from the bytes
+            // Build the IPv6 address string from the bytes and the passed in
+            // scope ID
             //
             StringBuilder builder = new StringBuilder();
             builder.Append("fe80::");
@@ -115,6 +116,7 @@ namespace IPv6ToBleSixLowPanLibraryForDesktop
                     builder.Append(":");
                 }
             }
+            builder.Append("%" + scopeId.ToString());
 
             //
             // Step 5
