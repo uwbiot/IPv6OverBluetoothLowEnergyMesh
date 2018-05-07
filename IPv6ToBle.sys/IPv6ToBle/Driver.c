@@ -145,16 +145,6 @@ Return Value:
 
     //
     // Step 7
-    // Initialize and start the periodic timer
-    //
-    status = IPv6ToBleDriverInitTimer();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
-    //
-    // Step 8
     // Create the injection handle for packet injection. We do that here
     // because, on the border router device, we may not register callouts right away
     // if loading lists from the registry fails. But we still want to create
@@ -171,6 +161,19 @@ Return Value:
         goto Exit;
     }
 
+#ifdef BORDER_ROUTER
+
+    //
+    // Step 8
+    // Initialize and start the periodic timer. This applies only to the border
+    // router.
+    //
+    status = IPv6ToBleDriverInitTimer();
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
+
 	//
 	// Step 9
 	// Populate the device context with runtime information about the white 
@@ -179,8 +182,6 @@ Return Value:
     //
     // Note: This only applies to the border router device.
 	//
-
-#ifdef BORDER_ROUTER
 
 	// Populate the lists. 
 	// 
@@ -310,8 +311,8 @@ Return Value:
     listenRequestQueueLockAttributes.ParentObject = gWdfDeviceObject;
 
     status = WdfSpinLockCreate(&listenRequestQueueLockAttributes,
-        &gListenRequestQueueLock
-    );
+                               &gListenRequestQueueLock
+                               );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Creating listen request queue spin lock failed %!STATUS!", status);
@@ -443,7 +444,7 @@ Return Value:
                                    );
 
     // Set the framework to automatically synchronize this with callbacks under
-    // the parent object (the device), at least at DISPATCH_LEVEL
+    // the parent object (the device)
     timerConfig.AutomaticSerialization = TRUE;
 
     // Initialize the timer attributes to make the device object its parent

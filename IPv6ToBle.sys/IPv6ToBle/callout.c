@@ -147,6 +147,28 @@ Return Value:
 
         return;
     }
+
+    // Check for loopback packets and ignore them
+    if (inFixedValues)
+    {
+        FWP_DATA_TYPE valueType = inFixedValues->incomingValue->value.type;
+        if (valueType == FWP_UINT32)
+        {
+            UINT32 flags = inFixedValues->incomingValue->value.uint32;
+            if (flags & FWP_CONDITION_FLAG_IS_LOOPBACK)
+            {
+                classifyOut->actionType = FWP_ACTION_PERMIT;
+                if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
+                {
+                    classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+                }
+
+                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Permitting loopback packet.");
+
+                return;
+            }
+        }
+    }
     
     //
     // Step 2
@@ -492,6 +514,28 @@ Return Value:
         TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet was injected by self earlier");
 
         return;
+    }
+
+    // Check for loopback packets and ignore them
+    if (inFixedValues)
+    {
+        FWP_DATA_TYPE valueType = inFixedValues->incomingValue->value.type;
+        if (valueType == FWP_UINT32)
+        {
+            UINT32 flags = inFixedValues->incomingValue->value.uint32;
+            if (flags & FWP_CONDITION_FLAG_IS_LOOPBACK)
+            {
+                classifyOut->actionType = FWP_ACTION_PERMIT;
+                if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
+                {
+                    classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+                }
+
+                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Permitting loopback packet.");
+
+                return;
+            }
+        }
     }
 
     //

@@ -27,7 +27,7 @@
 
 [DefaultInstall.Services]
     AddService = %IPv6ToBleServiceName%,,IPv6ToBle.Service
-    StartType = 2                               ; SERVICE_AUTO_START
+    StartType  = 2                              ; SERVICE_AUTO_START
 
 [DefaultUninstall]
     DelFiles = IPv6ToBle.DriverFiles
