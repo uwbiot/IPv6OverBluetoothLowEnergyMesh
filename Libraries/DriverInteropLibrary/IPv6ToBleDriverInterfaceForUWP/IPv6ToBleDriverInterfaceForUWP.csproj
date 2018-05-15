@@ -107,8 +107,14 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="IPv6ToBleDriverInterface.cs" />
+    <Compile Include="AsyncResultObjects\DeviceAsyncResult.cs" />
+    <Compile Include="DeviceIO\DeviceIO.cs" />
+    <Compile Include="AsyncResultObjects\AsyncResult.cs" />
+    <Compile Include="AsyncResultObjects\AsyncResultNoResult.cs" />
+    <Compile Include="IPv6ToBleIoctl.cs" />
+    <Compile Include="Kernel32Import.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="DeviceIO\SafePinnedObject.cs" />
     <EmbeddedResource Include="Properties\IPv6ToBleDriverInterfaceForUWP.rd.xml" />
   </ItemGroup>
   <ItemGroup>
