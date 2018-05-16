@@ -34,6 +34,7 @@
 
 [DefaultUninstall.Services]
     DelService = %IPv6ToBleServiceName%,0x200   ; SPSVCINST_STOPSERVICE
+	DelReg	   = IPv6ToBle.DelRegistry
 
 [IPv6ToBle.DriverFiles]
     IPv6ToBle.sys,,,0x00000040                  ; COPYFLG_OVERWRITE_OLDER_ONLY
@@ -45,6 +46,13 @@
     StartType      = 2                          ; SERVICE_AUTO_START
     ErrorControl   = 1                          ; SERVICE_ERROR_NORMAL
     ServiceBinary  = %12%\IPv6ToBle.sys         ; %WinDir%\System32\Drivers\IPv6ToBle.sys
+	AddReg		   = IPv6ToBle.AddRegistry
+
+[IPv6ToBle.AddRegistry]
+	HKR,"Parameters","Border Router",0x00010001,"0"	; FLG_ADDREG_TYPE_DWORD
+
+[IPv6ToBle.DelRegistry]
+	HKR,"Parameters",,,
 
 [Strings]
     ProviderString          = "Duncan MacMichael"
