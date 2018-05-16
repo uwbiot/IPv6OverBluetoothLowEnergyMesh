@@ -32,7 +32,7 @@ NTSTATUS
 IPv6ToBleRegistryOpenParametersKey();
 
 //-----------------------------------------------------------------------------
-// Wrapper functions to open the white list and mesh list keys
+// Wrapper function to open the white list and mesh list keys
 //-----------------------------------------------------------------------------
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -64,12 +64,9 @@ IPv6ToBleRegistryCheckBorderRouterFlag();
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
-IPv6ToBleRegistryRetrieveWhiteList();
-
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-NTSTATUS
-IPv6ToBleRegistryRetrieveMeshList();
+IPv6ToBleRegistryRetrieveRuntimeList(
+	_In_ ULONG WhichList
+);
 
 //-----------------------------------------------------------------------------
 // Functions to store the white list and mesh lists in the registry
@@ -87,12 +84,9 @@ IPv6ToBleRegistryRetrieveMeshList();
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
-IPv6ToBleRegistryAssignWhiteList();
-
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-NTSTATUS
-IPv6ToBleRegistryAssignMeshList();
+IPv6ToBleRegistryAssignRuntimeList(
+	_In_ ULONG WhichList
+);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

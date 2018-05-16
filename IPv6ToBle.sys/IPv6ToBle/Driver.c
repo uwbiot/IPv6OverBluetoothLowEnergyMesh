@@ -176,7 +176,7 @@ Return Value:
 	if (gBorderRouterFlag)
 	{
 		//
-		// Step 8
+		// Step 9
 		// Initialize and start the periodic timer. This applies only to the border
 		// router.
 		//
@@ -187,7 +187,7 @@ Return Value:
 		}
 
 		//
-		// Step 9
+		// Step 10
 		// Populate the device context with runtime information about the white 
 		// list and mesh list if applicable. These function calls open and close
 		// the registry keys as needed.
@@ -204,7 +204,7 @@ Return Value:
 		// there's nothing in the registry yet, or if the user cleared out one or
 		// both of the lists between reboots.
 		BOOLEAN whiteListLoaded = TRUE;
-		status = IPv6ToBleRegistryRetrieveWhiteList();
+		status = IPv6ToBleRegistryRetrieveRuntimeList(WHITE_LIST);
 		if (!NT_SUCCESS(status))
 		{
 			// We ignore status if this call fails because we stil want to check
@@ -214,7 +214,7 @@ Return Value:
 		}
 
 		BOOLEAN meshListLoaded = TRUE;
-		status = IPv6ToBleRegistryRetrieveMeshList();
+		status = IPv6ToBleRegistryRetrieveRuntimeList(MESH_LIST);
 		if (!NT_SUCCESS(status))
 		{
 			meshListLoaded = FALSE;
@@ -236,8 +236,8 @@ Return Value:
 	}
 
 	//
-	// Step 10
-	// Register the callout and filter. 
+	// Step 11
+	// Register the callout(s) and filter. 
     //
     // BORDER_ROUTER device
     // By getting this far, it means that we have at least one item in each of
@@ -252,13 +252,7 @@ Return Value:
     // device.
     //
 
-	// Register the callout and filter(s)
 	status = IPv6ToBleCalloutsRegister();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
 
 Exit:
 
@@ -535,13 +529,13 @@ Return Value:
 		// Step 2
 		// Clean up the runtime lists
 		//
-		IPv6ToBleRuntimeListPurgeWhiteList();
+		IPv6ToBleRuntimeListPurgeRuntimeList(WHITE_LIST);
 		if (gWhiteListHead)
 		{
 			ExFreePoolWithTag(gWhiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
 		}
 
-		IPv6ToBleRuntimeListPurgeMeshList();
+		IPv6ToBleRuntimeListPurgeRuntimeList(MESH_LIST);
 		if (gMeshListHead)
 		{
 			ExFreePoolWithTag(gMeshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
@@ -550,7 +544,7 @@ Return Value:
 
     //
     // Step 3
-    // Clean up the NDIS memory pool data structure in the device context	
+    // Clean up the NDIS memory pool data structure
     //
     IPv6ToBleNDISPoolDataDestroy(gNdisPoolData);
 
@@ -642,7 +636,7 @@ Return Value:
                               IPv6ToBleRegistryFlushMeshListWorkItemEx,
                               DelayedWorkQueue,
                               NULL
-                            );
+                              );
         }
     }
     WdfSpinLockRelease(gMeshListModifiedLock);

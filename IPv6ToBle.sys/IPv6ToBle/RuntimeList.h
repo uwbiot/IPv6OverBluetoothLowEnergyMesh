@@ -26,16 +26,9 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
-IPv6ToBleRuntimeListAssignWhiteListEntry(
-    _In_    WDFREQUEST  Request
-);
-
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS
-IPv6ToBleRuntimeListAssignMeshListEntry(
-    _In_    WDFREQUEST  Request
+IPv6ToBleRuntimeListAssignNewListEntry(
+    _In_    WDFREQUEST  Request,
+	_In_	ULONG		WhichList
 );
 
 //-----------------------------------------------------------------------------
@@ -46,16 +39,9 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
-IPv6ToBleRuntimeListRemoveWhiteListEntry(
-    _In_    WDFREQUEST  Request
-);
-
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS
-IPv6ToBleRuntimeListRemoveMeshListEntry(
-    _In_    WDFREQUEST  Request
+IPv6ToBleRuntimeListRemoveListEntry(
+    _In_    WDFREQUEST  Request,
+	_In_	ULONG		WhichList
 );
 
 //-----------------------------------------------------------------------------
@@ -66,12 +52,8 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 VOID
-IPv6ToBleRuntimeListPurgeWhiteList();
-
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-VOID
-IPv6ToBleRuntimeListPurgeMeshList();
+IPv6ToBleRuntimeListPurgeRuntimeList(
+	_In_ ULONG WhichList
+);
 
 #endif  // _RUNTIMELIST_H_

@@ -241,7 +241,9 @@ Exit:
 
 _Use_decl_annotations_
 NTSTATUS
-IPv6ToBleRegistryRetrieveWhiteList()
+IPv6ToBleRegistryRetrieveRuntimeList(
+	_In_ ULONG WhichList
+)
 /*++
 Routine Description:
 
@@ -275,32 +277,43 @@ Return Value:
 
 	NTSTATUS status = STATUS_SUCCESS;
 
-	WDFCOLLECTION whiteListAddresses = NULL;
+	WDFCOLLECTION listAddresses = NULL;
 	WDF_OBJECT_ATTRIBUTES addressStringsAttributes;
 
 	ULONG i;
 	ULONG count;
+
     BOOLEAN parametersKeyOpened = FALSE;
     BOOLEAN listKeyOpened = FALSE;
-	IN6_ADDR ipv6AddressStorage;	// struct to store an IPv6 address
 
-	
+	IN6_ADDR ipv6AddressStorage;
+
+	// Validate input
+	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+	{
+		status = STATUS_INVALID_PARAMETER;
+		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Invalid list option during %!FUNC! with %!STATUS!", status);
+		goto Exit;
+	}
 
 	//
 	// Step 1
-	// Retrieve the white list key. It is a REG_MULTI_SZ key, or multi strings
+	// Retrieve the list key. It is a REG_MULTI_SZ key, or multi strings
 	// key. Assign its string contents to the runtime context for the device.
 	// 
-	// NOTE: If this operation fails for the white list, we skip to the mesh
-	// list since there may be something there even if the white list is empty.
+	// NOTE: If this operation fails for the white list, DriverEntry skips to the
+	// mesh list since there may be something there even if the white list is 
+	// empty.
 	//
 
 	// Declare the name of the value we're querying from the key
 	DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
+	DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
+	const UNICODE_STRING listValueName = (WhichList == WHITE_LIST ? whiteListValueName : meshListValueName);
 
 	// Create a collection to store the retrieved white list addresses
 	status = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES,
-		                         &whiteListAddresses
+		                         &listAddresses
 	                             );
 	if (!NT_SUCCESS(status))
 	{
@@ -310,7 +323,7 @@ Return Value:
 
 	// Set the collection to be the parent of the retrieved string objects
 	WDF_OBJECT_ATTRIBUTES_INIT(&addressStringsAttributes);
-	addressStringsAttributes.ParentObject = whiteListAddresses;
+	addressStringsAttributes.ParentObject = listAddresses;
 
     // Open the parent key    
     status = IPv6ToBleRegistryOpenParametersKey();
@@ -321,30 +334,59 @@ Return Value:
     parametersKeyOpened = TRUE;
 
     // Open the list key
-	status = IPv6ToBleRegistryOpenWhiteListKey();
-	if (!NT_SUCCESS(status))
+	if (WhichList == WHITE_LIST)
 	{
-		goto Exit;
+		status = IPv6ToBleRegistryOpenWhiteListKey();
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
 	}
+	else
+	{
+		status = IPv6ToBleRegistryOpenMeshListKey();
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
+	}	
 	listKeyOpened = TRUE;
 
-	// Query the white list key. Fails first time driver is installed or if the
+	// Query the list key. Fails first time driver is installed or if the
 	// user purged the list and rebooted because the key exists but is empty.
-	status = WdfRegistryQueryMultiString(gWhiteListKey,
-		                                 &whiteListValueName,
-		                                 &addressStringsAttributes,
-		                                 whiteListAddresses
-	                                     );
-	if (!NT_SUCCESS(status))
+	if (WhichList == WHITE_LIST)
 	{
-		// If the key is empty, status will be STATUS_RESOURCE_DATA_NOT_FOUND.
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Querying white list failed because it was empty %!STATUS!", status);
-		goto Exit;
+		status = WdfRegistryQueryMultiString(gWhiteListKey,
+											 &listValueName,
+											 &addressStringsAttributes,
+											 listAddresses
+											 );
+		if (!NT_SUCCESS(status))
+		{
+			// If the key is empty, status will be STATUS_RESOURCE_DATA_NOT_FOUND.
+			TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Querying white list failed because it was empty %!STATUS!", status);
+			goto Exit;
+		}
 	}
+	else
+	{
+		status = WdfRegistryQueryMultiString(gMeshListKey,
+											 &listValueName,
+											 &addressStringsAttributes,
+											 listAddresses
+											 );
+		if (!NT_SUCCESS(status))
+		{
+			// If the key is empty, status will be STATUS_RESOURCE_DATA_NOT_FOUND.
+			TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Querying mesh list failed because it was empty %!STATUS!", status);
+			goto Exit;
+		}
+	}
+	
 
 	//
 	// Step 2
-	// Set the white list key's contents to the runtime context. We don't have 
+	// Set the list key's contents to the runtime list. We don't have 
 	// to worry about synchronizing access to the lists because this function 
 	// is either called from DriverEntry, or later from the context of the 
 	// EvtDeviceIoControl callback, and access to those is synchronized by the
@@ -354,7 +396,7 @@ Return Value:
 	// Since the list is non-empty, we can walk the list, get the strings, and
 	// assign them to the context. No need for synchronization because this
 	// function is called from DriverEntry, which is synchronized.
-	count = WdfCollectionGetCount(whiteListAddresses);
+	count = WdfCollectionGetCount(listAddresses);
 	for (i = 0; i < count; i++)
 	{
 
@@ -363,9 +405,9 @@ Return Value:
         // in the first place.
 		DECLARE_UNICODE_STRING_SIZE(currentIpv6Address, INET6_ADDRSTRLEN);
 		WDFSTRING currentWdfString = (WDFSTRING)WdfCollectionGetItem(
-			                             whiteListAddresses,
-			                             i
-		                             );
+			                              listAddresses,
+			                              i
+		                              );
 		WdfStringGetUnicodeString(currentWdfString, &currentIpv6Address);
 
         // Defensively null-terminate the string
@@ -374,36 +416,60 @@ Return Value:
                                         );
         currentIpv6Address.Buffer[currentIpv6Address.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-        // Convert the string to its 16-byte value
-        PWSTR terminator;
-        status = RtlIpv6StringToAddressW(currentIpv6Address.Buffer,
-                                         &terminator,
-                                         &ipv6AddressStorage
-                                         );
+        // Convert the string to its 16-byte value and scope ID
+		ULONG scopeId = 0;
+		USHORT port = 0;
+        status = RtlIpv6StringToAddressExW(currentIpv6Address.Buffer,
+                                          &ipv6AddressStorage,
+										  &scopeId,
+										  &port
+                                          );
 
         // Create the list entry and add it
         if (NT_SUCCESS(status))
 		{
+			if (WhichList == WHITE_LIST)
+			{
+				PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
+														NonPagedPoolNx,
+														sizeof(WHITE_LIST_ENTRY),
+														IPV6_TO_BLE_WHITE_LIST_TAG
+													   );
+				if (!newWhiteListEntry)
+				{
+					status = STATUS_INSUFFICIENT_RESOURCES;
+					TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "New white list entry allocation failed during %!FUNC! with this error code: %!STATUS!", status);
+					goto Exit;
+				}
 
-			// Using non-paged pool because the list may be accessed at
-            // IRQL = DISPATCH_LEVEL
-            PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
-                                                      NonPagedPoolNx,
-                                                      sizeof(WHITE_LIST_ENTRY),
-                                                      IPV6_TO_BLE_WHITE_LIST_TAG
-                                                  );
-            if (!newWhiteListEntry)
-            {
-                status = STATUS_INSUFFICIENT_RESOURCES;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "New white list entry allocation failed during %!FUNC! with this error code: %!STATUS!", status);
-                goto Exit;
-            }
+				// Add the entry to the list
+				InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);
 
-            // Add the entry to the list
-            InsertHeadList(gWhiteListHead, &newWhiteListEntry->listEntry);
+				// Insert the address into the entry
+				newWhiteListEntry->ipv6Address = ipv6AddressStorage;
+				newWhiteListEntry->scopeId = scopeId;
+			}
+			else
+			{
+				PMESH_LIST_ENTRY newMeshListEntry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
+														NonPagedPoolNx,
+														sizeof(MESH_LIST_ENTRY),
+														IPV6_TO_BLE_MESH_LIST_TAG
+													 );
+				if (!newMeshListEntry)
+				{
+					status = STATUS_INSUFFICIENT_RESOURCES;
+					TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "New mesh list entry allocation failed during %!FUNC! with this error code: %!STATUS!", status);
+					goto Exit;
+				}
 
-            // Insert the address into the entry
-            newWhiteListEntry->ipv6Address = ipv6AddressStorage;
+				// Add the entry to the list
+				InsertHeadList(gMeshListHead, &newMeshListEntry->listEntry);
+
+				// Insert the address into the entry
+				newMeshListEntry->ipv6Address = ipv6AddressStorage;
+				newMeshListEntry->scopeId = scopeId;
+			}            
 		}
         else
         {
@@ -419,7 +485,7 @@ Exit:
     // Clean up any memory allocated if we failed at some point
     if (!NT_SUCCESS(status))
     {
-        IPv6ToBleRuntimeListPurgeWhiteList();
+        IPv6ToBleRuntimeListPurgeRuntimeList(WhichList);
     }
 
     // Close the keys
@@ -429,13 +495,20 @@ Exit:
     }
     if (listKeyOpened)
     {
-        WdfRegistryClose(gWhiteListKey);
+		if (WhichList == WHITE_LIST)
+		{
+			WdfRegistryClose(gWhiteListKey);
+		}
+		else
+		{
+			WdfRegistryClose(gMeshListKey);
+		}        
     }
 
     // Clean up the collection object and its children
-    if (whiteListAddresses)
+    if (listAddresses)
     {
-        WdfObjectDelete(whiteListAddresses);
+        WdfObjectDelete(listAddresses);
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
@@ -445,189 +518,9 @@ Exit:
 
 _Use_decl_annotations_
 NTSTATUS
-IPv6ToBleRegistryRetrieveMeshList()
-/*++
-Routine Description:
-
-	Loads information about the trusted external device mesh list. If it has
-	values in it, assign them to the runtime context so we don't have to keep
-	accessing the registry.
-
-    This function is only called from Driver Entry so it should be called at
-    PASSIVE_LEVEL.
-
-Arguments:
-
-	None. Accesses global variables defined in Driver.h.
-
-Return Value:
-
-	Returns STATUS_SUCCESS if the list was populated, and an appropriate
-	NTSTATUS error code otherwise. If there is nothing stored in the key yet,
-	or the list is empty, we return that error. The driver then sits and waits
-	for enough information to act and does not fail its driver entry. This will
-	happen either the very first time the driver is installed, or if the user
-	deletes all entries in the list during runtime and reboots.
-
-	If this occurs, the driver finishes its driver entry and does not register
-	its callouts and filters yet. They would be registered later once the
-	driver receives further addresses from the usermode app and each list has
-	at least one address.
---*/
-{
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
-
-	NTSTATUS status = STATUS_SUCCESS;
-
-	WDFCOLLECTION meshListAddresses = NULL;
-	WDF_OBJECT_ATTRIBUTES addressStringsAttributes;
-
-	ULONG i;
-	ULONG count;
-    BOOLEAN parametersKeyOpened = FALSE;
-    BOOLEAN listKeyOpened = FALSE;
-	IN6_ADDR ipv6AddressStorage;	// struct to store an IPv6 address
-
-	
-
-    // Declare the name of the value we're querying from the key
-    DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
-
-	// Create a collection to store the retrieved mesh list addresses
-	status = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &meshListAddresses);
-	if (!NT_SUCCESS(status))
-	{
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WDFCOLLECTION creation failed during %!FUNC! with %!STATUS!", status);
-		goto Exit;
-	}
-
-	// Set the collection to be the parent of the retrieved string objects
-	WDF_OBJECT_ATTRIBUTES_INIT(&addressStringsAttributes);
-	addressStringsAttributes.ParentObject = meshListAddresses;
-
-    // Open the parent key    
-    status = IPv6ToBleRegistryOpenParametersKey();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-    parametersKeyOpened = TRUE;
-
-	// Open the list key	
-	status = IPv6ToBleRegistryOpenMeshListKey();
-	if (!NT_SUCCESS(status))
-	{
-		goto Exit;
-	}
-	listKeyOpened = TRUE;
-
-	// Query the white list key. Fails first time driver is installed or if the
-	// user purged the list and rebooted because the key exists but is empty.
-	status = WdfRegistryQueryMultiString(gMeshListKey,
-		                                 &meshListValueName,
-		                                 &addressStringsAttributes,
-		                                 meshListAddresses
-	                                     );
-	if (!NT_SUCCESS(status))
-	{
-		// If the key is empty, status will be STATUS_RESOURCE_DATA_NOT_FOUND.
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Querying mesh list failed because it was empty %!STATUS!", status);
-		goto Exit;
-	}
-
-	// Since the list is non-empty, we can walk the list, get the strings, and
-	// assign them to the context. No need for synchronization because this
-	// function is called from DriverEntry, which is synchronized.
-	count = WdfCollectionGetCount(meshListAddresses);
-	for (i = 0; i < count; i++)
-	{
-
-        // Get the string from the collection retrieved from the registry. It
-        // should be null-terminated already if it was stored there correctly
-        // in the first place.
-        DECLARE_UNICODE_STRING_SIZE(currentIpv6Address, INET6_ADDRSTRLEN);
-        WDFSTRING currentWdfString = (WDFSTRING)WdfCollectionGetItem(
-                                         meshListAddresses,
-                                         i
-                                     );
-        WdfStringGetUnicodeString(currentWdfString, &currentIpv6Address);
-
-        // Defensively null-terminate the string
-        currentIpv6Address.Length = min(currentIpv6Address.Length,
-                                        currentIpv6Address.MaximumLength - sizeof(WCHAR)
-                                        );
-        currentIpv6Address.Buffer[currentIpv6Address.Length / sizeof(WCHAR)] = UNICODE_NULL;
-
-        // Convert the string to its 16-byte value
-        PWSTR terminator;
-        status = RtlIpv6StringToAddressW(currentIpv6Address.Buffer,
-                                         &terminator,
-                                         &ipv6AddressStorage
-                                         );
-
-        // Create the list entry and add it
-        if (NT_SUCCESS(status))
-		{
-            // Using non-paged pool because the list may be accessed at
-            // IRQL = DISPATCH_LEVEL
-			PMESH_LIST_ENTRY entry = (PMESH_LIST_ENTRY)ExAllocatePoolWithTag(
-				                        NonPagedPoolNx,
-				                        sizeof(MESH_LIST_ENTRY),
-				                        IPV6_TO_BLE_MESH_LIST_TAG
-			                         );
-			if (!entry)
-			{
-				status = STATUS_INSUFFICIENT_RESOURCES;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Allocating mesh list entry for address retrieved from registry failed %!STATUS!", status);
-				goto Exit;
-			}
-
-			// Add the entry to the list
-			InsertHeadList(gMeshListHead, &entry->listEntry);
-
-			// Insert the address into the entry
-			entry->ipv6Address = ipv6AddressStorage;
-        }
-        else
-        {
-            goto Exit;
-        }
-
-		// Zero out the storage structure for next time
-		RtlZeroMemory(&ipv6AddressStorage, sizeof(IN6_ADDR));
-	}
-
-Exit:
-	// Clean up any memory allocated if we failed at some point
-	if (!NT_SUCCESS(status))
-	{
-		IPv6ToBleRuntimeListPurgeMeshList();
-	}
-
-    // Close the keys
-    if (parametersKeyOpened)
-    {
-        WdfRegistryClose(gParametersKey);
-    }
-    if (listKeyOpened)
-    {
-        WdfRegistryClose(gMeshListKey);
-    }
-
-    // Clean up the collection object and its children
-    if (meshListAddresses)
-    {
-        WdfObjectDelete(meshListAddresses);
-    }
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
-
-	return status;
-}
-
-_Use_decl_annotations_
-NTSTATUS
-IPv6ToBleRegistryAssignWhiteList()
+IPv6ToBleRegistryAssignRuntimeList(
+	_In_ ULONG WhichList
+)
 /*++
 Routine Description:
 
@@ -640,7 +533,8 @@ Routine Description:
 
 Arguments:
 
-    None. Accesses global variables defined in Driver.h.
+    WhichList - Determines which runtime list on which to operate. 0 for white
+		list, 1 for mesh list.
 
 Return Value:
 
@@ -656,15 +550,35 @@ Return Value:
     WDFCOLLECTION addressCollection = { 0 };
     WDF_OBJECT_ATTRIBUTES attributes;
 
+	// Validate input
+	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+	{
+		status = STATUS_INVALID_PARAMETER;
+		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Invalid list option during %!FUNC! with %!STATUS!", status);
+		goto Exit;
+	}
+
     //
     // Step 1
     // Check for empty list (counts as success)
     //
-    if (IsListEmpty(gWhiteListHead))
-    {
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "White list is empty - nothing to write to registry %!STATUS!", status);
-        goto Exit;
-    }
+	if (WhichList == WHITE_LIST)
+	{
+		if (IsListEmpty(gWhiteListHead))
+		{
+			TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "White list is empty - nothing to write to registry %!STATUS!", status);
+			goto Exit;
+		}
+	} 
+	else
+	{
+		if (IsListEmpty(gMeshListHead))
+		{
+			TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Mesh list is empty - nothing to write to registry %!STATUS!", status);
+			goto Exit;
+		}
+	}
+    
 
     //
     // Step 2
@@ -680,11 +594,23 @@ Return Value:
     parametersKeyOpened = TRUE;
 
     // Open the list key
-    status = IPv6ToBleRegistryOpenWhiteListKey();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
+	// Open the list key
+	if (WhichList == WHITE_LIST)
+	{
+		status = IPv6ToBleRegistryOpenWhiteListKey();
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
+	}
+	else
+	{
+		status = IPv6ToBleRegistryOpenMeshListKey();
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
+	}
     listKeyOpened = TRUE;
 
     //
@@ -704,72 +630,90 @@ Return Value:
     // Step 4
     // Traverse the list and add each entry's IPv6 address to the WDFCOLLECTION
     //
-    PLIST_ENTRY entry = gWhiteListHead->Flink;
-    if (!IsListEmpty(gWhiteListHead))
-    {
-        while (entry != gWhiteListHead)
-        {
-            // Get the struct that contains this entry
-            PWHITE_LIST_ENTRY whiteListEntry = CONTAINING_RECORD(entry,
-                                                                WHITE_LIST_ENTRY,
-                                                                listEntry
-                                                                );
-            
-            // Declare a unicode string to hold the to-be converted address
-            DECLARE_UNICODE_STRING_SIZE(currentIpv6AddressString,
-                                        INET6_ADDRSTRLEN
-                                        );
+	PLIST_ENTRY entry = WhichList == WHITE_LIST ? gWhiteListHead->Flink : gMeshListHead->Flink;
+	if (!IsListEmpty(WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+	{
+		while (entry != (WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+		{
+			// Get the struct that contains this entry
+			
+			// This is the closest we can get to dynamic type declaration at
+			// runtime
+			union {
+				PWHITE_LIST_ENTRY whiteListEntry;
+				PMESH_LIST_ENTRY meshListEntry;
+			} runtimeListEntry;
 
-            // Convert the address to a string (function null-terminates it)
-            ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
-            status = RtlIpv6AddressToStringExW(&whiteListEntry->ipv6Address,
-                                               whiteListEntry->scopeId,
-                                               0,
-                                               (PWSTR)currentIpv6AddressString.Buffer,
-                                               &currentIpv6AddressStringLength
-                                               );
-            if (!NT_SUCCESS(status))
-            {
-                TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
-                goto Exit;
-            }
+			if (WhichList == WHITE_LIST)
+			{
+				runtimeListEntry.whiteListEntry = CONTAINING_RECORD(entry,
+																	WHITE_LIST_ENTRY,
+																	listEntry
+																	);
+			}
+			else
+			{
+				runtimeListEntry.meshListEntry = CONTAINING_RECORD(entry,
+																   MESH_LIST_ENTRY,
+																   listEntry
+																   );
+			}
 
-            // Assign the actual number of bytes written to the UNICODE_STRING
-            // structure. Unicode characters are 2 bytes each and the
-            // conversion function reported the total number of CHARACTERS
-            // written to the buffer, so that is the length. Also, the max
-            // length must be a power of 2 accordingly, which is why
-            // INET6_ADDRSTRLEN is defined as 65 (64 + null terminator).
-            currentIpv6AddressString.Length = (sizeof(BYTE) * 2) * (USHORT)currentIpv6AddressStringLength;
+			// Declare a unicode string to hold the to-be converted address
+			DECLARE_UNICODE_STRING_SIZE(currentIpv6AddressString,
+										INET6_ADDRSTRLEN
+										);
 
-            // Initialize and create the WDF string object from the Unicode string
-            WDFSTRING currentIpv6AddressWdfString;
-            WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-            attributes.ParentObject = addressCollection;
+			// Convert the address to a string (function null-terminates it)
+			ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
+			status = RtlIpv6AddressToStringExW(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
+											   WhichList == WHITE_LIST ? runtimeListEntry.whiteListEntry->scopeId : runtimeListEntry.meshListEntry->scopeId,
+											   0,
+											   (PWSTR)currentIpv6AddressString.Buffer,
+											   &currentIpv6AddressStringLength
+											   );
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
+				goto Exit;
+			}
 
-            status = WdfStringCreate(&currentIpv6AddressString,
-                                     &attributes,
-                                     &currentIpv6AddressWdfString
-                                     );
-            if (!NT_SUCCESS(status))
-            {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfStringCreate failed during %!FUNC! with %!STATUS!", status);
-                goto Exit;
-            }
+			// Assign the actual number of bytes written to the UNICODE_STRING
+			// structure. Unicode characters are 2 bytes each and the
+			// conversion function reported the total number of CHARACTERS
+			// written to the buffer, so that is the length. Also, the max
+			// length must be a power of 2 accordingly, which is why
+			// INET6_ADDRSTRLEN is defined as 65 (64 + null terminator).
+			currentIpv6AddressString.Length = (sizeof(BYTE) * 2) * (USHORT)currentIpv6AddressStringLength;
 
-            // Add the WDFSTRING to the WDFCOLLECTION
-            status = WdfCollectionAdd(addressCollection,
-                                     currentIpv6AddressWdfString
-                                     );
-            if (!NT_SUCCESS(status))
-            {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfCollectionAdd failed during %!FUNC! with %!STATUS!", status);
-                goto Exit;
-            }
+			// Initialize and create the WDF string object from the Unicode string
+			WDFSTRING currentIpv6AddressWdfString;
+			WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
+			attributes.ParentObject = addressCollection;
 
-            // Advance the list
-            entry = entry->Flink;
-        }
+			status = WdfStringCreate(&currentIpv6AddressString,
+									 &attributes,
+									 &currentIpv6AddressWdfString
+									 );
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfStringCreate failed during %!FUNC! with %!STATUS!", status);
+				goto Exit;
+			}
+
+			// Add the WDFSTRING to the WDFCOLLECTION
+			status = WdfCollectionAdd(addressCollection,
+									  currentIpv6AddressWdfString
+									  );
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfCollectionAdd failed during %!FUNC! with %!STATUS!", status);
+				goto Exit;
+			}
+
+			// Advance the list
+			entry = entry->Flink;
+		}
     }
     
     //
@@ -778,11 +722,13 @@ Return Value:
     //
 
     // Declare the name of the value we're assigning to the key
-    DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
+	DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
+	DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
+	const UNICODE_STRING listValueName = (WhichList == WHITE_LIST ? whiteListValueName : meshListValueName);
 
     // Assign the collection of strings to the registry key's value
-    status = WdfRegistryAssignMultiString(gWhiteListKey, 
-                                          &whiteListValueName, 
+    status = WdfRegistryAssignMultiString(WhichList == WHITE_LIST ? gWhiteListKey : gMeshListKey, 
+                                          &listValueName, 
                                           addressCollection
                                           );
     if (!NT_SUCCESS(status))
@@ -799,191 +745,7 @@ Exit:
     }
     if (listKeyOpened)
     {
-        WdfRegistryClose(gWhiteListKey);
-    }
-
-    // Clean up collection object
-    if (addressCollection)
-    {
-        WdfObjectDelete(addressCollection);
-    }
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
-
-    return status;
-}
-
-_Use_decl_annotations_
-NTSTATUS
-IPv6ToBleRegistryAssignMeshList()
-/*++
-Routine Description:
-
-    Assigns the runtime mesh list to the registry and overwrites what is
-    there. Converts the byte values used during runtime back to string forms
-    for storage.
-
-    This function is called from the periodic timer callback function, which
-    is called at DISPATCH_LEVEL.
-
-Arguments:
-
-    None. Accesses global variables defined in Driver.h.
-
-Return Value:
-
-    STATUS_SUCCESS if successful; appropriate NTSTATUS error codes otherwise.
-
---*/
-{
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
-
-    NTSTATUS status = STATUS_SUCCESS;
-    BOOLEAN parametersKeyOpened = FALSE;
-    BOOLEAN listKeyOpened = FALSE;
-    WDFCOLLECTION addressCollection = { 0 };
-    WDF_OBJECT_ATTRIBUTES attributes;
-
-    //
-    // Step 1
-    // Check for empty list (counts as success)
-    //
-    if (IsListEmpty(gMeshListHead))
-    {
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Mesh list is empty - nothing to write to registry %!STATUS!", status);
-        goto Exit;
-    }
-
-    //
-    // Step 2
-    // Open the key
-    //
-
-    // Open the parent key    
-    status = IPv6ToBleRegistryOpenParametersKey();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-    parametersKeyOpened = TRUE;
-
-    // Open the list key
-    status = IPv6ToBleRegistryOpenMeshListKey();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-    listKeyOpened = TRUE;
-
-    //
-    // Step 3
-    // Create the collection object that will be
-    // assigned to the key (it is a collection of strings; the key is a 
-    // REG_MULTI_SZ key)
-    //
-    status = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &addressCollection);
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WDFCOLLECTION creation failed during %!FUNC! with %!STATUS!", status);
-        goto Exit;
-    }
-
-    //
-    // Step 4
-    // Traverse the list and add each entry's IPv6 address to the WDFCOLLECTION
-    //
-    PLIST_ENTRY entry = gMeshListHead->Flink;
-    while (entry != gMeshListHead)
-    {
-        // Get the struct that contains this entry
-        PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
-                                                           MESH_LIST_ENTRY,
-                                                           listEntry
-                                                           );
-
-        // Declare a unicode string to hold the to-be converted address
-        DECLARE_UNICODE_STRING_SIZE(currentIpv6AddressString,
-                                    INET6_ADDRSTRLEN
-                                    );
-
-        // Convert the address to a string (function null-terminates it)
-        ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
-        status = RtlIpv6AddressToStringExW(&meshListEntry->ipv6Address,
-                                           meshListEntry->scopeId,
-                                           0,
-                                           (PWSTR)currentIpv6AddressString.Buffer,
-                                           &currentIpv6AddressStringLength
-                                           );
-        if (!NT_SUCCESS(status))
-        {
-            TraceEvents(TRACE_LEVEL_WARNING, TRACE_HELPERS_REGISTRY, "Converting IPv6 address to string failed during %!FUNC! with %!STATUS!", status);
-            goto Exit;
-        }
-
-        // Assign the actual number of bytes written to the UNICODE_STRING
-        // structure. Unicode characters are 2 bytes each and the
-        // conversion function reported the total number of CHARACTERS
-        // written to the buffer, so that is the length. Also, the max
-        // length must be a power of 2 accordingly, which is why
-        // INET6_ADDRSTRLEN is defined as 65 (64 + null terminator).
-        currentIpv6AddressString.Length = (sizeof(BYTE) * 2) * (USHORT)currentIpv6AddressStringLength;
-
-        // Initialize and create the WDF string object from the Unicode string
-        WDFSTRING currentIpv6AddressWdfString;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-        attributes.ParentObject = addressCollection;
-        status = WdfStringCreate(&currentIpv6AddressString,
-                                 &attributes,
-                                 &currentIpv6AddressWdfString
-                                 );
-        if (!NT_SUCCESS(status))
-        {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfStringCreate failed during %!FUNC! with %!STATUS!", status);
-            goto Exit;
-        }
-
-        // Add the WDFSTRING to the WDFCOLLECTION
-        status = WdfCollectionAdd(addressCollection,
-                                  currentIpv6AddressWdfString
-                                  );
-        if (!NT_SUCCESS(status))
-        {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfCollectionAdd failed during %!FUNC! with %!STATUS!", status);
-            goto Exit;
-        }
-
-        // Advance the list
-        entry = entry->Flink;
-    }
-
-    //
-    // Step 5
-    // Assign the collection of string objects to the registry key
-    //
-
-    // Declare the name of the value we're assigning to the key
-    DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
-
-    // Assign the collection of strings to the registry key's value
-    status = WdfRegistryAssignMultiString(gMeshListKey,
-                                          &meshListValueName,
-                                          addressCollection
-                                          );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "WdfRegistryAssignMultiString failed during %!FUNC! with %!STATUS!", status);
-    }
-
-Exit:
-
-    // Close the keys if they were opened
-    if (parametersKeyOpened)
-    {
-        WdfRegistryClose(gParametersKey);
-    }
-    if (listKeyOpened)
-    {
-        WdfRegistryClose(gMeshListKey);
+        WdfRegistryClose(WhichList == WHITE_LIST ? gWhiteListKey : gMeshListKey);
     }
 
     // Clean up collection object
@@ -1041,7 +803,7 @@ Return Value:
 
     // No need to check this for failure, as if it fails we'll try again 
     // later; plus, the function itself will log a trace error if it fails
-    status = IPv6ToBleRegistryAssignWhiteList();
+    status = IPv6ToBleRegistryAssignRuntimeList(WHITE_LIST);
 
     // Reset the flag for next check if we succeeded
     if (NT_SUCCESS(status))
@@ -1106,7 +868,7 @@ Return Value:
 
     // No need to check this for failure, as if it fails we'll try again 
     // later; plus, the function itself will log a trace error if it fails
-    status = IPv6ToBleRegistryAssignMeshList();
+    status = IPv6ToBleRegistryAssignRuntimeList(MESH_LIST);
 
     // Reset the flag for next check if we succeeded
     if (NT_SUCCESS(status))

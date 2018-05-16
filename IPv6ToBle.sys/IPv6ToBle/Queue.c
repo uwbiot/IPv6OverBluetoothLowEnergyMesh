@@ -310,7 +310,7 @@ Return Value:
 		//
 		case IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST:
 		{
-			status = IPv6ToBleRuntimeListAssignWhiteListEntry(Request);
+			status = IPv6ToBleRuntimeListAssignNewListEntry(Request, WHITE_LIST);
 			break;
 		}
 
@@ -328,7 +328,7 @@ Return Value:
 		//
 		case IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST:
 		{
-			status = IPv6ToBleRuntimeListRemoveWhiteListEntry(Request);
+			status = IPv6ToBleRuntimeListRemoveListEntry(Request, WHITE_LIST);
 			break;
 		}
 
@@ -345,7 +345,7 @@ Return Value:
 		//
 		case IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST:
 		{
-			status = IPv6ToBleRuntimeListAssignMeshListEntry(Request);
+			status = IPv6ToBleRuntimeListAssignNewListEntry(Request, MESH_LIST);
 			break;
 		}
 
@@ -363,7 +363,7 @@ Return Value:
 		//
 		case IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST:
 		{
-			status = IPv6ToBleRuntimeListRemoveMeshListEntry(Request);
+			status = IPv6ToBleRuntimeListRemoveListEntry(Request, MESH_LIST);
 			break;
 		}
 
@@ -392,7 +392,7 @@ Return Value:
 		case IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST:
 		{
 			// Purge the runtime list
-			IPv6ToBleRuntimeListPurgeWhiteList();
+			IPv6ToBleRuntimeListPurgeRuntimeList(WHITE_LIST);
 
 			// Open the parent key
 			BOOLEAN parametersKeyOpened = FALSE;
@@ -460,7 +460,7 @@ Return Value:
 		case IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST:
 		{
 			// Purge the runtime list
-			IPv6ToBleRuntimeListPurgeMeshList();
+			IPv6ToBleRuntimeListPurgeRuntimeList(MESH_LIST);
 
 			// Open the parent key
 			BOOLEAN parametersKeyOpened = FALSE;
