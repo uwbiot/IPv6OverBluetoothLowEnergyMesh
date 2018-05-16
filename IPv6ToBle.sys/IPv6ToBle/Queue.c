@@ -275,11 +275,9 @@ Return Value:
             break;
         }
 
-#ifdef BORDER_ROUTER
-
-        //
-        // IOCTL 3: Inject outbound
-        //
+		//
+		// IOCTL 3: Inject outbound
+		//
 		// This IOCTL is sent as a request to send an IPv6 packet out. The
 		// IPv6 packet is supplied in the input buffer and is injected into the 
 		// outbound network layer. The packet is assumed to be formed correctly
@@ -288,225 +286,223 @@ Return Value:
 		// stack and will be validated along the way.
 		//
 		// This IOCTL is sent by the usermode packet processing app and is
-        // ONLY used on the border router device to send a packet back out to the 
-        // internet (e.g. an ACK to a previous status request from outside).
-        //
-		case IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6: 
-        {
+		// ONLY used on the border router device to send a packet back out to the 
+		// internet (e.g. an ACK to a previous status request from outside).
+		//
+		case IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6:
+		{
 
 			// Inject the packet
 			status = IPv6ToBleQueueInjectNetworkOutboundV6(Request);
-            break;
-		}        
+			break;
+		}
 
-        //
-        // IOCTL 4: Add to white list
-        //
-        // This IOCTL is sent as a request to add an address to the white list.
-        // The desired address is supplied in the WDFREQUEST input buffer.
-        //
-        // It is sent by the usermode GUI app after the app has
-        // successfully registered a trusted external device.
-        //
-        // This IOCTL is used ONLY on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST:
-        {
-            status = IPv6ToBleRuntimeListAssignWhiteListEntry(Request);
-            break;
-        }
+		//
+		// IOCTL 4: Add to white list
+		//
+		// This IOCTL is sent as a request to add an address to the white list.
+		// The desired address is supplied in the WDFREQUEST input buffer.
+		//
+		// It is sent by the usermode GUI app after the app has
+		// successfully registered a trusted external device.
+		//
+		// This IOCTL is used ONLY on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST:
+		{
+			status = IPv6ToBleRuntimeListAssignWhiteListEntry(Request);
+			break;
+		}
 
-        //
-        // IOCTL 5: Remove from white list
-        //
-        // This IOCTL is sent as a request to remove an address from the white
-        // list. The desired address is supplied in the WDFREQUEST input 
-        // buffer.
-        //
-        // This IOCTL is sent by the usermode GUI app after the app has
-        // successfully unregistered a trusted external device.
-        //
-        // This IOCTL is used ONLY on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST:
-        {
-            status = IPv6ToBleRuntimeListRemoveWhiteListEntry(Request);
-            break;
-        }
+		//
+		// IOCTL 5: Remove from white list
+		//
+		// This IOCTL is sent as a request to remove an address from the white
+		// list. The desired address is supplied in the WDFREQUEST input 
+		// buffer.
+		//
+		// This IOCTL is sent by the usermode GUI app after the app has
+		// successfully unregistered a trusted external device.
+		//
+		// This IOCTL is used ONLY on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST:
+		{
+			status = IPv6ToBleRuntimeListRemoveWhiteListEntry(Request);
+			break;
+		}
 
-        //
-        // IOCTL 6: Add to mesh list
-        //
-        // This IOCTL is sent as a request to add an address to the mesh list.
-        // The desired address is supplied in the WDFREQUEST input buffer.
-        //
-        // It is sent by the usermode GUI app after the app has
-        // successfully provisioned a new device into the BLE mesh network.
-        //
-        // This IOCTL is used only on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST:
-        {
-            status = IPv6ToBleRuntimeListAssignMeshListEntry(Request);
-            break;
-        }
+		//
+		// IOCTL 6: Add to mesh list
+		//
+		// This IOCTL is sent as a request to add an address to the mesh list.
+		// The desired address is supplied in the WDFREQUEST input buffer.
+		//
+		// It is sent by the usermode GUI app after the app has
+		// successfully provisioned a new device into the BLE mesh network.
+		//
+		// This IOCTL is used only on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST:
+		{
+			status = IPv6ToBleRuntimeListAssignMeshListEntry(Request);
+			break;
+		}
 
-        //
-        // IOCTL 7: Remove from mesh list
-        //
-        // This IOCTL is sent as a request to remove an address from the mesh
-        // list. The desired address is supplied in the WDFREQUEST input 
-        // buffer.
-        //
-        // It is sent by the usermode GUI app after the app has
-        // successfully deleted a device from the BLE mesh network.
-        //
-        // This IOCTL is ONLY used on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST:
-        {
-            status = IPv6ToBleRuntimeListRemoveMeshListEntry(Request);
-            break;
-        }
+		//
+		// IOCTL 7: Remove from mesh list
+		//
+		// This IOCTL is sent as a request to remove an address from the mesh
+		// list. The desired address is supplied in the WDFREQUEST input 
+		// buffer.
+		//
+		// It is sent by the usermode GUI app after the app has
+		// successfully deleted a device from the BLE mesh network.
+		//
+		// This IOCTL is ONLY used on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST:
+		{
+			status = IPv6ToBleRuntimeListRemoveMeshListEntry(Request);
+			break;
+		}
 
-        //
-        // IOCTL 8: Purge white list
-        //
-        // This IOCTL is sent as a request to purge the runtime white list
-        // and clear the white list from the registry.
-        //
-        // It is sent by the usermode GUI app in the event that the app needs
-        // to reset the white list and re-send it. This is in the event that
-        // the white list in the driver is corrupted and the GUI app needs to
-        // start it over, or they are somehow out of sync. This assumes that
-        // the GUI provisioning app is the authority on keeping a correct list.
-        //
-        // This is a bit of a misnomer, since the actual PurgeList() function
-        // doesn't clear the registry key; it only frees the runtime list
-        // memory. Tthis is because PurgeList() is always called to free memory
-        // upon driver unload, but we want the registry key to be non-volatile.
-        // But, this IOCTL specifically clears the registry key to start over 
-        // on the assumption that new white list addresses will follow to 
-        // re-build both the runtime list and the permanently stored list.
-        //
-        // This IOCTL is ONLY used on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST:
-        {
-            // Purge the runtime list
-            IPv6ToBleRuntimeListPurgeWhiteList();
+		//
+		// IOCTL 8: Purge white list
+		//
+		// This IOCTL is sent as a request to purge the runtime white list
+		// and clear the white list from the registry.
+		//
+		// It is sent by the usermode GUI app in the event that the app needs
+		// to reset the white list and re-send it. This is in the event that
+		// the white list in the driver is corrupted and the GUI app needs to
+		// start it over, or they are somehow out of sync. This assumes that
+		// the GUI provisioning app is the authority on keeping a correct list.
+		//
+		// This is a bit of a misnomer, since the actual PurgeList() function
+		// doesn't clear the registry key; it only frees the runtime list
+		// memory. Tthis is because PurgeList() is always called to free memory
+		// upon driver unload, but we want the registry key to be non-volatile.
+		// But, this IOCTL specifically clears the registry key to start over 
+		// on the assumption that new white list addresses will follow to 
+		// re-build both the runtime list and the permanently stored list.
+		//
+		// This IOCTL is ONLY used on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST:
+		{
+			// Purge the runtime list
+			IPv6ToBleRuntimeListPurgeWhiteList();
 
-            // Open the parent key
-            BOOLEAN parametersKeyOpened = FALSE;
-            status = IPv6ToBleRegistryOpenParametersKey();
-            if (!NT_SUCCESS(status))
-            {
-                goto PurgeWhiteListError;
-            }
-            parametersKeyOpened = TRUE;
+			// Open the parent key
+			BOOLEAN parametersKeyOpened = FALSE;
+			status = IPv6ToBleRegistryOpenParametersKey();
+			if (!NT_SUCCESS(status))
+			{
+				goto PurgeWhiteListError;
+			}
+			parametersKeyOpened = TRUE;
 
-            // Remove the list's registry key
-            status = IPv6ToBleRegistryOpenWhiteListKey();
-            if (!NT_SUCCESS(status))
-            {
-                goto PurgeWhiteListError;
-            }
-            status = WdfRegistryRemoveKey(gWhiteListKey);
-            if (!NT_SUCCESS(status))
-            {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
-            }
+			// Remove the list's registry key
+			status = IPv6ToBleRegistryOpenWhiteListKey();
+			if (!NT_SUCCESS(status))
+			{
+				goto PurgeWhiteListError;
+			}
+			status = WdfRegistryRemoveKey(gWhiteListKey);
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing white list key failed during %!FUNC!, status: %!STATUS!", status);
+			}
 
-            // Since the white list is *now* empty, unregister the callouts
-            // if they were registered
-            if (IsListEmpty(gWhiteListHead))
-            {
-                // Unregister the callouts
-                if (gCalloutsRegistered)
-                {
-                    IPv6ToBleCalloutsUnregister();
-                }
-            }
+			// Since the white list is *now* empty, unregister the callouts
+			// if they were registered
+			if (IsListEmpty(gWhiteListHead))
+			{
+				// Unregister the callouts
+				if (gCalloutsRegistered)
+				{
+					IPv6ToBleCalloutsUnregister();
+				}
+			}
 
-        PurgeWhiteListError:
+		PurgeWhiteListError:
 
-            if (parametersKeyOpened)
-            {
-                WdfRegistryClose(gParametersKey);
-            }
-            break;
-        }
+			if (parametersKeyOpened)
+			{
+				WdfRegistryClose(gParametersKey);
+			}
+			break;
+		}
 
-        //
-        // IOCTL 9: Purge mesh list
-        //
-        // This IOCTL is sent as a request to purge the runtime mesh list
-        // and clear the mesh list from the registry.
-        //
-        // It is sent by the usermode GUI app in the event that the app needs
-        // to reset the mesh list and re-send it. This is in the event that
-        // the mesh list in the driver is corrupted and the GUI app needs to
-        // start it over, or they are somehow out of sync. This assumes that
-        // the GUI provisioning app is the authority on keeping a correct list.
-        //
-        // This is a bit of a misnomer, since the actual PurgeList() function
-        // doesn't clear the registry key; it only frees the runtime list
-        // memory. This is because PurgeList() is always called to free memory
-        // upon driver unload, but we want the registry key to be non-volatile.
-        // But, this IOCTL specifically clears the registry key to start over 
-        // on the assumption that new mesh list addresses will follow to 
-        // re-build both the runtime list and the permanently stored list.
-        //
-        // This IOCTL is ONLY used on the border router device.
-        //
-        case IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST:
-        {
-            // Purge the runtime list
-            IPv6ToBleRuntimeListPurgeMeshList();
+		//
+		// IOCTL 9: Purge mesh list
+		//
+		// This IOCTL is sent as a request to purge the runtime mesh list
+		// and clear the mesh list from the registry.
+		//
+		// It is sent by the usermode GUI app in the event that the app needs
+		// to reset the mesh list and re-send it. This is in the event that
+		// the mesh list in the driver is corrupted and the GUI app needs to
+		// start it over, or they are somehow out of sync. This assumes that
+		// the GUI provisioning app is the authority on keeping a correct list.
+		//
+		// This is a bit of a misnomer, since the actual PurgeList() function
+		// doesn't clear the registry key; it only frees the runtime list
+		// memory. This is because PurgeList() is always called to free memory
+		// upon driver unload, but we want the registry key to be non-volatile.
+		// But, this IOCTL specifically clears the registry key to start over 
+		// on the assumption that new mesh list addresses will follow to 
+		// re-build both the runtime list and the permanently stored list.
+		//
+		// This IOCTL is ONLY used on the border router device.
+		//
+		case IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST:
+		{
+			// Purge the runtime list
+			IPv6ToBleRuntimeListPurgeMeshList();
 
-            // Open the parent key
-            BOOLEAN parametersKeyOpened = FALSE;
-            status = IPv6ToBleRegistryOpenParametersKey();
-            if (!NT_SUCCESS(status))
-            {
-                goto PurgeMeshListError;
-            }
-            parametersKeyOpened = TRUE;
+			// Open the parent key
+			BOOLEAN parametersKeyOpened = FALSE;
+			status = IPv6ToBleRegistryOpenParametersKey();
+			if (!NT_SUCCESS(status))
+			{
+				goto PurgeMeshListError;
+			}
+			parametersKeyOpened = TRUE;
 
-            // Remove the list's registry key
-            status = IPv6ToBleRegistryOpenMeshListKey();
-            if (!NT_SUCCESS(status))
-            {
-                goto PurgeMeshListError;
-            }
-            status = WdfRegistryRemoveKey(gMeshListKey);
-            if (!NT_SUCCESS(status))
-            {
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
-            }
+			// Remove the list's registry key
+			status = IPv6ToBleRegistryOpenMeshListKey();
+			if (!NT_SUCCESS(status))
+			{
+				goto PurgeMeshListError;
+			}
+			status = WdfRegistryRemoveKey(gMeshListKey);
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Removing mesh list key failed during %!FUNC!, status: %!STATUS!", status);
+			}
 
-            // Since the mesh list is *now* empty, unregister the callouts
-            // if they were registered
-            if (IsListEmpty(gMeshListHead))
-            {
-                // Unregister the callouts
-                if (gCalloutsRegistered)
-                {
-                    IPv6ToBleCalloutsUnregister();
-                }
-            }
+			// Since the mesh list is *now* empty, unregister the callouts
+			// if they were registered
+			if (IsListEmpty(gMeshListHead))
+			{
+				// Unregister the callouts
+				if (gCalloutsRegistered)
+				{
+					IPv6ToBleCalloutsUnregister();
+				}
+			}
 
-        PurgeMeshListError:
+		PurgeMeshListError:
 
-            if (parametersKeyOpened)
-            {
-                WdfRegistryClose(gParametersKey);
-            }
-            break;
-        }
+			if (parametersKeyOpened)
+			{
+				WdfRegistryClose(gParametersKey);
+			}
+			break;
 
-#endif // BORDER_ROUTER
-
+		}
         default:
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Invalid IOCTL received.\n");

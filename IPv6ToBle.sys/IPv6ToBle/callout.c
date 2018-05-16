@@ -549,82 +549,81 @@ Return Value:
     // be normal traffic destined elsewhere.
     //
 
-#ifdef BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		// Extract the destination address from the IP header by retreating 16
+		// bytes (as it is at the end of the IPv6 header)
+		UINT8 extractedAddress[16] = { 0 };
+		NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
+		ndisStatus = NdisRetreatNetBufferListDataStart(layerData,
+													   (sizeof(BYTE) * 16),
+													   0,
+													   NULL,
+													   NULL
+													   );
+		if (ndisStatus != NDIS_STATUS_SUCCESS)
+		{
+			classifyOut->actionType = FWP_ACTION_PERMIT;
+			if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
+			{
+				classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+			}
 
-    // Extract the destination address from the IP header by retreating 16
-    // bytes (as it is at the end of the IPv6 header)
-    UINT8 extractedAddress[16] = { 0 };
-    NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
-    ndisStatus = NdisRetreatNetBufferListDataStart(layerData,
-                                                   (sizeof(BYTE) * 16),
-                                                   0,
-                                                   NULL,
-                                                   NULL
-                                                   );
-    if (ndisStatus != NDIS_STATUS_SUCCESS)
-    {
-        classifyOut->actionType = FWP_ACTION_PERMIT;
-        if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
-        {
-            classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
-        }
+			TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retreating NBL failed during %!FUNC! with %!STATUS!, permitting packet", status);
 
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retreating NBL failed during %!FUNC! with %!STATUS!, permitting packet", status);
+			return;
+		}
 
-        return;
-    }
+		// Copy the destination address
+		RtlCopyMemory(extractedAddress, layerData, IPV6_ADDRESS_LENGTH);
 
-    // Copy the destination address
-    RtlCopyMemory(extractedAddress, layerData, IPV6_ADDRESS_LENGTH);
+		// Advance back to the end of the IP header if the retreat operation
+		// succeeded
+		NdisAdvanceNetBufferListDataStart(layerData,
+										  (sizeof(BYTE) * 16),
+										  FALSE,
+										  NULL
+										  );
 
-    // Advance back to the end of the IP header if the retreat operation
-    // succeeded
-    NdisAdvanceNetBufferListDataStart(layerData,
-                                      (sizeof(BYTE) * 16),
-                                      FALSE,
-                                      NULL
-                                      );
+		BOOLEAN isInMeshList = FALSE;
 
-    BOOLEAN isInMeshList = FALSE;
+		// Compare each address in the mesh list to the destination address
+		PLIST_ENTRY entry = gMeshListHead->Flink;
+		while (entry != gMeshListHead)
+		{
+			PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
+															   MESH_LIST_ENTRY,
+															   listEntry
+															   );
+			// Compare the extracted address to this entry's address
+			if (RtlEqualMemory(extractedAddress,
+				&meshListEntry->ipv6Address,
+				IPV6_ADDRESS_LENGTH))
+			{
+				// It is in the mesh list!
+				isInMeshList = TRUE;
+				break;
+			}
 
-    // Compare each address in the mesh list to the destination address
-    PLIST_ENTRY entry = gMeshListHead->Flink;
-    while (entry != gMeshListHead)
-    {
-        PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
-            MESH_LIST_ENTRY,
-            listEntry
-        );
-        // Compare the extracted address to this entry's address
-        if (RtlEqualMemory(extractedAddress,
-            &meshListEntry->ipv6Address,
-            IPV6_ADDRESS_LENGTH))
-        {
-            // It is in the mesh list!
-            isInMeshList = TRUE;
-            break;
-        }
+			// Advance the list
+			entry = entry->Flink;
+		}
 
-        // Advance the list
-        entry = entry->Flink;
-    }
+		// Permit the packet if it wasn't in the mesh list, as that means the
+		// packet is destined elsewhere (normal traffic)
+		if (!isInMeshList)
+		{
+			classifyOut->actionType = FWP_ACTION_PERMIT;
+			if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
+			{
+				classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+			}
 
-    // Permit the packet if it wasn't in the mesh list, as that means the
-    // packet is destined elsewhere (normal traffic)
-    if (!isInMeshList)
-    {
-        classifyOut->actionType = FWP_ACTION_PERMIT;
-        if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
-        {
-            classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
-        }
+			TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet was not destined for a device in the mesh; must be destined elsewhere");
 
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet was not destined for a device in the mesh; must be destined elsewhere");
-
-        return;
-    }
-
-#endif  // BORDER_ROUTER
+			return;
+		}
+	}
 
     //
     // Step 3
@@ -651,10 +650,10 @@ Return Value:
 
     // Retrieve the output buffer
     status = WdfRequestRetrieveOutputBuffer(outRequest,
-                                           (size_t)&packetSize,
-                                           &outputBuffer,
-                                           NULL
-                                           );
+                                            (size_t)&packetSize,
+                                            &outputBuffer,
+                                            NULL
+                                            );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving output buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
@@ -909,19 +908,19 @@ Return Value:
     // packet V6 layer.
     //
 
-#ifdef BORDER_ROUTER // Register inbound and outbound classify on gateway
+	if (gBorderRouterFlag) // Register inbound and outbound classify on gateway
+	{
+		status = IPv6ToBleCalloutRegisterInboundIpPacketV6Callout(
+			&FWPM_LAYER_INBOUND_IPPACKET_V6,
+			&IPV6_TO_BLE_INBOUND_IP_PACKET_V6,
+			&gInboundIpPacketV6CalloutId
+		);
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
 
-    status = IPv6ToBleCalloutRegisterInboundIpPacketV6Callout(
-        &FWPM_LAYER_INBOUND_IPPACKET_V6,
-        &IPV6_TO_BLE_INBOUND_IP_PACKET_V6,
-        &gInboundIpPacketV6CalloutId
-    );
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
-#endif  // BORDER_ROUTER
+	}
 
     status = IPv6ToBleCalloutRegisterOutboundIpPacketV6Callout(
         &FWPM_LAYER_OUTBOUND_IPPACKET_V6,
@@ -1201,48 +1200,48 @@ Return Value:
     // router, or just one for the nodes
     //
 
-#ifdef BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		// Traverse the list and add a filter for each entry
+		PLIST_ENTRY entry = gMeshListHead->Flink;
+		while (entry != gMeshListHead)
+		{
+			PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
+				MESH_LIST_ENTRY,
+				listEntry
+			);
+			UINT8* destinationAddress = meshListEntry->ipv6Address.u.Byte;
 
-    // Traverse the list and add a filter for each entry
-    PLIST_ENTRY entry = gMeshListHead->Flink;
-    while (entry != gMeshListHead)
-    {
-        PMESH_LIST_ENTRY meshListEntry= CONTAINING_RECORD(entry,
-                                                          MESH_LIST_ENTRY,
-                                                          listEntry
-                                                          );
-        UINT8* destinationAddress = meshListEntry->ipv6Address.u.Byte;
+			// Add the filter
+			status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
+				L"A filter to match packets if destination is in mesh list. \
+				There are as many filters as there are mesh list entries.",
+				destinationAddress,
+				OUTBOUND,
+				layerKey,
+				calloutKey
+			);
+			if (!NT_SUCCESS(status))
+			{
+				break;
+			}
 
-        // Add the filter
-        status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
-            L"A filter to match packets if destination is in mesh list. \
-            There are as many filters as there are mesh list entries.",
-            destinationAddress,
-            OUTBOUND,
-            layerKey,
-            calloutKey
-        );
-        if (!NT_SUCCESS(status))
-        {
-            break;
-        }
-
-        // Advance the list
-        entry = entry->Flink;
-    }
-
-#else   // On node devices, catch all outbound traffic
-
-    status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
-        L"A filter to match all outbound IPv6 UDP traffic and redirect to the \
-        usermode packet processing app, which sends it out over BLE.",
-        NULL,
-        OUTBOUND,
-        layerKey,
-        calloutKey
-    );
-
-#endif  // BORDER_ROUTER
+			// Advance the list
+			entry = entry->Flink;
+		}
+	}
+	else
+	{
+		// On the non-BR devices, catch all outbound traffic
+		status = IPv6ToBleCalloutFilterAdd(L"Outbound IPv6 packet filter",
+										   L"A filter to match all outbound IPv6 UDP traffic and redirect to the \
+										   usermode packet processing app, which sends it out over BLE.",
+										   NULL,
+										   OUTBOUND,
+										   layerKey,
+										   calloutKey
+										   );
+	}
 
 Exit:
 
@@ -1321,29 +1320,27 @@ Return Value:
     // don't deal with the white list/mesh list.
     //
 
-#ifdef BORDER_ROUTER
-
-    if (direction == INBOUND)
-    {
-        if (IsListEmpty(gWhiteListHead))
-        {
-            TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for inbound IP packet V6 classify failed because the white list was empty %!STATUS!", status);
-            status = STATUS_UNSUCCESSFUL;
-            goto Exit;
-        }
-    }
-    else    // OUTBOUND
-    {
-        if (IsListEmpty(gMeshListHead))
-        {
-            TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for outbound IP packet V6 classify failed because the mesh list was empty %!STATUS!", status);
-            status = STATUS_UNSUCCESSFUL;
-            goto Exit;
-        }
-    }
-    
-
-#endif  // BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		if (direction == INBOUND)
+		{
+			if (IsListEmpty(gWhiteListHead))
+			{
+				TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for inbound IP packet V6 classify failed because the white list was empty %!STATUS!", status);
+				status = STATUS_UNSUCCESSFUL;
+				return status;
+			}
+		}
+		else    // OUTBOUND
+		{
+			if (IsListEmpty(gMeshListHead))
+			{
+				TraceEvents(TRACE_LEVEL_WARNING, TRACE_CALLOUT_REGISTRATION, "Adding filter for outbound IP packet V6 classify failed because the mesh list was empty %!STATUS!", status);
+				status = STATUS_UNSUCCESSFUL;
+				return status;
+			}
+		}
+	}
 
     //
     // Step 2
@@ -1376,41 +1373,40 @@ Return Value:
     // have 0 filter conditions and thus will filter all outbound traffic.
     //	
 
-#ifdef BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		FWPM_FILTER_CONDITION0 filterCondition = { 0 };
 
-    FWPM_FILTER_CONDITION0 filterCondition = { 0 };
+		// This should never be null because this function only would have been
+		// called after verifying the runtime list had at least one entry, but  
+		// check for good practice. At least, on the border router machine.
+		if (ipv6Address)
+		{
+			if (direction == INBOUND)
+			{
+				filterCondition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+				filterCondition.matchType = FWP_MATCH_EQUAL;
+				filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
+				filterCondition.conditionValue.byteArray16 =
+					(FWP_BYTE_ARRAY16*)ipv6Address;
+			}
+			else    // OUTBOUND
+			{
+				filterCondition.fieldKey = FWPM_CONDITION_IP_DESTINATION_ADDRESS;
+				filterCondition.matchType = FWP_MATCH_EQUAL;
+				filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
+				filterCondition.conditionValue.byteArray16 =
+					(FWP_BYTE_ARRAY16*)ipv6Address;
+			}
+		}
 
-    // This should never be null because this function only would have been
-    // called after verifying the runtime list had at least one entry, but  
-    // check for good practice. At least, on the border router machine.
-    if (ipv6Address)
-    {
-        if (direction == INBOUND)
-        {
-            filterCondition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-            filterCondition.matchType = FWP_MATCH_EQUAL;
-            filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
-            filterCondition.conditionValue.byteArray16 =
-                (FWP_BYTE_ARRAY16*)ipv6Address;
-        }
-        else    // OUTBOUND
-        {
-            filterCondition.fieldKey = FWPM_CONDITION_IP_DESTINATION_ADDRESS;
-            filterCondition.matchType = FWP_MATCH_EQUAL;
-            filterCondition.conditionValue.type = FWP_BYTE_ARRAY16_TYPE;
-            filterCondition.conditionValue.byteArray16 =
-                (FWP_BYTE_ARRAY16*)ipv6Address;
-        }
-    }
-
-    // Add the filter condition to the filter
-    filter.filterCondition = &filterCondition;
-
-#else   // Node devices
-
-    filter.filterCondition = 0;
-
-#endif  // BORDER_ROUTER
+		// Add the filter condition to the filter
+		filter.filterCondition = &filterCondition;
+	}
+	else
+	{
+		filter.filterCondition = 0;
+	}
 
     //
     // Step 4
@@ -1432,12 +1428,6 @@ Return Value:
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Adding filter for outbound IPv6 traffic failed %!STATUS!", status);
         }
     }
-
-#ifdef BORDER_ROUTER    // Node device code does not jump to an exit
-
-Exit:
-
-#endif  // BORDER_ROUTER
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CALLOUT_REGISTRATION, "%!FUNC! Exit");
 
@@ -1497,15 +1487,16 @@ Return Value:
     //
     if (gCalloutsRegistered)
     {
-#ifdef BORDER_ROUTER
 
-        status = FwpsCalloutUnregisterById0(gInboundIpPacketV6CalloutId);
-        if (!NT_SUCCESS(status))
-        {
-            TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the inbound IPv6 packet callout failed %!STATUS!", status);
-        }
+		if (gBorderRouterFlag)
+		{
+			status = FwpsCalloutUnregisterById0(gInboundIpPacketV6CalloutId);
+			if (!NT_SUCCESS(status))
+			{
+				TraceEvents(TRACE_LEVEL_ERROR, TRACE_CALLOUT_REGISTRATION, "Unregistering the inbound IPv6 packet callout failed %!STATUS!", status);
+			}
 
-#endif  // BORDER_ROUTER
+		}
 
         status = FwpsCalloutUnregisterById0(gOutboundIpPacketV6CalloutId);
         if (!NT_SUCCESS(status))

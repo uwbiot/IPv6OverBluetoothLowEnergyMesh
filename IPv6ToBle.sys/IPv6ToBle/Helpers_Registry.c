@@ -51,7 +51,7 @@ Return Value:
                                                 &gParametersKey
                                                 );
     if (!NT_SUCCESS(status)) {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Opening parameters registry key failed in %!FUNC! with this status code: %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Opening parameters registry key failed with this status code: %!STATUS!", status);
     }
     
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
@@ -86,8 +86,8 @@ Return Value:
 
 	// Define the key name
 	DECLARE_CONST_UNICODE_STRING(whiteListKeyName,
-	L"TrustedExternalDeviceWhiteList"
-		);
+								 L"TrustedExternalDeviceWhiteList"
+								 );
 
 	// Open the white list key. This API either creates the key if it doesn't 
 	// exist or opens the key if it does exist. The parent key must exist, and
@@ -159,6 +159,82 @@ Return Value:
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
+
+	return status;
+}
+
+_Use_decl_annotations_
+NTSTATUS
+IPv6ToBleRegistryCheckBorderRouterFlag()
+/*++
+Routine Description:
+
+	Attempts to read the configuration flag from the registry. The default value
+	in the INF file is set to 0 for false, meaning that the default configuration
+	of the driver is to behave as a non-border router device.
+
+	On the border router, the user will have to manually change the registry key
+	to 1 for true.
+
+	This decision is to minimize having to change this key, as it is presumed
+	that there will be a much lower ratio of border router(s) to devices in the
+	mesh.
+
+Arguments:
+
+	None. Accesses the global parameters key variable.
+
+Return Value:
+
+	STATUS_SUCCESS if the operation was successful; appropriate NTSTATUS error
+	code otherwise.
+
+--*/
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	BOOLEAN parametersKeyOpened = FALSE;
+
+	// Open the parameters key
+	status = IPv6ToBleRegistryOpenParametersKey();
+	if (!NT_SUCCESS(status))
+	{
+		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Could not open the parameters key, %!STATUS!", status);
+		goto Exit;
+	}
+	parametersKeyOpened = TRUE;
+
+	// Query the key
+	DECLARE_CONST_UNICODE_STRING(borderRouterFlagValueName, L"Border Router");
+	ULONG borderRouterFlagValue = 0;
+	status = WdfRegistryQueryULong(gParametersKey,
+								   &borderRouterFlagValueName,
+								   &borderRouterFlagValue
+								   );
+	if (!NT_SUCCESS(status))
+	{
+		// The key was empty or the value did not exist
+		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Could not load the border router flag value from the driver's parameters key, %!STATUS!", status);
+		goto Exit;
+	}
+
+	// Set the border router flag according to the value in the registry
+	if (borderRouterFlagValue == 0)
+	{
+		gBorderRouterFlag = FALSE;
+	}
+	else if (borderRouterFlagValue == 1)
+	{
+		gBorderRouterFlag = TRUE;
+	}
+	else
+	{
+		// Invalid value, return invalid parameter which causes the driver to
+		// fail to load
+		status = STATUS_INVALID_PARAMETER;
+		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Value stored in the parameters key for the border router flag was invalid. It must be 0 for non-BR and 1 for BR. Status = %!STATUS!", status);
+	}
+
+Exit:
 
 	return status;
 }

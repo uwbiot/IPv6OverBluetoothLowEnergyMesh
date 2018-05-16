@@ -45,6 +45,15 @@ _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryOpenMeshListKey();
 
+//-------------------------------------------------------------------------------
+// Function to load the global border router flag value from the registry
+//-------------------------------------------------------------------------------
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+NTSTATUS
+IPv6ToBleRegistryCheckBorderRouterFlag();
+
 //-----------------------------------------------------------------------------
 // Functions to load white list and mesh list information from the registry and
 // populate the runtime lists

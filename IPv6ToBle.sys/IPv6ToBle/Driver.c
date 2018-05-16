@@ -161,67 +161,79 @@ Return Value:
         goto Exit;
     }
 
-#ifdef BORDER_ROUTER
-
-    //
-    // Step 8
-    // Initialize and start the periodic timer. This applies only to the border
-    // router.
-    //
-    status = IPv6ToBleDriverInitTimer();
-    if (!NT_SUCCESS(status))
-    {
-        goto Exit;
-    }
-
 	//
-	// Step 9
-	// Populate the device context with runtime information about the white 
-    // list and mesh list if applicable. These function calls open and close
-    // the registry keys as needed.
-    //
-    // Note: This only applies to the border router device.
+	// Step 8
+	// Check the driver parameters key to see if we are running on the border
+	// router or not
 	//
-
-	// Populate the lists. 
-	// 
-	// We still want to succeed DriverEntry if we were unsuccessful at
-	// loading info from the registry about the two lists. Record the error
-	// with tracing, then re-set status to SUCCESS and exit gracefully. This 
-	// will always happen the very first time the driver is installed because 
-	// there's nothing in the registry yet, or if the user cleared out one or
-	// both of the lists between reboots.
-	BOOLEAN whiteListLoaded = TRUE;
-	status = IPv6ToBleRegistryRetrieveWhiteList();
+	status = IPv6ToBleRegistryCheckBorderRouterFlag();
 	if (!NT_SUCCESS(status))
-	{		
-		// We ignore status if this call fails because we stil want to check
-		// the mesh list. But we mark that it failed.
-		whiteListLoaded = FALSE;
-		TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Loading registry info for the white list failed %!STATUS!", status);
-	}
-
-	BOOLEAN meshListLoaded = TRUE;
-	status = IPv6ToBleRegistryRetrieveMeshList();
-	if (!NT_SUCCESS(status)) 
 	{
-		meshListLoaded = FALSE;
-		TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Loading registry info for the mesh list failed %!STATUS!", status);
-	}
-
-	// Still succeed if one failed but not the other, or if they both failed,
-	// but don't continue past here. Callout/filter is not registered, and the
-	// driver just sits waiting for the usermode app to give it enough info
-	// (i.e. add enough entries to the lists so each has at least one).
-	if ((!whiteListLoaded && meshListLoaded) ||
-		(whiteListLoaded && !meshListLoaded) ||
-		(!whiteListLoaded && !meshListLoaded))
-	{
-		status = STATUS_SUCCESS;
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Could not load both white list and mesh list, succeeding DriverEntry anyway.");
 		goto Exit;
 	}
-#endif  // BORDER_ROUTER
+	
+
+	if (gBorderRouterFlag)
+	{
+		//
+		// Step 8
+		// Initialize and start the periodic timer. This applies only to the border
+		// router.
+		//
+		status = IPv6ToBleDriverInitTimer();
+		if (!NT_SUCCESS(status))
+		{
+			goto Exit;
+		}
+
+		//
+		// Step 9
+		// Populate the device context with runtime information about the white 
+		// list and mesh list if applicable. These function calls open and close
+		// the registry keys as needed.
+		//
+		// Note: This only applies to the border router device.
+		//
+
+		// Populate the lists. 
+		// 
+		// We still want to succeed DriverEntry if we were unsuccessful at
+		// loading info from the registry about the two lists. Record the error
+		// with tracing, then re-set status to SUCCESS and exit gracefully. This 
+		// will always happen the very first time the driver is installed because 
+		// there's nothing in the registry yet, or if the user cleared out one or
+		// both of the lists between reboots.
+		BOOLEAN whiteListLoaded = TRUE;
+		status = IPv6ToBleRegistryRetrieveWhiteList();
+		if (!NT_SUCCESS(status))
+		{
+			// We ignore status if this call fails because we stil want to check
+			// the mesh list. But we mark that it failed.
+			whiteListLoaded = FALSE;
+			TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Loading registry info for the white list failed %!STATUS!", status);
+		}
+
+		BOOLEAN meshListLoaded = TRUE;
+		status = IPv6ToBleRegistryRetrieveMeshList();
+		if (!NT_SUCCESS(status))
+		{
+			meshListLoaded = FALSE;
+			TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Loading registry info for the mesh list failed %!STATUS!", status);
+		}
+
+		// Still succeed if one failed but not the other, or if they both failed,
+		// but don't continue past here. Callout/filter is not registered, and the
+		// driver just sits waiting for the usermode app to give it enough info
+		// (i.e. add enough entries to the lists so each has at least one).
+		if ((!whiteListLoaded && meshListLoaded) ||
+			(whiteListLoaded && !meshListLoaded) ||
+			(!whiteListLoaded && !meshListLoaded))
+		{
+			status = STATUS_SUCCESS;
+			TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Could not load both white list and mesh list, succeeding DriverEntry anyway.");
+			goto Exit;
+		}
+	}
 
 	//
 	// Step 10
@@ -319,75 +331,74 @@ Return Value:
         goto Exit;
     }
 
-#ifdef BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		// White list spinlock
+		WDF_OBJECT_ATTRIBUTES whiteListModifiedLockAttributes;
+		WDF_OBJECT_ATTRIBUTES_INIT(&whiteListModifiedLockAttributes);
+		whiteListModifiedLockAttributes.ParentObject = gWdfDeviceObject;
 
-    // White list spinlock
-    WDF_OBJECT_ATTRIBUTES whiteListModifiedLockAttributes;
-    WDF_OBJECT_ATTRIBUTES_INIT(&whiteListModifiedLockAttributes);
-    whiteListModifiedLockAttributes.ParentObject = gWdfDeviceObject;
+		status = WdfSpinLockCreate(&whiteListModifiedLockAttributes,
+								   &gWhiteListModifiedLock
+								   );
+		if (!NT_SUCCESS(status))
+		{
+			TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Creating white list modified spin lock failed %!STATUS!", status);
+			goto Exit;
+		}
 
-    status = WdfSpinLockCreate(&whiteListModifiedLockAttributes,
-                               &gWhiteListModifiedLock
-                               );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Creating white list modified spin lock failed %!STATUS!", status);
-        goto Exit;
-    }
+		// Mesh list spinlock
+		WDF_OBJECT_ATTRIBUTES meshListModifiedLockAttributes;
+		WDF_OBJECT_ATTRIBUTES_INIT(&meshListModifiedLockAttributes);
+		meshListModifiedLockAttributes.ParentObject = gWdfDeviceObject;
 
-    // Mesh list spinlock
-    WDF_OBJECT_ATTRIBUTES meshListModifiedLockAttributes;
-    WDF_OBJECT_ATTRIBUTES_INIT(&meshListModifiedLockAttributes);
-    meshListModifiedLockAttributes.ParentObject = gWdfDeviceObject;
+		status = WdfSpinLockCreate(&meshListModifiedLockAttributes,
+								   &gMeshListModifiedLock
+								   );
+		if (!NT_SUCCESS(status))
+		{
+			TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Creating mesh list modified spin lock failed %!STATUS!", status);
+			goto Exit;
+		}
 
-    status = WdfSpinLockCreate(&meshListModifiedLockAttributes,
-                               &gMeshListModifiedLock
-                               );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Creating mesh list modified spin lock failed %!STATUS!", status);
-        goto Exit;
-    }
+		NT_ASSERT(irql == KeGetCurrentIrql());
 
-    NT_ASSERT(irql == KeGetCurrentIrql());
+		//
+		// Step 2
+		// Initialize the list heads
+		//
 
-    //
-    // Step 2
-    // Initialize the list heads
-    //
+		// White list head
+		gWhiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
+														   sizeof(LIST_ENTRY),
+														   IPV6_TO_BLE_WHITE_LIST_TAG
+														   );
+		if (!gWhiteListHead)
+		{
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			goto Exit;
+		}
+		InitializeListHead(gWhiteListHead);
 
-    // White list head
-    gWhiteListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
-                                                        sizeof(LIST_ENTRY),
-                                                        IPV6_TO_BLE_WHITE_LIST_TAG
-                                                        );
-    if (!gWhiteListHead)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        goto Exit;
-    }
-    InitializeListHead(gWhiteListHead);
+		// Mesh list head
+		gMeshListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
+														   sizeof(LIST_ENTRY),
+														   IPV6_TO_BLE_WHITE_LIST_TAG
+														   );
+		if (!gMeshListHead)
+		{
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			goto Exit;
+		}
+		InitializeListHead(gMeshListHead);
 
-    // Mesh list head
-    gMeshListHead = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPoolNx,
-                                                        sizeof(LIST_ENTRY),
-                                                        IPV6_TO_BLE_WHITE_LIST_TAG
-                                                        );
-    if (!gMeshListHead)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        goto Exit;
-    }
-    InitializeListHead(gMeshListHead);
-
-    //
-    // Step 3
-    // Initialize the list booleans
-    //
-    gWhiteListModified = FALSE;
-    gMeshListModified = FALSE;
-
-#endif  // BORDER_ROUTER
+		//
+		// Step 3
+		// Initialize the list booleans
+		//
+		gWhiteListModified = FALSE;
+		gMeshListModified = FALSE;
+	}
 
     //
     // Step 4
@@ -518,25 +529,24 @@ Return Value:
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "Destroying the injection handle failed %!STATUS!", status);
     }
 
-#ifdef BORDER_ROUTER
+	if (gBorderRouterFlag)
+	{
+		//
+		// Step 2
+		// Clean up the runtime lists
+		//
+		IPv6ToBleRuntimeListPurgeWhiteList();
+		if (gWhiteListHead)
+		{
+			ExFreePoolWithTag(gWhiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
+		}
 
-    //
-    // Step 2
-    // Clean up the runtime lists
-    //
-    IPv6ToBleRuntimeListPurgeWhiteList();
-    if (gWhiteListHead)
-    {
-        ExFreePoolWithTag(gWhiteListHead, IPV6_TO_BLE_WHITE_LIST_TAG);
-    }
-
-    IPv6ToBleRuntimeListPurgeMeshList();
-    if (gMeshListHead)
-    {
-        ExFreePoolWithTag(gMeshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
-    }
-
-#endif  // BORDER_ROUTER
+		IPv6ToBleRuntimeListPurgeMeshList();
+		if (gMeshListHead)
+		{
+			ExFreePoolWithTag(gMeshListHead, IPV6_TO_BLE_MESH_LIST_TAG);
+		}
+	}
 
     //
     // Step 3

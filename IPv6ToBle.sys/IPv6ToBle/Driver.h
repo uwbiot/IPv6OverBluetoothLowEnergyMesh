@@ -16,18 +16,6 @@ Environment:
 --*/
 
 //-----------------------------------------------------------------------------
-// This definition is CRUCIAL at compilation time. Leave uncommented to compile
-// border router device-only code; comment out if compiling for the Pi/IoT Core
-// node devices. 
-//
-// We split the code based on the role, not the version of the OS or chipset
-// architecture. This permits flexibility with any future version of Windows or
-// chipsets.
-//-----------------------------------------------------------------------------
-
-#define BORDER_ROUTER
-
-//-----------------------------------------------------------------------------
 // Custom structures
 //-----------------------------------------------------------------------------
 
@@ -109,6 +97,7 @@ NDIS_POOL_DATA* gNdisPoolData;	    // NDIS memory pools (see Helpers_NDIS.h)
 //
 // Objects for the runtime white list and mesh list
 //
+BOOLEAN gBorderRouterFlag;			// Flag to see if running on BR
 PLIST_ENTRY	gWhiteListHead;		    // Head of the white list
 PLIST_ENTRY	gMeshListHead;		    // Head of the mesh list   
 
@@ -138,7 +127,7 @@ _IRQL_requires_same_
 EVT_WDF_DRIVER_UNLOAD IPv6ToBleEvtDriverUnload;
 
 //-----------------------------------------------------------------------------
-// Function to initialize global objects
+// Function to initialize driver objects
 //-----------------------------------------------------------------------------
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -165,8 +154,20 @@ EXTERN_C_END
 // Other defines, including memory pool tags (which are read in reverse)
 //-----------------------------------------------------------------------------
 
+//
+// Flags for determining on which runtime list a function should operate
+//
+#define WHITE_LIST 0
+#define MESH_LIST  1
+
+//
+// Length of an IPv6 address, in bytes
+//
 #define IPV6_ADDRESS_LENGTH 16
 
+//
+// Memory pool tags
+//
 #define IPV6_TO_BLE_NDIS_TAG		(UINT32)'TNBI'	// 'Ipv6 Ble Ndis Tag'
 #define IPV6_TO_BLE_NBL_TAG			(UINT32)'BNBI'	// 'Ipv6 Ble Net Buffer'
 #define IPV6_TO_BLE_WHITE_LIST_TAG	(UINT32)'LWBI'	// 'Ipv6 Ble White List'
