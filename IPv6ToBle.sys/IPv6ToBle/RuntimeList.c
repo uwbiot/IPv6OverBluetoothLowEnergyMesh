@@ -23,7 +23,7 @@ _Use_decl_annotations_
 NTSTATUS
 IPv6ToBleRuntimeListAssignNewListEntry(
     _In_    WDFREQUEST  Request,
-	_In_	ULONG		WhichList
+	_In_	ULONG		TargetList
 )
 /*++
 Routine Description:
@@ -57,22 +57,25 @@ Return Value:
     PVOID inputBuffer;
     size_t receivedSize = 0;
 
-	// Validate input
-	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+    //
+    // Step 1
+	// Validate input and record shortcut for the target runtime list head
+    //
+	if (TargetList != WHITE_LIST && TargetList != MESH_LIST)
 	{
 		status = STATUS_INVALID_PARAMETER;
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Invalid list option during %!FUNC! with %!STATUS!", status);
 		goto Exit;
 	}
+    PLIST_ENTRY targetListHead = (TargetList == WHITE_LIST) ? gWhiteListHead : gMeshListHead;
 
     //
-    // Step 1
-    // Retrieve the address from the request's input buffer. It must be in the
+    // Step 2
+    // Retrieve the address from the request's input buffer. It must be in the 
     // form of a string representation of the IPv6 address. Technically, an
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
     // the *minimum* size needed. However, it is expected to be a full address.
-    // 
-    
+    //     
     status = WdfRequestRetrieveInputBuffer(Request,
                                            sizeof(WCHAR) * 3,
                                            &inputBuffer,
@@ -93,7 +96,7 @@ Return Value:
     }
 
     //
-    // Step 2
+    // Step 3
     // Assign the retrieved string to a UNICODE_STRING structure
     //
     DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
@@ -101,7 +104,7 @@ Return Value:
     desiredAddress.Length = (USHORT)receivedSize;
 
     //
-    // Step 3
+    // Step 4
     // Validate the received address and get its 16 byte value form
     //
 
@@ -132,16 +135,16 @@ Return Value:
     }
 
     //
-    // Step 4
+    // Step 5
     // Verify the entry isn't already in the list
     // 
-    PLIST_ENTRY entry = WhichList == WHITE_LIST ? gWhiteListHead->Flink : gMeshListHead->Flink;
+    PLIST_ENTRY entry = targetListHead->Flink;
 
     NT_ASSERT(entry);
 
-    if (!IsListEmpty(WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+    if (!IsListEmpty(targetListHead))
     {
-        while (entry != (WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+        while (entry != targetListHead)
         {
 			// Get the struct that contains this entry
 
@@ -152,7 +155,7 @@ Return Value:
 				PMESH_LIST_ENTRY meshListEntry;
 			} runtimeListEntry;
 
-			if (WhichList == WHITE_LIST)
+			if (TargetList == WHITE_LIST)
 			{
 				runtimeListEntry.whiteListEntry = CONTAINING_RECORD(entry,
 																	WHITE_LIST_ENTRY,
@@ -167,10 +170,10 @@ Return Value:
 																   );
 			}
             // Compare the memory (byte arrays)
-            if (RtlEqualMemory(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
+            if (RtlEqualMemory(TargetList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
                                &ipv6AddressStorage,
                                sizeof(IN6_ADDR)) &&
-                RtlEqualMemory(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->scopeId : &runtimeListEntry.meshListEntry->scopeId,
+                RtlEqualMemory(TargetList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->scopeId : &runtimeListEntry.meshListEntry->scopeId,
                                &scopeId,
                                sizeof(ULONG)))
             {
@@ -185,10 +188,10 @@ Return Value:
     }    
 
     //
-    // Step 4
+    // Step 6
     // Assuming it is not a duplicate, add the entry to the list
     //
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
 												NonPagedPoolNx,
@@ -232,10 +235,10 @@ Return Value:
 	}
 
     //
-    // Step 5
+    // Step 7
     // Update the boolean that the list has been modified
     //
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		WdfSpinLockAcquire(gWhiteListModifiedLock);
 		gWhiteListModified = TRUE;
@@ -272,8 +275,8 @@ Return Value:
     // IRQL > PASSIVE_LEVEL that nees to check whether the callouts are
     // registered.
     //
-    if ((WhichList == WHITE_LIST && !IsListEmpty(gMeshListHead)) ||
-		(WhichList == MESH_LIST && !IsListEmpty(gWhiteListHead)))
+    if ((TargetList == WHITE_LIST && !IsListEmpty(gMeshListHead)) ||
+		(TargetList == MESH_LIST && !IsListEmpty(gWhiteListHead)))
     {
         if (gCalloutsRegistered)
         {
@@ -304,7 +307,7 @@ _Use_decl_annotations_
 NTSTATUS
 IPv6ToBleRuntimeListRemoveListEntry(
     _In_    WDFREQUEST  Request,
-	_In_	ULONG		WhichList
+	_In_	ULONG		TargetList
 )
 /*++
 Routine Description:
@@ -319,7 +322,7 @@ Arguments:
     Request - the WDFREQUEST object sent from user mode. The desired address is
     supplied in the request's input buffer.
 
-	WhichList - the desired list from which to remove an entry.
+	TargetList - the desired list from which to remove an entry.
     
     Accesses global variables defined in Driver.h.
 
@@ -338,19 +341,23 @@ Return Value:
     PVOID inputBuffer;
     size_t receivedSize = 0;
 
-	// Validate input
-	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+    //
+    // Step 1
+	// Validate input and record shortcut for target list head
+    //
+	if (TargetList != WHITE_LIST && TargetList != MESH_LIST)
 	{
 		status = STATUS_INVALID_PARAMETER;
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Invalid list option during %!FUNC! with %!STATUS!", status);
 		goto Exit;
 	}
+    PLIST_ENTRY targetListHead = (TargetList == WHITE_LIST) ? gWhiteListHead : gMeshListHead;
 
     //
-    // Step 1
+    // Step 2
     // Check for empty list
     //
-    if (IsListEmpty(WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+    if (IsListEmpty(targetListHead))
     {
         status = STATUS_INVALID_PARAMETER;
         TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "List was empty, error code: %!STATUS!", status);
@@ -358,7 +365,7 @@ Return Value:
     }
 
     //
-    // Step 2
+    // Step 3
     // Retrieve the address from the request's input buffer. It must be in the
     // form of a string representation of the IPv6 address. Technically, an
     // IPv6 address can be valid with only 3 characters (e.g. ::1) so that is
@@ -384,7 +391,7 @@ Return Value:
     }
 
     //
-    // Step 3
+    // Step 4
     // Assign the retrieved string to a UNICODE_STRING structure
     //
     DECLARE_UNICODE_STRING_SIZE(desiredAddress, INET6_ADDRSTRLEN);
@@ -392,7 +399,7 @@ Return Value:
     desiredAddress.Length = (USHORT)receivedSize;
 
     //
-    // Step 4
+    // Step 5
     // Validate the received address and get its 16 byte value form
     //
 
@@ -423,14 +430,14 @@ Return Value:
     }
 
     //
-    // Step 5
+    // Step 6
     // Traverse the list and remove the entry if we find it
     //
-    PLIST_ENTRY entry = WhichList == WHITE_LIST ? gWhiteListHead->Flink : gMeshListHead->Flink;
+    PLIST_ENTRY entry = targetListHead->Flink;
 
     NT_ASSERT(entry);
 
-    while (entry != (WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+    while (entry != targetListHead)
     {
 		// Get the struct that contains this entry
 
@@ -441,7 +448,7 @@ Return Value:
 			PMESH_LIST_ENTRY meshListEntry;
 		} runtimeListEntry;
 
-		if (WhichList == WHITE_LIST)
+		if (TargetList == WHITE_LIST)
 		{
 			runtimeListEntry.whiteListEntry = CONTAINING_RECORD(entry,
 																WHITE_LIST_ENTRY,
@@ -456,25 +463,23 @@ Return Value:
 															   );
 		}
         // Compare the memory (byte arrays)        
-        if (RtlEqualMemory(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
+        if (RtlEqualMemory(TargetList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
                            &ipv6AddressStorage,
                            sizeof(IN6_ADDR)) &&
-            RtlEqualMemory(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->scopeId : &runtimeListEntry.meshListEntry->scopeId,
+            RtlEqualMemory(TargetList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->scopeId : &runtimeListEntry.meshListEntry->scopeId,
                            &scopeId,
                            sizeof(ULONG)))
         {
             // Found it, now remove it
             isInList = TRUE;
-            BOOLEAN removed = RemoveEntryList(entry);
-            if (!removed)
-            {
-                status = STATUS_UNSUCCESSFUL;
-                TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Removing white list entry from the list failed %!STATUS!", status);
-                goto Exit;
-            }
+
+            // No need to check the bool result of this function, as it only
+            // reports TRUE if the list is now empty and we don't care about
+            // that right now
+            RemoveEntryList(entry);
 
             // Free the memory (should be valid if we got to this point)
-			if (WhichList == WHITE_LIST)
+			if (TargetList == WHITE_LIST)
 			{
 				ExFreePoolWithTag(runtimeListEntry.whiteListEntry,
 								  IPV6_TO_BLE_WHITE_LIST_TAG
@@ -496,7 +501,7 @@ Return Value:
     }  
 
     //
-    // Step 6
+    // Step 7
     // Exit if we didn't find the entry, otherwise mark that we modified the
     // list by acquiring the appropriate spinlock
     //
@@ -508,7 +513,7 @@ Return Value:
     }
     else
     {
-		if (WhichList == WHITE_LIST)
+		if (TargetList == WHITE_LIST)
 		{
 			WdfSpinLockAcquire(gWhiteListModifiedLock);
 			gWhiteListModified = TRUE;
@@ -523,12 +528,12 @@ Return Value:
     }
 
     //
-    // Step 7
+    // Step 8
     // If the list is *now* empty and the callouts were registered,
     // unregister the callouts. Doesn't matter about the other list.
     //
-    if ((WhichList == WHITE_LIST && IsListEmpty(gWhiteListHead)) ||
-		(WhichList == MESH_LIST && IsListEmpty(gMeshListHead)))
+    if ((TargetList == WHITE_LIST && IsListEmpty(gWhiteListHead)) ||
+		(TargetList == MESH_LIST && IsListEmpty(gMeshListHead)))
     {
         // Unregister the callouts
         if (gCalloutsRegistered)
@@ -544,7 +549,7 @@ Return Value:
         }
         parametersKeyOpened = TRUE;
 
-		if (WhichList == WHITE_LIST)
+		if (TargetList == WHITE_LIST)
 		{
 			status = IPv6ToBleRegistryOpenWhiteListKey();
 			if (!NT_SUCCESS(status))
@@ -588,7 +593,7 @@ Exit:
 _Use_decl_annotations_
 VOID
 IPv6ToBleRuntimeListPurgeRuntimeList(
-	_In_ ULONG WhichList
+	_In_ ULONG TargetList
 )
 /*++
 Routine Description:
@@ -611,22 +616,22 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_RUNTIME_LIST, "%!FUNC! Entry");
 
 	// Validate input
-	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+	if (TargetList != WHITE_LIST && TargetList != MESH_LIST)
 	{
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_RUNTIME_LIST, "Invalid list option during %!FUNC!");
 		return;
 	}
 
     // Check for empty list
-    if ((WhichList == WHITE_LIST && IsListEmpty(gWhiteListHead)) ||
-		(WhichList == MESH_LIST && IsListEmpty(gMeshListHead)))
+    if ((TargetList == WHITE_LIST && IsListEmpty(gWhiteListHead)) ||
+		(TargetList == MESH_LIST && IsListEmpty(gMeshListHead)))
     {
-        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "%s List is empty; nothing to purge.", WhichList == WHITE_LIST ? "White" : "Mesh");
+        TraceEvents(TRACE_LEVEL_WARNING, TRACE_RUNTIME_LIST, "%s List is empty; nothing to purge.", TargetList == WHITE_LIST ? "White" : "Mesh");
         return;
     }
 
     // Clean up the linked list
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		while (!IsListEmpty(gWhiteListHead))
 		{

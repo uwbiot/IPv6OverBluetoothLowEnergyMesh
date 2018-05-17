@@ -65,7 +65,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryRetrieveRuntimeList(
-	_In_ ULONG WhichList
+	_In_ ULONG TargetList
 );
 
 //-----------------------------------------------------------------------------
@@ -85,7 +85,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 NTSTATUS
 IPv6ToBleRegistryAssignRuntimeList(
-	_In_ ULONG WhichList
+	_In_ ULONG TargetList
 );
 
 _IRQL_requires_(PASSIVE_LEVEL)

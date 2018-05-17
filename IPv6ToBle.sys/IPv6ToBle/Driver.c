@@ -103,6 +103,17 @@ Return Value:
 
     //
     // Step 3
+    // Check the driver parameters key to see if we are running on the border
+    // router or not
+    //
+    status = IPv6ToBleRegistryCheckBorderRouterFlag();
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
+
+    //
+    // Step 4
     // Initialize the global objects
     //
     status = IPv6ToBleDriverInitGlobalObjects();
@@ -112,7 +123,7 @@ Return Value:
     }
 
 	// 
-	// Step 4
+	// Step 5
 	// Create the control device object
 	//
 	status = IPv6ToBleDeviceCreate(gWdfDriverObject);
@@ -124,7 +135,7 @@ Return Value:
 	}    
 
     //
-    // Step 5
+    // Step 6
     // Initialize the I/O queues
     //
     status = IPv6ToBleQueuesInitialize(gWdfDeviceObject);
@@ -134,7 +145,7 @@ Return Value:
     }
 
     //
-    // Step 6
+    // Step 7
     // Finish initializing the control device object
     //
     WdfControlFinishInitializing(gWdfDeviceObject);
@@ -144,7 +155,7 @@ Return Value:
     gWdmDeviceObject = WdfDeviceWdmGetDeviceObject(gWdfDeviceObject);
 
     //
-    // Step 7
+    // Step 8
     // Create the injection handle for packet injection. We do that here
     // because, on the border router device, we may not register callouts right away
     // if loading lists from the registry fails. But we still want to create
@@ -159,19 +170,7 @@ Return Value:
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "FwpsInjectionHandleCreate0 failed %!STATUS!", status);
         goto Exit;
-    }
-
-	//
-	// Step 8
-	// Check the driver parameters key to see if we are running on the border
-	// router or not
-	//
-	status = IPv6ToBleRegistryCheckBorderRouterFlag();
-	if (!NT_SUCCESS(status))
-	{
-		goto Exit;
-	}
-	
+    }	
 
 	if (gBorderRouterFlag)
 	{

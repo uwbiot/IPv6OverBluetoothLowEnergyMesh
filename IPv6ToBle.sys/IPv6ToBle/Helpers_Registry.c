@@ -242,7 +242,7 @@ Exit:
 _Use_decl_annotations_
 NTSTATUS
 IPv6ToBleRegistryRetrieveRuntimeList(
-	_In_ ULONG WhichList
+	_In_ ULONG TargetList
 )
 /*++
 Routine Description:
@@ -289,7 +289,7 @@ Return Value:
 	IN6_ADDR ipv6AddressStorage;
 
 	// Validate input
-	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+	if (TargetList != WHITE_LIST && TargetList != MESH_LIST)
 	{
 		status = STATUS_INVALID_PARAMETER;
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Invalid list option during %!FUNC! with %!STATUS!", status);
@@ -309,7 +309,7 @@ Return Value:
 	// Declare the name of the value we're querying from the key
 	DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
 	DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
-	const UNICODE_STRING listValueName = (WhichList == WHITE_LIST ? whiteListValueName : meshListValueName);
+	const UNICODE_STRING listValueName = (TargetList == WHITE_LIST ? whiteListValueName : meshListValueName);
 
 	// Create a collection to store the retrieved white list addresses
 	status = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES,
@@ -334,7 +334,7 @@ Return Value:
     parametersKeyOpened = TRUE;
 
     // Open the list key
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		status = IPv6ToBleRegistryOpenWhiteListKey();
 		if (!NT_SUCCESS(status))
@@ -354,7 +354,7 @@ Return Value:
 
 	// Query the list key. Fails first time driver is installed or if the
 	// user purged the list and rebooted because the key exists but is empty.
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		status = WdfRegistryQueryMultiString(gWhiteListKey,
 											 &listValueName,
@@ -428,7 +428,7 @@ Return Value:
         // Create the list entry and add it
         if (NT_SUCCESS(status))
 		{
-			if (WhichList == WHITE_LIST)
+			if (TargetList == WHITE_LIST)
 			{
 				PWHITE_LIST_ENTRY newWhiteListEntry = (PWHITE_LIST_ENTRY)ExAllocatePoolWithTag(
 														NonPagedPoolNx,
@@ -485,7 +485,7 @@ Exit:
     // Clean up any memory allocated if we failed at some point
     if (!NT_SUCCESS(status))
     {
-        IPv6ToBleRuntimeListPurgeRuntimeList(WhichList);
+        IPv6ToBleRuntimeListPurgeRuntimeList(TargetList);
     }
 
     // Close the keys
@@ -495,7 +495,7 @@ Exit:
     }
     if (listKeyOpened)
     {
-		if (WhichList == WHITE_LIST)
+		if (TargetList == WHITE_LIST)
 		{
 			WdfRegistryClose(gWhiteListKey);
 		}
@@ -519,7 +519,7 @@ Exit:
 _Use_decl_annotations_
 NTSTATUS
 IPv6ToBleRegistryAssignRuntimeList(
-	_In_ ULONG WhichList
+	_In_ ULONG TargetList
 )
 /*++
 Routine Description:
@@ -533,7 +533,7 @@ Routine Description:
 
 Arguments:
 
-    WhichList - Determines which runtime list on which to operate. 0 for white
+    TargetList - Determines which runtime list on which to operate. 0 for white
 		list, 1 for mesh list.
 
 Return Value:
@@ -551,7 +551,7 @@ Return Value:
     WDF_OBJECT_ATTRIBUTES attributes;
 
 	// Validate input
-	if (WhichList != WHITE_LIST && WhichList != MESH_LIST)
+	if (TargetList != WHITE_LIST && TargetList != MESH_LIST)
 	{
 		status = STATUS_INVALID_PARAMETER;
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_REGISTRY, "Invalid list option during %!FUNC! with %!STATUS!", status);
@@ -562,7 +562,7 @@ Return Value:
     // Step 1
     // Check for empty list (counts as success)
     //
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		if (IsListEmpty(gWhiteListHead))
 		{
@@ -595,7 +595,7 @@ Return Value:
 
     // Open the list key
 	// Open the list key
-	if (WhichList == WHITE_LIST)
+	if (TargetList == WHITE_LIST)
 	{
 		status = IPv6ToBleRegistryOpenWhiteListKey();
 		if (!NT_SUCCESS(status))
@@ -630,10 +630,10 @@ Return Value:
     // Step 4
     // Traverse the list and add each entry's IPv6 address to the WDFCOLLECTION
     //
-	PLIST_ENTRY entry = WhichList == WHITE_LIST ? gWhiteListHead->Flink : gMeshListHead->Flink;
-	if (!IsListEmpty(WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+	PLIST_ENTRY entry = TargetList == WHITE_LIST ? gWhiteListHead->Flink : gMeshListHead->Flink;
+	if (!IsListEmpty(TargetList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
 	{
-		while (entry != (WhichList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
+		while (entry != (TargetList == WHITE_LIST ? gWhiteListHead : gMeshListHead))
 		{
 			// Get the struct that contains this entry
 			
@@ -644,7 +644,7 @@ Return Value:
 				PMESH_LIST_ENTRY meshListEntry;
 			} runtimeListEntry;
 
-			if (WhichList == WHITE_LIST)
+			if (TargetList == WHITE_LIST)
 			{
 				runtimeListEntry.whiteListEntry = CONTAINING_RECORD(entry,
 																	WHITE_LIST_ENTRY,
@@ -666,8 +666,8 @@ Return Value:
 
 			// Convert the address to a string (function null-terminates it)
 			ULONG currentIpv6AddressStringLength = INET6_ADDRSTRLEN;
-			status = RtlIpv6AddressToStringExW(WhichList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
-											   WhichList == WHITE_LIST ? runtimeListEntry.whiteListEntry->scopeId : runtimeListEntry.meshListEntry->scopeId,
+			status = RtlIpv6AddressToStringExW(TargetList == WHITE_LIST ? &runtimeListEntry.whiteListEntry->ipv6Address : &runtimeListEntry.meshListEntry->ipv6Address,
+											   TargetList == WHITE_LIST ? runtimeListEntry.whiteListEntry->scopeId : runtimeListEntry.meshListEntry->scopeId,
 											   0,
 											   (PWSTR)currentIpv6AddressString.Buffer,
 											   &currentIpv6AddressStringLength
@@ -724,10 +724,10 @@ Return Value:
     // Declare the name of the value we're assigning to the key
 	DECLARE_CONST_UNICODE_STRING(whiteListValueName, L"WhiteList");
 	DECLARE_CONST_UNICODE_STRING(meshListValueName, L"MeshList");
-	const UNICODE_STRING listValueName = (WhichList == WHITE_LIST ? whiteListValueName : meshListValueName);
+	const UNICODE_STRING listValueName = (TargetList == WHITE_LIST ? whiteListValueName : meshListValueName);
 
     // Assign the collection of strings to the registry key's value
-    status = WdfRegistryAssignMultiString(WhichList == WHITE_LIST ? gWhiteListKey : gMeshListKey, 
+    status = WdfRegistryAssignMultiString(TargetList == WHITE_LIST ? gWhiteListKey : gMeshListKey, 
                                           &listValueName, 
                                           addressCollection
                                           );
@@ -745,7 +745,7 @@ Exit:
     }
     if (listKeyOpened)
     {
-        WdfRegistryClose(WhichList == WHITE_LIST ? gWhiteListKey : gMeshListKey);
+        WdfRegistryClose(TargetList == WHITE_LIST ? gWhiteListKey : gMeshListKey);
     }
 
     // Clean up collection object
