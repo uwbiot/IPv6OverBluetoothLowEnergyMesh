@@ -20,12 +20,13 @@ using Windows.ApplicationModel.Background;
 //
 // Namespaces for this project
 //
-using IPv6ToBleInteropLibrary;
 using IPv6ToBleBluetoothGattLibraryForUWP;
 using IPv6ToBleAdvLibraryForUWP;
 using IPv6ToBleBluetoothGattLibraryForUWP.Characteristics;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using IPv6ToBleSixLowPanLibraryForUWP;
+using IPv6ToBleDriverInterfaceForUWP;
+using IPv6ToBleDriverInterfaceForUWP.DeviceIO;
 
 
 // The Background Application template is documented at http://go.microsoft.com/fwlink/?LinkID=533884&clcid=0x409
@@ -35,9 +36,8 @@ namespace IPv6ToBlePacketProcessingForIoTCore
     public sealed class StartupTask : IBackgroundTask
     {
         #region Local variables
-
         //---------------------------------------------------------------------
-        // Local variables
+        // General variables
         //---------------------------------------------------------------------
 
         // Booleans to track whether the packet has finished transmitting, and
@@ -45,11 +45,19 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         private bool packetTransmissionFinished = false;
         private bool packetTransmittedSuccessfully = false;
 
-        // Temporary hard-coded routing table
-        private Dictionary<IPAddress, List<IPAddress>> staticRoutingTable;
+        // A list of this device's link-local IPv6 addresses (in case it has
+        // more than one adapter with an IPv6 address)
+        private List<IPAddress> localIPv6AddressesForDesktop = null;
 
-        // This device's link-local IPv6 address
-        private IPAddress localAddress = null;
+        // This device's generated link-local IPv6 address
+        private IPAddress generatedLocalIPv6AddressForNode = null;
+
+        // A deferral for this task to run forever
+        private BackgroundTaskDeferral mainDeferral = null;
+
+        //---------------------------------------------------------------------
+        // Bluetooth variables
+        //---------------------------------------------------------------------
 
         // The GATT server to receive packets and provide information to
         // remote devices
@@ -59,12 +67,8 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         // can receive a packet
         private IPv6ToBleAdvPublisherPacketReceive packetReceiver = null;
 
-        // A Bluetooth Advertisement watcher to use when looking for a nearby
-        // device to which to send a packet
-        private IPv6ToBleAdvWatcherPacketWrite packetWriter = null;
-
-        // A background task deferral to run forever
-        private BackgroundTaskDeferral mainDeferral = null;
+        // A FIFO queue of recent messages/packets to use with managed flooding
+        private Queue<byte[]> messageCache = null;
 
         #endregion
 
@@ -84,8 +88,6 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             taskInstance.Canceled += TaskInstance_Canceled;
 
             Init();
-
-            DoWork();
         }
 
         //---------------------------------------------------------------------
@@ -101,23 +103,11 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 1
             // Acquire this device's IPv6 address from the local Bluetooth radio
             //
-            localAddress = Task.Run(IPv6AddressFromBluetoothAddress.GenerateAsync).Result;
-            if (localAddress == null)
+            generatedLocalIPv6AddressForNode = Task.Run(() => IPv6AddressFromBluetoothAddress.GenerateAsync(2)).Result;
+            if (generatedLocalIPv6AddressForNode == null)
             {
-                Debug.WriteLine("Could not acquire the local IPv6 address.");
+                Debug.WriteLine("Could not generate the local IPv6 address.");
                 throw new Exception();
-            }
-
-            //
-            // Step 2
-            // Verify we can open a handle to the driver. If we can't, we fail
-            // starting the service.
-            //
-            bool isDriverReachable = TryOpenHandleToDriver();
-            if (!isDriverReachable)
-            {
-                Debug.WriteLine("Could not open a handle to the driver.");
-                throw new FileNotFoundException();
             }
 
             //
@@ -126,7 +116,17 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // over Bluetooth LE
             //
             gattServer = new IPv6ToBleGattServer();
-            bool gattServerStarted = Task.Run(gattServer.StartAsync).Result;
+            bool gattServerStarted = false;
+            try
+            {
+                gattServerStarted = Task.Run(gattServer.StartAsync).Result;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Error starting GATT server with this" +
+                                        "message: " + ex.Message);
+            }
+
             if (!gattServerStarted)
             {
                 Debug.WriteLine("Could not start the GATT server.");
@@ -142,45 +142,20 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             packetReceiver.Start();
 
             //
-            // Step 5
-            // Set up the Bluetooth advertiser for sending packets, but don't
-            // start it yet
+            // Step 6
+            // Initialize the message cache for 10 messages
             //
-            packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
+            messageCache = new Queue<byte[]>(10);
 
             //
-            // TEMP: hard code the routing table. Each line is in the format:
+            // Step 7
+            // Send 10 initial listening requests to the driver
             //
-            // Node RouteToNodeFromBorderRouter
-            //
-            staticRoutingTable = new Dictionary<IPAddress, List<IPAddress>>();
-
-            // Parse the known device addresses
-            bool parsed = false;
-            IPAddress borderRouterAddress = null;
-            IPAddress pi1Address = null;
-            IPAddress pi2Address = null;
-
-            // No error checking because these are known good addresses verified
-            // here: http://v6decode.com/#address=fe80%3A%3A71c4%3A225%3Ad048%3A9476%2511
-            // Also, constructors can't fail
-            parsed = IPAddress.TryParse("fe80::b826:1c8b:ccbb:32f0%10", out borderRouterAddress);
-            parsed = IPAddress.TryParse("fe80::291:a8ff:feeb:27b8", out pi1Address);
-            parsed = IPAddress.TryParse("fe80::3ff8:d2ff:feeb:27b8", out pi2Address);
-
-            // Test configuration is:
-            // Border Router -> Pi 1 -> Pi 2
-            //
-            // Route 1: To Pi 1
-            staticRoutingTable.Add(pi1Address, new List<IPAddress>());
-            staticRoutingTable[pi1Address].Add(borderRouterAddress);
-            staticRoutingTable[pi1Address].Add(pi1Address);
-
-            // Route 2: To Pi 2
-            staticRoutingTable.Add(pi2Address, new List<IPAddress>());
-            staticRoutingTable[pi2Address].Add(borderRouterAddress);
-            staticRoutingTable[pi2Address].Add(pi1Address);
-            staticRoutingTable[pi2Address].Add(pi2Address);
+            for (int i = 0; i < 10; i++)
+            {
+                SendListenRequestToDriver();
+                Thread.Sleep(100); // Wait 1/10 second to start another one
+            }
         }
 
         /// <summary>
@@ -202,271 +177,21 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 1
             // Shut down Bluetooth resources upon exit
             //
-            packetReceiver.Stop();
-            packetWriter.Stop();
+            if(packetReceiver != null)
+            {
+                packetReceiver.Stop();
+            }
 
             //
             // Step 2
             // Complete the deferral
+            //
             mainDeferral.Complete();
         }
 
         #endregion
 
-        #region Business logic
-        private void DoWork()
-        {     
-            // Indefinitely run in a cycle of sending listening requests to the
-            // driver, waiting for a packet, receiving a packet from the driver,
-            //sending a received packet over Bluetooth LE, etc.
-            while (true)
-            {
-                SendListenRequestToDriverAndSendReceivedPacketAsync();
-            }            
-        }
-
-        #endregion
-
-        #region Driver packet operations
-
-        /// <summary>
-        /// Verifies that the driver is present. Does not do anything else.
-        /// </summary>
-        /// <returns></returns>
-        private bool TryOpenHandleToDriver()
-        {
-            bool isDriverReachable = true;
-
-            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
-                "\\\\.\\IPv6ToBle",
-                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
-                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
-                IntPtr.Zero,
-                IPv6ToBleDriverInterface.OPEN_EXISTING,
-                0,
-                IntPtr.Zero
-            );
-
-            if (driverHandle.IsInvalid)
-            {
-                int code = Marshal.GetLastWin32Error();
-
-                Debug.WriteLine("Could not open a handle to the driver, " +
-                                "error code: " + code.ToString()
-                                );
-                isDriverReachable = false;
-            }
-
-            return isDriverReachable;
-        }
-
-        /// <summary>
-        /// Sends the IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 control code to the
-        /// driver to ask the driver to listen for a packet.
-        /// </summary>
-        private unsafe void SendListenRequestToDriverAndSendReceivedPacketAsync()
-        {
-            //
-            // Step 1
-            // Open the handle to the driver with Overlapped async I/O flagged
-            //
-            SafeFileHandle driverHandle = IPv6ToBleDriverInterface.CreateFile(
-                "\\\\.\\IPv6ToBle",
-                IPv6ToBleDriverInterface.GENERIC_READ | IPv6ToBleDriverInterface.GENERIC_WRITE,
-                IPv6ToBleDriverInterface.FILE_SHARE_READ | IPv6ToBleDriverInterface.FILE_SHARE_WRITE,
-                IntPtr.Zero,
-                IPv6ToBleDriverInterface.OPEN_EXISTING,
-                IPv6ToBleDriverInterface.FILE_FLAG_OVERLAPPED,  // async
-                IntPtr.Zero
-            );
-
-            if (driverHandle.IsInvalid)
-            {
-                int code = Marshal.GetLastWin32Error();
-
-                Debug.WriteLine("Could not open a handle to the driver, " +
-                                "error code: " + code.ToString()
-                                );
-                return;
-            }
-
-            //
-            // Step 2
-            // Prepare for asynchronous I/O
-            //
-
-            // Bind the driver handle to the Windows Thread Pool. Really, we're
-            // binding the handle to an I/O completion port owned by the thread
-            // pool.
-            bool handleBound = ThreadPool.BindHandle(driverHandle);
-            if (!handleBound)
-            {
-                Debug.WriteLine("Could not bind driver handle to a thread " +
-                                "pool I/O completion port."
-                                );
-            }
-
-            // Set up the byte array to hold a packet (always use 1280 bytes
-            // to make sure we can receive the maximum Bluetooth packet size)
-            byte[] packet = new byte[1280];
-            int bytesReceived = 0;
-
-            // Create a NativeOverlapped pointer to pass to DeviceIoControl().
-            // The Pack() method packs the current managed Overlapped structure
-            // into a native one, specifies a delegate callback for when the 
-            // asynchronous operation completes, and specifies a managed object
-            // (the packet) that serves as the buffer.
-            Overlapped overlapped = new Overlapped();
-            NativeOverlapped* nativeOverlapped = overlapped.Pack(IPv6ToBleListenCompletionCallback,
-                                                                 packet
-                                                                 );
-
-            //
-            // Step 3
-            // Send the IOCTL to request the driver to listen for a packet and
-            // give us the packet through the request's output buffer
-            //
-            // Note about asynchronous DeviceIoControl: when using overlapped
-            // I/O, the call immediately returns with a boolean result. If
-            // the result is true, the operation completed synchronously. If
-            // false, it may be executing asynchronously. The error code is
-            // ERROR_IO_PENDING for async I/O; otherwise it's a failure code.
-            //
-            // If DeviceIoControl() executes synchronously for some reason or
-            // fails to execute asynchronously, the NativeOverlapped pointer
-            // must still be freed.
-            //            
-
-            // System-defined ERROR_IO_PENDING == 997
-            const int ErrorIoPending = 997;
-
-            // Send the IOCTL
-            bool listenResult = IPv6ToBleDriverInterface.DeviceIoControl(
-                                    driverHandle,
-                                    IPv6ToBleDriverInterface.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6,
-                                    null,
-                                    0,
-                                    packet,
-                                    (sizeof(byte) * 1280),
-                                    out bytesReceived,
-                                    nativeOverlapped
-                                    );
-            if (listenResult)
-            {
-                // Operation completed synchronously for some reason
-                Debug.WriteLine("DeviceIoControl executed synchronously " +
-                                "despite overlapped I/O flag."
-                                );
-                Overlapped.Unpack(nativeOverlapped);
-                Overlapped.Free(nativeOverlapped);
-            }
-            else
-            {
-                int error = Marshal.GetLastWin32Error();
-
-                if (error != ErrorIoPending)
-                {
-                    // Failed to execute DeviceIoControl with overlapped I/O
-                    Debug.WriteLine("Failed to execute " +
-                        "DeviceIoControl asynchronously with error code" +
-                        error + "\n");
-                    Overlapped.Unpack(nativeOverlapped);
-                    Overlapped.Free(nativeOverlapped);
-                }
-                else
-                {
-                    // Wait for a packet to arrive. We do this by trying to get
-                    // the overlapped result for 10 seconds, then aborting this
-                    // attempt if it fails. This is so we can return control
-                    // to the while loop in the DoWork() function, giving
-                    // the thread a chance to see if it has been requested to
-                    // stop.
-
-                    listenResult = IPv6ToBleDriverInterface.GetOverlappedResultEx(
-                                       driverHandle,
-                                       nativeOverlapped,
-                                       out bytesReceived,
-                                       10000,  // 10 seconds
-                                       false   // don't block forever
-                                   );
-
-                    // We have a packet. Send it out over Bluetooth. The very
-                    // act of receiving a packet from the driver MUST mean that
-                    // the packet was not meant for this device.
-                    if (listenResult)
-                    {
-                        IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
-                        SendPacketOverBluetoothLE(packet, destinationAddress);
-                    }
-                    else
-                    {
-                        // We waited 10 seconds for a packet from the driver
-                        // and got nothing, so log the error, free the 
-                        // NativeOverlapped structure, and continue
-                        error = Marshal.GetLastWin32Error();
-                        Debug.WriteLine("Did not receive a packet in the time" +
-                                        " interval. Trying again. Error code: " +
-                                        error
-                                        );
-                        Overlapped.Unpack(nativeOverlapped);
-                        Overlapped.Free(nativeOverlapped);
-                    }
-                }
-            }
-
-            // Close the driver handle, implicitly canceling outstanding I/O
-            IPv6ToBleDriverInterface.CloseHandle(driverHandle);
-        }
-
-        /// <summary>
-        /// Delegate callback function for handling asynchronous I/O
-        /// completion events.
-        /// 
-        /// This function cleans up the NativeOverlapped structure by 
-        /// unpacking and freeing it.
-        /// 
-        /// For more info on this function, see
-        /// https://msdn.microsoft.com/library/system.threading.iocompletioncallback
-        /// </summary>
-        private unsafe void IPv6ToBleListenCompletionCallback(
-            uint errorCode,
-            uint numBytes,
-            NativeOverlapped* nativeOverlapped
-        )
-        {
-            // Verify the operation succeeded, catch an exception if it did
-            // not, and finally free the NativeOverlapped structure
-            try
-            {
-                if (errorCode != 0)
-                {
-
-                    throw new Win32Exception((int)errorCode);
-                }
-                else
-                {
-                    Overlapped.Unpack(nativeOverlapped);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine("Asynchronous Overlapped I/O failed with this" +
-                                " error: " + e.Message
-                                );
-            }
-            finally
-            {
-                Overlapped.Free(nativeOverlapped);
-            }
-        }
-
-        #endregion
-
-        #region Packet event listeners
-
-        //---------------------------------------------------------------------
-        // Listeners for when packets are transmitted or received
-        //---------------------------------------------------------------------
+        #region Bluetooth advertisement event listeners
 
         /// <summary>
         /// Awaits the asynchronous packet transmission operations by listening
@@ -508,71 +233,137 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         {
             if (eventArgs.PropertyName == "Packet")
             {
+                byte[] packet = localPacketWriteCharacteristic.Packet;
+
                 // Only send it back out if this device is not the destination;
                 // in other words, if this device is a middle router in the
                 // subnet
                 IPAddress destinationAddress = GetDestinationAddressFromPacket(
-                                                    localPacketWriteCharacteristic.Packet
+                                                    packet
                                                 );
-                if (!IPAddress.Equals(destinationAddress, localAddress))
+
+                // Check if the packet is NOT for this device
+                bool packetIsForThisDevice = false;
+
+                packetIsForThisDevice = IPAddress.Equals(destinationAddress, generatedLocalIPv6AddressForNode);
+
+                //foreach (IPAddress address in localIPv6AddressesForDesktop)
+                //{
+                //    if (IPAddress.Equals(address, destinationAddress))
+                //    {
+                //        packetIsForThisDevice = true;
+                //    }
+                //}
+
+                if (!packetIsForThisDevice)
                 {
-                    SendPacketOverBluetoothLE(localPacketWriteCharacteristic.Packet,
-                                              destinationAddress
-                                              );
+                    // Check if the message is in the local message cache or not
+                    if (messageCache.Contains(packet))
+                    {
+                        Debug.WriteLine("This packet has been seen before.");
+                        return;
+                    }
+
+                    // If this message has not been seen before, add it to the
+                    // message queue and remove the oldest if there would now
+                    // be more than 10
+                    if (messageCache.Count < 10)
+                    {
+                        messageCache.Enqueue(packet);
+                    }
+                    else
+                    {
+                        messageCache.Dequeue();
+                        messageCache.Enqueue(packet);
+                    }
+
+                    SendPacketOverBluetoothLE(packet, destinationAddress);
                 }
                 else
                 {
-                    // display the packet if this were a test GUI app
+                    // It's for this device. Check if it has been seen before
+                    // or not.
+
+                    // Check if the message is in the local message cache or not
+                    if (messageCache.Contains(packet))
+                    {
+                        //Debug.WriteLine("This packet has been seen before.");
+                        Debug.WriteLine("This packet has been seen before.");
+                        return;
+                    }
+
+                    // If this message has not been seen before, add it to the
+                    // message queue and remove the oldest if there would now
+                    // be more than 10
+                    if (messageCache.Count < 10)
+                    {
+                        messageCache.Enqueue(packet);
+                    }
+                    else
+                    {
+                        messageCache.Dequeue();
+                        messageCache.Enqueue(packet);
+                    }
+
+                    // DISPLAY THE PACKET!!
+                    Debug.WriteLine("Received this packet over " +
+                                            "Bluetooth: " + Utilities.BytesToString(packet));
+
+                    // Send the packet to the driver for inbound injection
+                    SendPacketToDriverForInboundInjection(packet);
                 }
             }
         }
+
         #endregion
 
-        #region Packet transmission
-
+        #region Bluetooth LE operations
         /// <summary>
         /// Sends a packet out over Bluetooth Low Energy. Spins up a watcher
         /// for advertisements from nearby servers who can receive the packet.
         /// </summary>
         /// <param name="packet"></param>
-        private void SendPacketOverBluetoothLE(
+        internal void SendPacketOverBluetoothLE(
             byte[] packet,
             IPAddress destinationAddress
         )
         {
+            Debug.WriteLine("Starting to send packet over BLE.");
+
+            // Create a packet watcher to watch for nearby recipients of the
+            // packet
+            IPv6ToBleAdvWatcherPacketWrite packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
+
             // Start the watcher. This causes it to write the
             // packet when it finds a suitable recipient.
             packetWriter.Start(packet,
-                               destinationAddress,
-                               staticRoutingTable
+                               destinationAddress
                                );
 
             // Wait for the watcher to signal the event that the
             // packet has transmitted. This should happen after the
-            // watcher receives an advertisement OR a timeout of
+            // watcher receives an advertisement(s) OR a timeout of
             // 5 seconds occurs.
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            while (!packetTransmissionFinished ||
-                    stopwatch.Elapsed < TimeSpan.FromSeconds(5)
-                    ) ;
+            while (stopwatch.Elapsed < TimeSpan.FromSeconds(5)) ;
             stopwatch.Stop();
 
             // Check transmission status
             if (!packetTransmittedSuccessfully)
             {
-                Debug.WriteLine("Could not transmit the packet" +
-                                " over Bluetooth LE successfully."
-                                );
+                Debug.WriteLine("Could not transmit this packet: " +
+                                            Utilities.BytesToString(packet) +
+                                            " to this address: " +
+                                            destinationAddress.ToString());
             }
             else
             {
                 // We successfully transmitted the packet! Cue fireworks.
                 Debug.WriteLine("Successfully transmitted this " +
-                                "packet:\n" + Utilities.BytesToString(packet) +
-                                "\n" + "to this address:\n" +
-                                destinationAddress.ToString()
-                                );
+                               "packet:" + Utilities.BytesToString(packet) +
+                                "to this address:" +
+                                destinationAddress.ToString());
             }
 
             // Stop the watcher
@@ -582,11 +373,129 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             packetTransmissionFinished = false;
             packetTransmittedSuccessfully = false;
         }
+        #endregion
+
+        #region Driver operations
+
+        private void SendListenRequestToDriver()
+        {
+            //
+            // Step 1
+            // Open an async handle to the driver
+            //
+            SafeFileHandle device = null;
+            try
+            {
+                device = DeviceIO.OpenDevice("\\\\.\\IPv6ToBle",
+                                             true    // async
+                                             );
+            }
+            catch (Win32Exception e)
+            {
+                Debug.WriteLine("Error opening handle to the driver. " +
+                                        "Error code: " + e.NativeErrorCode);
+                return;
+            }
+
+            //
+            // Step 2
+            // Begin an asynchronous operation to get a packet from the driver
+            //
+            int status = 0;
+            IAsyncResult listenResult = DeviceIO.BeginGetPacketFromDriverAsync(
+                                            device,
+                                            IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6,
+                                            1280, // 1280 bytes max
+                                            PacketListenCompletionCallback,
+                                            status
+                                        );
+            if (listenResult == null)
+            {
+                Debug.WriteLine("Invalid input for listening for a packet.");
+            }
+        }
+
+        /// <summary>
+        /// This callback is invoked when one of our previously sent listening
+        /// requests is completed, indicating an async I/O operation has 
+        /// finished. 
+        /// 
+        /// In other words, we should have a packet from the driver if the
+        /// operation was successful.
+        /// 
+        /// This method is invoked by the thread pool thread that was waiting
+        /// on the operation.
+        /// </summary>
+        private unsafe void PacketListenCompletionCallback(
+            IAsyncResult result
+        )
+        {
+            //
+            // Step 1
+            // Retrieve the async result's...result
+            //
+            byte[] packet = DeviceIO.EndGetPacketFromDriverAsync(result);
+
+            //
+            // Step 2
+            // Send the packet over Bluetooth provided it's not null
+            //
+            if (packet != null)
+            {
+                IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
+                SendPacketOverBluetoothLE(packet,
+                                          destinationAddress
+                                          );
+            }
+            else
+            {
+                Debug.WriteLine("Packet was null. Some error must have" +
+                                        "occurred. Nothing to send over BLE.");
+                return;
+            }
+
+            //
+            // Step 3
+            // Send another listening request to the driver to replace this one
+            //
+            SendListenRequestToDriver();
+        }
+
+        private unsafe void SendPacketToDriverForInboundInjection(byte[] packet)
+        {
+            //
+            // Step 1
+            // Open a synchronous handle to the driver
+            //
+            SafeFileHandle device = null;
+            try
+            {
+                device = DeviceIO.OpenDevice("\\\\.\\IPv6ToBle",
+                                             false  // synchronous
+                                             );
+            }
+            catch (Win32Exception e)
+            {
+                Debug.WriteLine("Error opening handle to the driver. " +
+                                        "Error code: " + e.NativeErrorCode);
+                return;
+            }
+
+            //
+            // Step 2
+            // Send the packet to the driver for it to inject into the inbound
+            // network stack
+            //
+            DeviceIO.SynchronousControl(device,
+                                        IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6
+                                        );
+        }
 
         #endregion
 
-        #region Helpers
-        private IPAddress GetDestinationAddressFromPacket(byte[] packet)
+        #region IPv6 address helpers
+
+        internal IPAddress GetDestinationAddressFromPacket(byte[] packet)
         {
             // Get the destination IPv6 address from the packet.
             // The destination address is the last 16 bytes of the
@@ -600,7 +509,6 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                                   );
             return new IPAddress(destinationAddressBytes);
         }
-
         #endregion
     }
 }
