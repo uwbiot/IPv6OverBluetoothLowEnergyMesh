@@ -27,7 +27,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
     /// DeviceIoControl()   Sends an I/O control code (IOCTL)  
     /// 
     /// </summary>
-    public class Kernel32Import
+    internal class Kernel32Import
     {
         /// <summary>
         /// Public constants for CreateFile(). These are selective 
@@ -84,7 +84,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
         public unsafe static extern bool DeviceIoControl(
             SafeFileHandle      hDevice, 
             int                 dwIoControlCode, 
-            SafePinnedObject    lpInBuffer,
+            byte[]              lpInBuffer,
             int                 nInBufferSize, 
             SafePinnedObject    lpOutBuffer, 
             int                 nOutBufferSize, 

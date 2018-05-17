@@ -11,7 +11,7 @@ namespace IPv6ToBleDriverInterfaceForDesktop
     /// IPv6ToBle.sys, the WFP callout driver for the IPv6 Over Bluetooth Low
     /// Energy Mesh project.
     /// </summary>
-    class IPv6ToBleIoctl
+    public static class IPv6ToBleIoctl
     {
         /// <summary>
         /// Private constants for IOCTL definitions.

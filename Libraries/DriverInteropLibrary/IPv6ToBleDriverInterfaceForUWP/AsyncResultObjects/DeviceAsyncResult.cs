@@ -15,8 +15,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.AsyncResultObjects
     {
         #region Local variables
 
-        // Input and output buffers for device I/O
-        private SafePinnedObject mInDeviceBuffer;
+        // Output buffer for device I/O
         private SafePinnedObject mOutDeviceBuffer;
 
         #endregion
@@ -25,13 +24,11 @@ namespace IPv6ToBleDriverInterfaceForUWP.AsyncResultObjects
         /// Constructor
         /// </summary>
         public DeviceAsyncResult(
-            SafePinnedObject    inDeviceBuffer,
             SafePinnedObject    outDeviceBuffer,
             AsyncCallback       asyncCallback,
             object              state
         ) : base(asyncCallback, state)
         {
-            mInDeviceBuffer = inDeviceBuffer;
             mOutDeviceBuffer = outDeviceBuffer;
         }
 
@@ -49,11 +46,15 @@ namespace IPv6ToBleDriverInterfaceForUWP.AsyncResultObjects
             // Pack the managed Overlapped structure into a NativeOverlapped
             // structure, which pins the memory until the operation completes
             return overlapped.Pack(CompletionCallback,
-                                   new object[] { mInDeviceBuffer.Target, mOutDeviceBuffer.Target });
+                                   mOutDeviceBuffer.Target
+                                   );
         }
 
         /// <summary>
-        /// The completion callback for when the operation completes.
+        /// The completion callback for when the operation completes. This is
+        /// an internal callback that frees the native memory and subsequently
+        /// invokes the original caller's completion callback so it can
+        /// retrieve the result.
         /// </summary>
         private unsafe void CompletionCallback(
             UInt32 errorCode,
@@ -110,9 +111,8 @@ namespace IPv6ToBleDriverInterfaceForUWP.AsyncResultObjects
             finally
             {
                 // Make sure that the input and output buffers are unpinned
-                mInDeviceBuffer.Dispose();
                 mOutDeviceBuffer.Dispose();
-                mInDeviceBuffer = mOutDeviceBuffer = null;  // Allow early GC
+                mOutDeviceBuffer = null;  // Allow early GC
             }
         }
     }

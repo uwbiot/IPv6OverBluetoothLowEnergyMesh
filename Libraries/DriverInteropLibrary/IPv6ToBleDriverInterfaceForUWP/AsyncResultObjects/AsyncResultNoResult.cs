@@ -45,7 +45,6 @@ namespace IPv6ToBleDriverInterfaceForUWP.AsyncResultObjects
         private ManualResetEvent mAsyncWaitHandle;
 
         // Field set when operation completes
-
         private Exception mException;
 
         #endregion

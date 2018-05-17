@@ -30,7 +30,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         )
         {
             // Open the handle to the driver
-            SafeFileHandle device = Kernel32Import.CreateFile("\\\\.\\IPv6ToBle",
+            SafeFileHandle device = Kernel32Import.CreateFile(deviceName,
                 Kernel32Import.GENERIC_READ | Kernel32Import.GENERIC_WRITE,
                 Kernel32Import.FILE_SHARE_READ | Kernel32Import.FILE_SHARE_WRITE,
                 IntPtr.Zero,
@@ -65,21 +65,25 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         /// </summary>
         /// <param name="device"></param>
         /// <param name="controlCode"></param>
-        public unsafe static void SynchronousControl(
+        public unsafe static bool SynchronousControl(
             SafeFileHandle  device,
             int             controlCode
         )
         {
             int bytesReturned = 0;  // don't care about this in synchronous I/O
-            Kernel32Import.DeviceIoControl(device,
-                                           controlCode,
-                                           new byte[0],
-                                           0,
-                                           new byte[0],
-                                           0,
-                                           out bytesReturned,
-                                           null
-                                           );
+            bool result = Kernel32Import.DeviceIoControl(device,
+                                                         controlCode,
+                                                         new byte[0],
+                                                         0,
+                                                         new byte[0],
+                                                         0,
+                                                         out bytesReturned,
+                                                         null
+                                                         );
+            // Close the driver handle
+            Kernel32Import.CloseHandle(device);
+
+            return result;
         }
 
         /// <summary>
@@ -92,22 +96,27 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         /// </summary>
         /// <param name="device"></param>
         /// <param name="controlCode"></param>
-        public unsafe static void SynchronousControl(
+        public unsafe static bool SynchronousControl(
             SafeFileHandle  device,
             int             controlCode,
             String          ipv6Address
         )
         {
             int bytesReturned = 0;  // don't care about this in synchronous I/O
-            Kernel32Import.DeviceIoControl(device,
-                                           controlCode,
-                                           ipv6Address,
-                                           sizeof(char) * ipv6Address.Length,
-                                           null,
-                                           0,
-                                           out bytesReturned,
-                                           null
-                                           );
+            bool result = Kernel32Import.DeviceIoControl(device,
+                                                         controlCode,
+                                                         ipv6Address,
+                                                         sizeof(char) * ipv6Address.Length,
+                                                         null,
+                                                         0,
+                                                         out bytesReturned,
+                                                         null
+                                                         );
+
+            // Close the driver handle
+            Kernel32Import.CloseHandle(device);
+
+            return result;
         }
 
         /// <summary>
@@ -121,18 +130,27 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         public static IAsyncResult BeginGetPacketFromDriverAsync(
             SafeFileHandle  device,
             int             controlCode,
-            object          inBuffer,
             Int32           maxElements,
             AsyncCallback   asyncCallback,
             object          state
         )
         {
+            // Error checking
+            if(device == null)
+            {
+                throw new InvalidEnumArgumentException("Device handle was null");
+            }
+
+            if (maxElements > 1280)
+            {
+                return null;
+            }
+
             // Construct the output buffer; that is, the packet. Shouldn't be
-            // more than 1280 bytes or the driver will reject the request.
+            // more than 1280 bytes or the driver will reject the request.            
             byte[] packet = new byte[maxElements];
             DeviceAsyncResult<byte[]> asyncResult = AsyncControl(device,
                                                                  controlCode,
-                                                                 inBuffer,
                                                                  packet,
                                                                  asyncCallback,
                                                                  state
@@ -163,7 +181,6 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         private static unsafe void NativeAsyncControl(
             SafeFileHandle      device,
             int                 controlCode,
-            SafePinnedObject    inBuffer,
             SafePinnedObject    outBuffer,
             out Int32           bytesReturned,
             NativeOverlapped*   nativeOverlapped
@@ -171,8 +188,8 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         {
             bool succeeded = Kernel32Import.DeviceIoControl(device,
                                                             controlCode,
-                                                            inBuffer,
-                                                            inBuffer.Size,
+                                                            null,
+                                                            0,
                                                             outBuffer,
                                                             outBuffer.Size,
                                                             out bytesReturned,
@@ -206,18 +223,11 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
         private static DeviceAsyncResult<T> AsyncControl<T>(
             SafeFileHandle  device,
             int             controlCode,
-            object          inBuffer,
             T               outBuffer,
             AsyncCallback   asyncCallback,
             object          state
         )
         {
-            // Set up the safe pinned objects based on the passed in objects
-            SafePinnedObject inDeviceBuffer = null;
-            if (inBuffer != null)
-            {
-                inDeviceBuffer = new SafePinnedObject(inBuffer);
-            }
 
             SafePinnedObject outDeviceBuffer = null;
             if(outBuffer != null)
@@ -226,8 +236,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
             }
 
             // Create the async result object
-            DeviceAsyncResult<T> asyncResult = new DeviceAsyncResult<T>(inDeviceBuffer,
-                                                                        outDeviceBuffer,
+            DeviceAsyncResult<T> asyncResult = new DeviceAsyncResult<T>(outDeviceBuffer,
                                                                         asyncCallback,
                                                                         state
                                                                         );
@@ -236,7 +245,6 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
                 Int32 bytesReturned;
                 NativeAsyncControl(device,
                                    controlCode,
-                                   inDeviceBuffer,
                                    outDeviceBuffer,
                                    out bytesReturned,
                                    asyncResult.GetNativeOverlapped()
