@@ -45,7 +45,7 @@ namespace IPv6ToBleDriverInterfaceForDesktop.AsyncResultObjects
 
             // Pack the managed Overlapped structure into a NativeOverlapped
             // structure, which pins the memory until the operation completes
-            return overlapped.Pack(CompletionCallback,
+            return overlapped.Pack(new IOCompletionCallback(CompletionCallback),
                                    mOutDeviceBuffer.Target
                                    );
         }
@@ -104,7 +104,6 @@ namespace IPv6ToBleDriverInterfaceForDesktop.AsyncResultObjects
                     }
 
                     // Record the result and call the AsyncCallback method
-                    // passed to the BeginGetArray method
                     base.SetAsCompleted(result, false);
                 }
             }

@@ -127,7 +127,7 @@ namespace IPv6ToBleDriverInterfaceForDesktop.DeviceIO
         /// to TRUE prior to calling this method.
         /// </summary>
         /// <returns></returns>
-        public static IAsyncResult BeginGetPacketFromDriverAsync(
+        public static IAsyncResult BeginGetPacketFromDriverAsync<TResult>(
             SafeFileHandle  device,
             int             controlCode,
             Int32           maxElements,
@@ -145,7 +145,6 @@ namespace IPv6ToBleDriverInterfaceForDesktop.DeviceIO
             {
                 return null;
             }
-
             // Construct the output buffer; that is, the packet. Shouldn't be
             // more than 1280 bytes or the driver will reject the request.            
             byte[] packet = new byte[maxElements];
@@ -165,56 +164,14 @@ namespace IPv6ToBleDriverInterfaceForDesktop.DeviceIO
         /// The reciprocal of BeginGetPacketFromDriverAsync().
         /// </summary>
         /// <param name="result"></param>
-        public static byte[] EndGetPacketFromDriverAsync(
+        public static byte[] EndGetPacketFromDriverAsync<TResult>(
             IAsyncResult result
         )
         {
             DeviceAsyncResult<byte[]> asyncResult = (DeviceAsyncResult<byte[]>)result;
             byte[] packet = asyncResult.EndInvoke();
             return packet;
-        }
-
-        /// <summary>
-        /// Helper method that actually sends the given IOCTL to the driver by
-        /// calling the native DeviceIOControl() function. Called by AsyncControl().
-        /// </summary>
-        private static unsafe void NativeAsyncControl(
-            SafeFileHandle      device,
-            int                 controlCode,
-            SafePinnedObject    outBuffer,
-            out Int32           bytesReturned,
-            NativeOverlapped*   nativeOverlapped
-        )
-        {
-            bool succeeded = Kernel32Import.DeviceIoControl(device,
-                                                            controlCode,
-                                                            null,
-                                                            0,
-                                                            outBuffer,
-                                                            outBuffer.Size,
-                                                            out bytesReturned,
-                                                            nativeOverlapped
-                                                            );
-            
-            // If DeviceIoControl returns TRUE, the operation completed
-            // synchronously
-            if(succeeded)
-            {
-                throw new InvalidOperationException($"Async call to DeviceIoControl completed synchronously.");
-            }
-
-            // DeviceIoControl is operating asynchronously; test the returned
-            // error code to see if it is pending or not
-            Int32 error = Marshal.GetLastWin32Error();
-            const Int32 cErrorIOPending = 997;  // system-defined code for pending I/O
-            if(error == cErrorIOPending)
-            {
-                return;
-            }
-
-            // Throw an exception if DeviceIoControl fails altogether
-            throw new InvalidOperationException($"Control failed with error {error}");
-        }
+        }        
 
         /// <summary>
         /// Helper method to construct an asyncResult object and use it to
@@ -252,6 +209,48 @@ namespace IPv6ToBleDriverInterfaceForDesktop.DeviceIO
             }
 
             return asyncResult;
+        }
+
+        /// <summary>
+        /// Helper method that actually sends the given IOCTL to the driver by
+        /// calling the native DeviceIOControl() function. Called by AsyncControl().
+        /// </summary>
+        private static unsafe void NativeAsyncControl(
+            SafeFileHandle device,
+            int controlCode,
+            SafePinnedObject outBuffer,
+            out Int32 bytesReturned,
+            NativeOverlapped* nativeOverlapped
+        )
+        {
+            bool succeeded = Kernel32Import.DeviceIoControl(device,
+                                                            controlCode,
+                                                            null,
+                                                            0,
+                                                            outBuffer,
+                                                            outBuffer.Size,
+                                                            out bytesReturned,
+                                                            nativeOverlapped
+                                                            );
+
+            // If DeviceIoControl returns TRUE, the operation completed
+            // synchronously
+            if (succeeded)
+            {
+                throw new InvalidOperationException($"Async call to DeviceIoControl completed synchronously.");
+            }
+
+            // DeviceIoControl is operating asynchronously; test the returned
+            // error code to see if it is pending or not
+            Int32 error = Marshal.GetLastWin32Error();
+            const Int32 cErrorIOPending = 997;  // system-defined code for pending I/O
+            if (error == cErrorIOPending)
+            {
+                return;
+            }
+
+            // Throw an exception if DeviceIoControl fails altogether
+            throw new InvalidOperationException($"Control failed with error {error}");
         }
     }
 }

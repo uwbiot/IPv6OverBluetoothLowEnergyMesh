@@ -17,7 +17,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
     /// This class is based on the example provided by Jeffrey Richter in his
     /// June 2007 article, "Concurrent Affairs," in MSDN Magazine.
     /// </summary>
-    public sealed class SafePinnedObject : SafeHandleZeroOrMinusOneIsInvalid
+    internal sealed class SafePinnedObject : SafeHandleZeroOrMinusOneIsInvalid
     {
         // The handle of the pinned object, or 0
         private GCHandle managedGarbageCollectorHandle;
