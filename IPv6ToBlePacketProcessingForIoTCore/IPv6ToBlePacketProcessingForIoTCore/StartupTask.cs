@@ -379,6 +379,8 @@ namespace IPv6ToBlePacketProcessingForIoTCore
 
         private void SendListenRequestToDriver()
         {
+            Debug.WriteLine("Sending listening request to driver.");
+
             //
             // Step 1
             // Open an async handle to the driver
@@ -401,13 +403,12 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 2
             // Begin an asynchronous operation to get a packet from the driver
             //
-            int status = 0;
-            IAsyncResult listenResult = DeviceIO.BeginGetPacketFromDriverAsync(
+            IAsyncResult listenResult = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(
                                             device,
                                             IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6,
                                             1280, // 1280 bytes max
                                             PacketListenCompletionCallback,
-                                            status
+                                            null
                                         );
             if (listenResult == null)
             {
@@ -434,7 +435,21 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 1
             // Retrieve the async result's...result
             //
-            byte[] packet = DeviceIO.EndGetPacketFromDriverAsync(result);
+            byte[] packet;
+            try
+            {
+                packet = DeviceIO.EndGetPacketFromDriverAsync<byte[]>(result);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Exception occurred.\n" +
+                                "Source: " + e.Source + "\n" + 
+                                "Message: " + e.Message + "\n" +
+                                "Stack trace: " + e.StackTrace + "\n"
+                                );
+                return;
+            }
+
 
             //
             // Step 2
@@ -442,6 +457,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             //
             if (packet != null)
             {
+                Debug.WriteLine("Got a packet! Contents: " + Utilities.BytesToString(packet));
                 IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
                 SendPacketOverBluetoothLE(packet,
                                           destinationAddress
