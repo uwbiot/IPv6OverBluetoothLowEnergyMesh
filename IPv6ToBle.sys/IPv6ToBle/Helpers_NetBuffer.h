@@ -50,11 +50,12 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 _Success_(return != 0)
-BYTE*
+NTSTATUS
 IPv6ToBleNBLCopyToBuffer(
 	_In_	NET_BUFFER_LIST*	NBL,
-	_Out_	UINT32*				size,
-	_In_	UINT32				additionalSpace
+    _In_	UINT32				additionalSpace,
+    _Out_   BYTE*               outBuffer,
+	_Inout_	UINT32*				outBufferSize	
 );
 
 EXTERN_C_END

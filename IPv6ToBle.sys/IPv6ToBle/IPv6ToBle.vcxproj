@@ -200,6 +200,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <AdditionalDependencies>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x64\ndis.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x64\fwpkclnt.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\km\x64\wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -225,7 +226,7 @@
     </Link>
     <PkgGen />
     <PkgGen>
-      <Version>1.0.0.1</Version>
+      <Version>1.0.0.2</Version>
     </PkgGen>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">

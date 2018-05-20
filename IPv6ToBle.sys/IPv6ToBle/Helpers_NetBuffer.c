@@ -108,11 +108,12 @@ Exit:
 }
 
 _Use_decl_annotations_
-BYTE*
+NTSTATUS
 IPv6ToBleNBLCopyToBuffer(
-	_In_	NET_BUFFER_LIST*	NBL,
-	_Out_	UINT32*				size,
-	_In_	UINT32				additionalSpace
+    _In_	NET_BUFFER_LIST*	NBL,
+    _In_	UINT32				additionalSpace,
+    _Out_   BYTE*               outBuffer,
+    _Inout_ UINT32*				outBufferSize
 )
 /*++
 Routine Description:
@@ -158,10 +159,9 @@ Return Value:
 	// Step 1
 	// Prepare information for copying the bytes (num bytes to copy, num bytes
 	// copied, etc.)
-	//	
-	BYTE* packetForUsermode = 0;
+	//
 	UINT32 bytesToCopy = additionalSpace;
-	*size = 0;
+	//*outBufferSize = 0;
 
 	//
 	// Step 2
@@ -199,44 +199,9 @@ Return Value:
 			bytesToCopy += NET_BUFFER_DATA_LENGTH(netBuffer);
 		}
 	}
-
-    //
-    // Step 4
-    // Create a new array of zeroes for the packet for user mode
-    //
-    for (; packetForUsermode == 0;)
-    {
-        size_t SAFE_SIZE = 0;
-        if (bytesToCopy &&
-            RtlSizeTMult(sizeof(BYTE),
-                        (size_t)bytesToCopy,
-                        &SAFE_SIZE) == STATUS_SUCCESS &&
-            SAFE_SIZE >= (sizeof(BYTE) * bytesToCopy))
-        {
-            packetForUsermode = (BYTE*)ExAllocatePoolWithTag(NonPagedPoolNx,
-                                    SAFE_SIZE,
-                                    IPV6_TO_BLE_NDIS_TAG
-                                );
-            if (packetForUsermode)
-            {
-                RtlSecureZeroMemory(packetForUsermode, SAFE_SIZE);
-            }
-        }
-        else
-        {
-            packetForUsermode = 0;
-            break;
-        }
-    }
-    if (packetForUsermode == 0)
-    {
-        status = (UINT32)STATUS_NO_MEMORY;
-        goto Exit;
-    }
-
 	//
-	// Step 5
-	// Copy the data to the byte array
+	// Step 4
+	// Copy the data to the buffer for user mode
 	//
 	if (NBL)
 	{
@@ -276,7 +241,7 @@ Return Value:
 				
 				// Copy the memory from this NET_BUFFER to the byte array to
 				// return (i.e. the packet to pass to usermode)
-				RtlCopyMemory(&packetForUsermode[bytesCopied],
+				RtlCopyMemory(&outBuffer[bytesCopied],
 					contiguousBuffer ? contiguousBuffer : allocatedBuffer,
 					bytesNeeded
 				);
@@ -309,24 +274,12 @@ Exit:
 	}
 
 	// Free the packet if we failed, else report the size and return it
-	if (!NT_SUCCESS(status))
+	if (NT_SUCCESS(status))
 	{
-		if (packetForUsermode)
-		{
-			ExFreePoolWithTag((BYTE*)packetForUsermode,
-								IPV6_TO_BLE_NBL_TAG
-								);
-			packetForUsermode = 0;
-		}
-	}
-	else 
-	{
-		*size = bytesToCopy;
+        *outBufferSize = bytesToCopy;
 	}
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NET_BUFFER, "%!FUNC! Exit");
 
-    // If successful, the packet for usermode will be copied to a usermode-
-    // supplied buffer in the classify callbacks, then freed there
-	return packetForUsermode;
+	return status;
 }

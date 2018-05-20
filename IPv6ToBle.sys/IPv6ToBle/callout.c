@@ -87,36 +87,31 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "%!FUNC! Entry");
 
-    UNREFERENCED_PARAMETER(inFixedValues);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
     UNREFERENCED_PARAMETER(flowContext);
 
     NTSTATUS status = STATUS_SUCCESS;
-    NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
 
 #if DBG
     KIRQL irql = KeGetCurrentIrql();
 #endif // DBG
     
     
-    WDFREQUEST outRequest;
-    PVOID outputBuffer = 0;
+    BYTE* outputBuffer = 0;
 
-    BOOLEAN isInMeshList = FALSE;
+    WDFREQUEST outRequest = NULL;
     BOOLEAN requestRetrieved = FALSE;
 
     UINT32 ipHeaderSize = inMetaValues->ipHeaderSize;
     UINT32 transportHeaderSize = inMetaValues->transportHeaderSize;
 
     FWPS_PACKET_INJECTION_STATE packetState;
-    UINT32 packetSize = 0;
-    BYTE* packetForUsermode = 0;    
 
     //
     // Step 1
     // Verify rights to alter the classify and check if we previously injected
-    // the packet
+    // the packet. This should never be the case, except possibly for loopbacks
     //
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0)
     {
@@ -169,27 +164,28 @@ Return Value:
             }
         }
     }
-    
+
     //
     // Step 2
-    // Verify the destination.
+    // Verify the destination if on the border router.
     // 
     // If the packet is intended for a mesh device, continue with the rest of
     // the function and pass the packet to the usermode packet processing app.
     //
     // If the packet is not intended for a mesh device, permit it as it must
-    // be destined for the border router itself.
+    // be normal traffic destined elsewhere.
     //
 
     // Extract the destination address from the IP header by retreating 16
     // bytes (as it is at the end of the IPv6 header)
     UINT8 extractedAddress[16] = { 0 };
+    NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
     ndisStatus = NdisRetreatNetBufferListDataStart(layerData,
-                                                   (sizeof(BYTE) * 16),
-                                                   0,
-                                                   NULL,
-                                                   NULL
-                                                   );
+                                                    (sizeof(BYTE) * 16),
+                                                    0,
+                                                    NULL,
+                                                    NULL
+                                                    );
     if (ndisStatus != NDIS_STATUS_SUCCESS)
     {
         classifyOut->actionType = FWP_ACTION_PERMIT;
@@ -209,20 +205,21 @@ Return Value:
     // Advance back to the end of the IP header if the retreat operation
     // succeeded
     NdisAdvanceNetBufferListDataStart(layerData,
-                                      (sizeof(BYTE) * 16),
-                                      FALSE,
-                                      NULL
-                                      );
+                                        (sizeof(BYTE) * 16),
+                                        FALSE,
+                                        NULL
+                                        );
+
+    BOOLEAN isInMeshList = FALSE;
 
     // Compare each address in the mesh list to the destination address
     PLIST_ENTRY entry = gMeshListHead->Flink;
     while (entry != gMeshListHead)
     {
         PMESH_LIST_ENTRY meshListEntry = CONTAINING_RECORD(entry,
-                                                          MESH_LIST_ENTRY,
-                                                          listEntry
-                                                          );
-
+                                                            MESH_LIST_ENTRY,
+                                                            listEntry
+                                                            );
         // Compare the extracted address to this entry's address
         if (RtlEqualMemory(extractedAddress,
             &meshListEntry->ipv6Address,
@@ -238,7 +235,7 @@ Return Value:
     }
 
     // Permit the packet if it wasn't in the mesh list, as that means the
-    // packet is destined for the border router itself
+    // packet is destined elsewhere (normal traffic)
     if (!isInMeshList)
     {
         classifyOut->actionType = FWP_ACTION_PERMIT;
@@ -247,56 +244,58 @@ Return Value:
             classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
         }
 
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet was not destined for a device in the mesh; must be destined for the border router");
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Packet was not destined for a device in the mesh; must be destined for the border router");
 
         return;
     }
 
     //
     // Step 3
-    // Attempt to retrieve a WDFREQUEST from the listen request queue in the
-    // device context, then retrieve its output buffer
-    //
+    // Verify the packet is a UDP packet by checking the transport header size
+    // (should be 8 bytes)
+    //    
+    if (transportHeaderSize > 8)
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Packet is not a UDP packet, transport header size is %d when it should be 8", transportHeaderSize);
 
-    // Retrieve a request from the listen request queue
+        goto Exit;
+    }
+
+    //
+    // Step 4
+    // Attempt to retrieve a WDFREQUEST from the listen request queue in the
+    // device context, then retrieve its output buffer.
+    //    
+
+    // Retrieve the output buffer. It should be large enough to hold the MTU of
+    // 1280 bytes because the EvtIoControl callback verifies that before even
+    // adding the request to the listening queue.      
     WdfSpinLockAcquire(gListenRequestQueueLock);
     status = WdfIoQueueRetrieveNextRequest(gListenRequestQueue,
-                                           &outRequest
-                                           );
+        &outRequest
+    );
     WdfSpinLockRelease(gListenRequestQueueLock);
     if (!NT_SUCCESS(status))
     {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Retrieving request to listen for inbound IPv6 packets failed %!STATUS!", status);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Retrieving request to listen for outbound IPv6 packets failed %!STATUS!", status);
         goto Exit;
     }
 
     NT_ASSERT(irql == KeGetCurrentIrql());
     requestRetrieved = TRUE;
 
-    // Retrieve the output buffer. It should be large enough to hold the MTU of
-    // 1280 bytes because the EvtIoControl callback verifies that before even
-    // adding the request to the listening queue.
+    // Retrieve the output buffer
+    size_t outputBufferLength = 0;
     status = WdfRequestRetrieveOutputBuffer(outRequest,
-                                           (size_t)&packetSize,
-                                           &outputBuffer,
-                                           NULL
-                                           );
+                                            sizeof(BYTE) * 49,  // Min 49 bytes
+                                            (PVOID*)&outputBuffer,
+                                            &outputBufferLength
+                                            );
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Retrieving output buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
         goto Exit;
-    }    
-
-    //
-    // Step 4
-    // Verify the packet is a UDP packet by checking the transport header size
-    // (should be 8 bytes)
-    //    
-    if (transportHeaderSize > 8)
-    {   
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Packet is not a UDP packet, transport header size is %d when it should be 8", transportHeaderSize);
-        goto Exit;        
-    }    
+    }
 
     //
     // Step 5
@@ -308,39 +307,19 @@ Return Value:
     //
     // We can then use this size to also verify the request output buffer is
     // big enough in the next step.
-    //   
-    packetForUsermode = IPv6ToBleNBLCopyToBuffer(layerData,
-                                                 &packetSize,
-                                                 ipHeaderSize
-                                                 );
-    if (packetSize > 1280)
+    //
+    status = IPv6ToBleNBLCopyToBuffer(layerData,
+                                      ipHeaderSize,
+                                      outputBuffer,
+                                      (UINT32*)&outputBufferLength
+                                      );
+    if (outputBufferLength > 1280)
     {
-        if (packetForUsermode)
-        {
-            ExFreePoolWithTag((BYTE*)packetForUsermode,
-                IPV6_TO_BLE_NBL_TAG
-            );
-            packetForUsermode = 0;
-        }
 
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Packet is too large; it must be no larger than 1280 octets for Bluetooth MTU");
 
         goto Exit;
     }
-    if (!packetForUsermode)
-    {
-        status = STATUS_NO_MEMORY;
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_INBOUND_IP_PACKET_V6, "Copying NBL to buffer for usermode failed during %!FUNC! with %!STATUS!", status);
-        goto Exit;
-    }
-    
-
-    //
-    // Step  6    
-    // Copy the memory from the packet for usermode to the request's output
-    // buffer
-    //
-    RtlCopyMemory(&outputBuffer, &packetForUsermode, packetSize);
 
 Exit:
 
@@ -349,18 +328,9 @@ Exit:
         WdfRequestComplete(outRequest, status);
     }
 
-    // Free the packet(buffer) now that it's been copied to usermode
-    if (packetForUsermode)
-    {
-        ExFreePoolWithTag(&packetForUsermode, IPV6_TO_BLE_NDIS_TAG);
-        packetForUsermode = 0;
-    }
-
     //
     // Always set these variables upon exiting; the callout must either block
-    // or permit. Only two conditions will result in permitting the traffic,
-    // and those returns early in the function. Therefore, everything else will
-    // block and absorb by eventually hitting this.
+    // or permit.
     //
     classifyOut->actionType = FWP_ACTION_BLOCK;
     classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
@@ -458,7 +428,6 @@ Return Value:
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "%!FUNC! Entry");
 
-    UNREFERENCED_PARAMETER(inFixedValues);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
     UNREFERENCED_PARAMETER(flowContext);
@@ -470,16 +439,14 @@ Return Value:
 #endif // DBG
 
     
-    PVOID outputBuffer = 0;
-
-    WDFREQUEST outRequest;
+    BYTE* outputBuffer = 0;
+    
+    WDFREQUEST outRequest = NULL;
     BOOLEAN requestRetrieved = FALSE;    
 
     UINT32 transportHeaderSize = inMetaValues->transportHeaderSize;
 
     FWPS_PACKET_INJECTION_STATE packetState;
-    UINT32 packetSize = 0;
-    BYTE* packetForUsermode = 0;
 
     //
     // Step 1
@@ -623,45 +590,10 @@ Return Value:
 
 			return;
 		}
-	}
+	}        
 
     //
     // Step 3
-    // Attempt to retrieve a WDFREQUEST from the listen request queue in the
-    // device context, then retrieve its output buffer.
-    //    
-
-    // Retrieve the output buffer. It should be large enough to hold the MTU of
-    // 1280 bytes because the EvtIoControl callback verifies that before even
-    // adding the request to the listening queue.    
-    WdfSpinLockAcquire(gListenRequestQueueLock);
-    status = WdfIoQueueRetrieveNextRequest(gListenRequestQueue,
-                                           &outRequest
-                                           );
-    WdfSpinLockRelease(gListenRequestQueueLock);
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving request to listen for inbound IPv6 packets failed %!STATUS!", status);
-        goto Exit;
-    }
-
-    NT_ASSERT(irql == KeGetCurrentIrql());
-    requestRetrieved = TRUE;
-
-    // Retrieve the output buffer
-    status = WdfRequestRetrieveOutputBuffer(outRequest,
-                                            (size_t)&packetSize,
-                                            &outputBuffer,
-                                            NULL
-                                            );
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving output buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
-        goto Exit;
-    }    
-
-    //
-    // Step 4
     // Verify the packet is a UDP packet by checking the transport header size
     // (should be 8 bytes)
     //    
@@ -670,7 +602,43 @@ Return Value:
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet is not a UDP packet, transport header size is %d when it should be 8", transportHeaderSize);
 
         goto Exit;
-    }    
+    }   
+
+    //
+    // Step 4
+    // Attempt to retrieve a WDFREQUEST from the listen request queue in the
+    // device context, then retrieve its output buffer.
+    //    
+
+    // Retrieve the output buffer. It should be large enough to hold the MTU of
+    // 1280 bytes because the EvtIoControl callback verifies that before even
+    // adding the request to the listening queue.      
+    WdfSpinLockAcquire(gListenRequestQueueLock);
+    status = WdfIoQueueRetrieveNextRequest(gListenRequestQueue,
+                                           &outRequest
+                                           );
+    WdfSpinLockRelease(gListenRequestQueueLock);
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving request to listen for outbound IPv6 packets failed %!STATUS!", status);
+        goto Exit;
+    }
+
+    NT_ASSERT(irql == KeGetCurrentIrql());
+    requestRetrieved = TRUE;
+
+    // Retrieve the output buffer
+    size_t outputBufferLength = 0;
+    status = WdfRequestRetrieveOutputBuffer(outRequest,
+                                            sizeof(BYTE) * 49,  // Min 49 bytes
+                                            (PVOID*)&outputBuffer,
+                                            &outputBufferLength
+                                            );
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Retrieving output buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
 
     //
     // Step 5
@@ -683,53 +651,27 @@ Return Value:
     // We can then use this size to also verify the request output buffer is
     // big enough in the next step.
     //
-    packetForUsermode = IPv6ToBleNBLCopyToBuffer(layerData,
-                                                 &packetSize,
-                                                 0 // On outbound IP_PACKET
-                                                   // layer, NBL is positioned
-                                                   // at the BEGINNING of the
-                                                   // IP header. So this is 0.
-                                                 );
-    if (packetSize > 1280)
+    status = IPv6ToBleNBLCopyToBuffer(layerData,
+                                      0, // On outbound IP_PACKET
+                                         // layer, NBL is positioned
+                                         // at the BEGINNING of the
+                                         // IP header. So this is 0.
+                                      outputBuffer,
+                                      (UINT32*)&outputBufferLength
+                                      );
+    if (outputBufferLength > 1280)
     {
-        if (packetForUsermode)
-        {
-            ExFreePoolWithTag((BYTE*)packetForUsermode,
-                IPV6_TO_BLE_NBL_TAG
-            );
-            packetForUsermode = 0;
-        }
 
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Packet is too large; it must be no larger than 1280 octets for Bluetooth MTU");
         
         goto Exit;
     }
-    if (!packetForUsermode)
-    {
-        status = STATUS_NO_MEMORY;
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_CLASSIFY_OUTBOUND_IP_PACKET_V6, "Copying NBL to buffer for usermode failed during %!FUNC! with %!STATUS!", status);
-        goto Exit;
-    }    
-
-    //
-    // Step  6    
-    // Copy the memory from the packet for usermode to the request's output
-    // buffer
-    //
-    RtlCopyMemory(&outputBuffer, &packetForUsermode, packetSize);
 
 Exit:
 
     if (requestRetrieved)
     {
         WdfRequestComplete(outRequest, status);
-    }
-
-    // Free the packet(buffer) now that it has been passed to usermode
-    if (packetForUsermode)
-    {
-        ExFreePoolWithTag(&packetForUsermode, IPV6_TO_BLE_NDIS_TAG);
-        packetForUsermode = 0;
     }
 
     //
