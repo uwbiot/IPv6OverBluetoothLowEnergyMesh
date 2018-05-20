@@ -21,6 +21,9 @@ using Microsoft.Win32.SafeHandles;      // Safe file handles
 using System.Threading;                 // Asynchronous I/O and thread pool
 using System.Runtime.InteropServices;   // Marhsalling interop calls
 using System.Diagnostics;
+using System.Net.Sockets;
+using System.Net;
+using System.Text;
 
 namespace DriverTest
 {
@@ -80,7 +83,7 @@ namespace DriverTest
                 return;
             }
 
-            IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
+            IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
         }
 
         /// <summary>
@@ -94,7 +97,57 @@ namespace DriverTest
             IAsyncResult result
         )
         {
-            
+            //
+            // Step 1
+            // Retrieve the async result's...result
+            //
+            byte[] packet = null;
+            try
+            {
+                packet = DeviceIO.EndGetPacketFromDriverAsync<byte[]>(result);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Exception occurred." + e.Message);
+                return;
+            }
+
+
+            //
+            // Step 2
+            // Send the packet over Bluetooth provided it's not null
+            //
+            if (packet != null)
+            {
+                Debug.WriteLine("Successfully got a packet from the driver.");
+            }
+            else
+            {
+                Debug.WriteLine("Packet was null.");
+                return;
+            }
+
+            // Test: Send another listening request to the driver
+            //
+            // Step 1
+            // Open the handle to the driver with Overlapped async I/O flagged
+            //
+            SafeFileHandle device = null;
+            try
+            {
+                device = DeviceIO.OpenDevice("\\\\.\\IPv6ToBle", true);
+            }
+            catch
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            IAsyncResult newResult = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
         }
 
         /// <summary>
@@ -151,7 +204,7 @@ namespace DriverTest
 
             // Hard-coded for testing, would normally acquire from an
             // authenticated service or other source
-            String whiteListAddress = "fe80::b826:1c8b:ccbb:32f0%10";
+            String whiteListAddress = "fe80::b826:1c8b:ccbb:32f0%11";
 
             // Send the IOCTL
             bool result = DeviceIO.SynchronousControl(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST, whiteListAddress);
@@ -389,6 +442,23 @@ namespace DriverTest
                 DisplayErrorDialog("Purging mesh list failed with this " +
                                     "error code: " + error.ToString());
             }
+        }
+
+        private void Button_10_send_udp_packet_Click(object sender, RoutedEventArgs e)
+        {
+            Socket sock = new Socket(AddressFamily.InterNetworkV6, 
+                                     SocketType.Dgram,
+                                     ProtocolType.Udp
+                                     );
+
+            IPAddress serverAddr = IPAddress.Parse("fe80::3ff8:d2ff:feeb:27b8%2");
+
+            IPEndPoint endPoint = new IPEndPoint(serverAddr, 11000);
+
+            string text = "Hello";
+            byte[] send_buffer = Encoding.ASCII.GetBytes(text);
+
+            sock.SendTo(send_buffer, endPoint);
         }
     }
 }
