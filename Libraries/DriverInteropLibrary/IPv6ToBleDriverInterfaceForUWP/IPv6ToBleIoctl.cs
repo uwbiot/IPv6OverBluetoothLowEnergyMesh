@@ -44,7 +44,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
         /// <summary>
         /// Public IOCTL definitions as defined in Public.h of IPv6ToBle.sys.
         /// </summary>
-        public static int IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 =
+        public static readonly int IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8081,
@@ -52,7 +52,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 =
+        public static readonly int IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8082,
@@ -60,7 +60,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 =
+        public static readonly int IOCTL_IPV6_TO_BLE_INJECT_OUTBOUND_NETWORK_V6 =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8083,
@@ -68,7 +68,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST =
+        public static readonly int IOCTL_IPV6_TO_BLE_ADD_TO_WHITE_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8084,
@@ -76,7 +76,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST =
+        public static readonly int IOCTL_IPV6_TO_BLE_REMOVE_FROM_WHITE_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8085,
@@ -84,7 +84,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST =
+        public static readonly int IOCTL_IPV6_TO_BLE_ADD_TO_MESH_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8086,
@@ -92,7 +92,7 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST =
+        public static readonly int IOCTL_IPV6_TO_BLE_REMOVE_FROM_MESH_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8087,
@@ -100,17 +100,26 @@ namespace IPv6ToBleDriverInterfaceForUWP
                 FILE_ANY_ACCESS
                 );
 
-        public static int IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST =
+        public static readonly int IOCTL_IPV6_TO_BLE_PURGE_WHITE_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8088,
                 METHOD_BUFFERED,
                 FILE_ANY_ACCESS
                 );
-        public static int IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST =
+
+        public static readonly int IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST =
             CTL_CODE(
                 FILE_DEVICE_IPV6_TO_BLE,
                 0x8089,
+                METHOD_BUFFERED,
+                FILE_ANY_ACCESS
+                );
+
+        public static readonly int IOCTL_IPV6_TO_BLE_QUERY_MESH_ROLE =
+            CTL_CODE(
+                FILE_DEVICE_IPV6_TO_BLE,
+                0x8090,
                 METHOD_BUFFERED,
                 FILE_ANY_ACCESS
                 );

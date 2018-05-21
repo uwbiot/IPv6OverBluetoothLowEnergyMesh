@@ -52,8 +52,8 @@
     <Compile Include="AsyncResultObjects\AsyncResultNoResult.cs" />
     <Compile Include="AsyncResultObjects\DeviceAsyncResult.cs" />
     <Compile Include="DeviceIO\DeviceIO.cs" />
-    <Compile Include="DeviceIO\SafePinnedObject.cs" />
     <Compile Include="IPv6ToBleIoctl.cs" />
+    <Compile Include="DeviceIO\SafePinnedObject.cs" />
     <Compile Include="Kernel32Import.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

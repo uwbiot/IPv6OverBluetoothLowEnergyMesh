@@ -70,14 +70,14 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
             int             controlCode
         )
         {
-            int bytesReturned = 0;  // don't care about this in synchronous I/O
+            uint bytesReturned = 0;  // don't care about this in synchronous I/O
             bool result = Kernel32Import.DeviceIoControl(device,
                                                          controlCode,
                                                          new byte[0],
                                                          0,
                                                          new byte[0],
                                                          0,
-                                                         out bytesReturned,
+                                                         ref bytesReturned,
                                                          null
                                                          );
             // Close the driver handle
@@ -102,16 +102,73 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
             String          ipv6Address
         )
         {
-            int bytesReturned = 0;  // don't care about this in synchronous I/O
+            uint bytesReturned = 0;  // don't care about this in synchronous I/O
             bool result = Kernel32Import.DeviceIoControl(device,
                                                          controlCode,
                                                          ipv6Address,
                                                          sizeof(char) * ipv6Address.Length,
                                                          null,
                                                          0,
-                                                         out bytesReturned,
+                                                         ref bytesReturned,
                                                          null
                                                          );
+
+            // Close the driver handle
+            Kernel32Import.CloseHandle(device);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Method to initiate a SYNCHRONOUS control command to the driver.
+        /// 
+        /// The device handle MUST have been opened without the async option
+        /// set prior to calling this method.
+        /// 
+        /// This overload takes an int input and is used to query the driver 
+        /// what the mesh role is for this device.
+        /// 
+        /// The main return value of this function is whether the
+        /// DeviceIoControl operation succeeded or not; therefore, to determine
+        /// if this device is a border router or not, the caller must verify
+        /// both the result and the isBorderRouter parameter.
+        /// </summary>
+        /// <param name="device"></param>
+        /// <param name="controlCode"></param>
+        public unsafe static bool SynchronousControl(
+            SafeFileHandle  device,
+            int             controlCode,
+            out bool        isBorderRouter
+        )
+        {
+            uint meshRole = 0;
+            uint bytesReturned = 0;  // don't care about this in synchronous I/O
+            bool result = Kernel32Import.DeviceIoControl(device,
+                                                         controlCode,
+                                                         0,
+                                                         sizeof(uint),
+                                                         ref meshRole,
+                                                         sizeof(uint),
+                                                         ref bytesReturned,
+                                                         null
+                                                         );
+            if(result)
+            {
+                // Record the answer from the driver
+                if (meshRole == 1)
+                {
+                    isBorderRouter = true;
+                }
+                else
+                {          
+                    isBorderRouter = false;
+                }
+            }
+            else
+            {
+                isBorderRouter = false;
+            }
+            
 
             // Close the driver handle
             Kernel32Import.CloseHandle(device);
@@ -199,11 +256,11 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
                                                                         );
             unsafe
             {
-                Int32 bytesReturned;
+                uint bytesReturned = 0;
                 NativeAsyncControl(device,
                                    controlCode,
                                    outDeviceBuffer,
-                                   out bytesReturned,
+                                   ref bytesReturned,
                                    asyncResult.GetNativeOverlapped()
                                    );
             }
@@ -219,7 +276,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
             SafeFileHandle device,
             int controlCode,
             SafePinnedObject outBuffer,
-            out Int32 bytesReturned,
+            ref uint bytesReturned,
             NativeOverlapped* nativeOverlapped
         )
         {
@@ -229,7 +286,7 @@ namespace IPv6ToBleDriverInterfaceForUWP.DeviceIO
                                                             0,
                                                             outBuffer,
                                                             outBuffer.Size,
-                                                            out bytesReturned,
+                                                            ref bytesReturned,
                                                             nativeOverlapped
                                                             );
 

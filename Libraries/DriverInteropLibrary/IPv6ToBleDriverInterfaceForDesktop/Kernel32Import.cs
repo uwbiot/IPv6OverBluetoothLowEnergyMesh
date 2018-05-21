@@ -88,7 +88,7 @@ namespace IPv6ToBleDriverInterfaceForDesktop
             int                 nInBufferSize, 
             SafePinnedObject    lpOutBuffer, 
             int                 nOutBufferSize, 
-            out int             lpBytesReturned, 
+            ref uint            lpBytesReturned, 
             NativeOverlapped*   lpOverlapped
         );
 
@@ -114,7 +114,7 @@ namespace IPv6ToBleDriverInterfaceForDesktop
             int                 nInBufferSize,
             byte[]              lpOutBuffer,
             int                 nOutBufferSize,
-            out int             lpBytesReturned,
+            ref uint            lpBytesReturned,
             NativeOverlapped*   lpOverlapped
         );
 
@@ -147,7 +147,32 @@ namespace IPv6ToBleDriverInterfaceForDesktop
             int                 nInBufferSize, 
             String              lpOutBuffer, 
             int                 nOutBufferSize, 
-            out int             lpBytesReturned, 
+            ref uint            lpBytesReturned, 
+            NativeOverlapped*   lpOverlapped
+        );
+
+        /// <summary>
+        /// DeviceIoControl() overloaded for int output buffer data.
+        /// This version is used by the packet processing app to query the
+        /// device's mesh role.
+        /// 
+        /// This version of DeviceIoControl() is to be used with this IOCTL:
+        /// 
+        /// IOCTL_IPV6_TO_BLE_QUERY_MESH_ROLE
+        /// 
+        /// For more information about this function, see
+        /// https://msdn.microsoft.com/library/windows/desktop/aa363216.
+        /// </summary>
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode,
+            SetLastError = true)]
+        public unsafe static extern bool DeviceIoControl(
+            SafeFileHandle      hDevice,
+            int                 dwIoControlCode,
+            uint                lpInBuffer,
+            int                 nInBufferSize,
+            ref uint            lpOutBuffer,
+            int                 nOutBufferSize,
+            ref uint            lpBytesReturned,
             NativeOverlapped*   lpOverlapped
         );
     }
