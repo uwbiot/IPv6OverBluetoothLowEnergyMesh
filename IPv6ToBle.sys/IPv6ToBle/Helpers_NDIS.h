@@ -21,6 +21,20 @@ Environment:
 
 EXTERN_C_START
 
+//-----------------------------------------------------------------------------
+// Function to register as an NDIS interface provider, for inbound packet
+// injection
+//-----------------------------------------------------------------------------
+
+//_IRQL_requires_(PASSIVE_LEVEL)
+//_IRQL_requires_same_
+//NTSTATUS
+//IPv6ToBleNDISRegisterAsIfProvider();
+
+//-----------------------------------------------------------------------------
+// Functions to manipulate NDIS memory pools
+//-----------------------------------------------------------------------------
+
 _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_

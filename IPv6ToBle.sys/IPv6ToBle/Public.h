@@ -108,3 +108,12 @@ Environment:
 // Sent by the provisioning manager app.
 //
 #define IOCTL_IPV6_TO_BLE_PURGE_MESH_LIST CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8089, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+//
+// Tenth IOCTL: Report the role of the device to a querying user mode app.
+//
+// Used on any device.
+//
+// Sent by the packet processing app.
+//
+#define IOCTL_IPV6_TO_BLE_QUERY_MESH_ROLE CTL_CODE(FILE_DEVICE_IPV6_TO_BLE, 0x8090, METHOD_BUFFERED, FILE_ANY_ACCESS)

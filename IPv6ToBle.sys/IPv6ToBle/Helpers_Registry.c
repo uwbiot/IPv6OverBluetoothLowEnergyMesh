@@ -191,6 +191,8 @@ Return Value:
 
 --*/
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Entry");
+
 	NTSTATUS status = STATUS_SUCCESS;
 	BOOLEAN parametersKeyOpened = FALSE;
 
@@ -235,6 +237,8 @@ Return Value:
 	}
 
 Exit:
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_REGISTRY, "%!FUNC! Exit");
 
 	return status;
 }

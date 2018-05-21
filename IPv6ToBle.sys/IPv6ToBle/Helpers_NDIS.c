@@ -18,11 +18,93 @@ Environment:
 #include "Includes.h"
 #include "Helpers_NDIS.tmh" // auto-generated tracing file
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-_Check_return_
-_Success_(return == STATUS_SUCCESS)
+//_Use_decl_annotations_
+//NTSTATUS
+//IPv6ToBleNDISRegisterAsIfProvider()
+///*++
+//Routine Description:
+//
+//    Registers this driver as a bare-minimum interface NDIS interface provider.    
+//
+//    This function simlpy registers this driver as an NDIS IF provider and gets
+//    a NET_LUID index to identify us. This driver is not a miniport driver, so
+//    the system Tcpip.sys driver won't bind to us and we aren't heavy enough to
+//    actually do network I/O. That is fine for the purposes of being a filter
+//    driver. This process is only required for inbound packet injection into the
+//    network stack.
+//
+//    Note: the IF provider handle must be freed during driver unload.
+//
+//Arguments:
+//
+//    None. Accesses global variables defined in Driver.h for the NDIS IF
+//    provider handle and NET_LUID index.
+//
+//Return Value:
+//
+//    NDIS_STATUS_SUCCESS if successful, appropriate NTSTATUS error codes 
+//    otherwise.
+//
+//--*/
+//{
+//    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NDIS, "%!FUNC! Entry");
+//
+//    NDIS_STATUS ndisStatus = NDIS_STATUS_SUCCESS;
+//
+//    //
+//    // Step 1
+//    // Allocate and initialize an interface characteristics structure
+//    //
+//    NDIS_IF_PROVIDER_CHARACTERISTICS providerCharacteristics;
+//    
+//    providerCharacteristics.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+//    providerCharacteristics.Header.Revision = NDIS_OBJECT_REVISION_1;
+//    providerCharacteristics.Header.Size = NDIS_SIZEOF_IF_PROVIDER_CHARACTERISTICS_REVISION_1;
+//
+//    // Set handlers for interface query and set operations to NULL because we
+//    // are a light-weight interface that doesn't actually handle network I/O
+//    providerCharacteristics.QueryObjectHandler = NULL;
+//    providerCharacteristics.SetObjectHandler = NULL;
+//
+//    //
+//    // Step 2
+//    // Register as an interface provider
+//    //
+//    ndisStatus = NdisIfRegisterProvider(&providerCharacteristics,
+//                                        NULL,
+//                                        &gNdisIfProviderHandle
+//                                        );
+//    if (ndisStatus != NDIS_STATUS_SUCCESS)
+//    {
+//        TraceEvents(TRACE_LEVEL_ERROR, TRACE_HELPERS_NDIS, "Registering as an NDIS interface provider failed %!STATUS!", (NTSTATUS)ndisStatus);
+//        goto Exit;
+//    }
+//
+//    //
+//    // Step 3
+//    // Request for NDIS to give us a 24-bit NET_LUID index if we don't have one
+//    // already
+//    //
+//
+//
+//Exit:
+//
+//    // Deregister the IF provider interface handle if we failed after 
+//    // registration
+//    if (ndisStatus != NDIS_STATUS_SUCCESS)
+//    {
+//        if (gNdisIfProviderHandle)
+//        {
+//            NdisIfDeregisterProvider(gNdisIfProviderHandle);
+//        }
+//    }
+//
+//    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HELPERS_NDIS, "%!FUNC! Exit");
+//
+//    return (NTSTATUS)ndisStatus;
+//}
+
+_Use_decl_annotations_
 NTSTATUS
 IPv6ToBleNDISPoolDataCreate(
 	_Out_    NDIS_POOL_DATA*	ndisPoolData,
@@ -89,11 +171,7 @@ Exit:
 	return status;
 }
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-_Check_return_
-_Success_(return == STATUS_SUCCESS)
+_Use_decl_annotations_
 NTSTATUS
 IPv6ToBleNDISPoolDataPopulate(
 	_Inout_	 NDIS_POOL_DATA*	ndisPoolData,
@@ -161,9 +239,9 @@ Return Value:
 	nblPoolParameters.PoolTag = memoryTag;
 
 	ndisPoolData->nblPoolHandle = NdisAllocateNetBufferListPool(
-		ndisPoolData->ndisHandle,
-		&nblPoolParameters
-	);
+		                            ndisPoolData->ndisHandle,
+		                            &nblPoolParameters
+	                              );
 
 	if (ndisPoolData->nblPoolHandle == 0)
 	{
@@ -183,9 +261,9 @@ Return Value:
 	nbPoolParameters.DataSize = 0;
 
 	ndisPoolData->nbPoolHandle = NdisAllocateNetBufferPool(
-		ndisPoolData->ndisHandle,
-		&nbPoolParameters
-	);
+		                             ndisPoolData->ndisHandle,
+		                             &nbPoolParameters
+	                             );
 
 	if (ndisPoolData->nbPoolHandle == 0)
 	{
@@ -206,10 +284,7 @@ Exit:
 	return status;
 }
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-_Success_(ndisPoolData == 0)
+_Use_decl_annotations_
 inline VOID
 IPv6ToBleNDISPoolDataDestroy(
 	_Inout_ NDIS_POOL_DATA*	ndisPoolData
@@ -254,9 +329,7 @@ Return Value:
 	return;
 }
 
-_IRQL_requires_min_(PASSIVE_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
+_Use_decl_annotations_
 inline VOID
 IPv6ToBleNDISPoolDataPurge(
 	_Inout_	NDIS_POOL_DATA*	ndisPoolData

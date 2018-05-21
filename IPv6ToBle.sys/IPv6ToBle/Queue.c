@@ -187,6 +187,7 @@ Return Value:
 
 	
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
+    ULONG_PTR bytesTransferred = 0;
 
 #if DBG
     KIRQL irql = KeGetCurrentIrql();
@@ -503,6 +504,22 @@ Return Value:
 			break;
 
 		}
+
+        //
+        // IOCTL 10: Query mesh role
+        //
+        // This IOCTL is sent as a request to determine the mesh role a device
+        // is playing. The packet processing app queries this as a way to find
+        // out if it is a border router or not. This is the easiest way to
+        // find this out because the driver already uses the registry and
+        // queries this value for its own purposes.
+        //
+        case IOCTL_IPV6_TO_BLE_QUERY_MESH_ROLE:
+        {
+            status = IPv6ToBleQueueReportMeshRole(Request, &bytesTransferred);
+            break;
+        }
+
         default:
         {
             TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Invalid IOCTL received.\n");
@@ -511,7 +528,7 @@ Return Value:
 	}
 
 	// Complete the request with the returned status from the called operation
-    WdfRequestComplete(Request, status);
+    WdfRequestCompleteWithInformation(Request, status, bytesTransferred);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "%!FUNC! Exit");
 
@@ -570,13 +587,13 @@ Return Value:
     // Step 1
     // Retrieve the packet to send from the input buffer of the WDFREQUEST. The
     // minimum size is 40 bytes (fixed size for IPv6 header) + 8 bytes for the
-    // UDP header + at least 1 byte for the rest of the payload. This is the 
-    // minimum; the packet will likely be larger than this (but must be less 
-    // than 1280 as that is the MTU for Bluetooth radios).
+    // UDP header. This is the minimum; the packet will likely be larger than 
+    // this (but must be less than 1280 as that is the MTU for Bluetooth 
+    // radios).
     //
     BYTE* packetFromUsermode;
     status = WdfRequestRetrieveInputBuffer(Request,
-                                          (sizeof(BYTE) * 49),
+                                          (sizeof(BYTE) * 48),
                                           &inputBuffer,
                                           &receivedSize
                                           );
@@ -687,12 +704,12 @@ Return Value:
 	// Step 1
 	// Retrieve the packet to send from the input buffer of the WDFREQUEST. The
     // minimum size is 40 bytes (fixed size for IPv6 header) + 8 bytes for the
-    // UDP header + at least 1 byte for the payload. This is the minimum; the 
-    // packet will likely be larger than this.
+    // UDP header. This is the minimum; the packet will likely be larger than 
+    // this.
 	//
 	BYTE* packetFromUsermode;
     status = WdfRequestRetrieveInputBuffer(Request,
-                                          (sizeof(BYTE) * 49),
+                                          (sizeof(BYTE) * 48),
 										  &inputBuffer, 
 										  &receivedSize
 										  );
@@ -823,4 +840,73 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INJECT_NETWORK_COMPLETE, "%!FUNC! Exit");
 
     return;
+}
+
+_Use_decl_annotations_
+NTSTATUS
+IPv6ToBleQueueReportMeshRole(
+    _In_    WDFREQUEST  Request,
+    _Out_   ULONG_PTR*  bytesTransferred
+)
+/*++
+Routine Description:
+
+    Reports the status of whether this device is a border router (i.e. its
+    role in the mesh).
+
+Arguments:
+
+    Request - the WDFREQUEST sent by a user mode app, the output buffer of
+    which will receive the value of the global gBorderRouterFlag variable.
+
+Return Value:
+
+    Returns STATUS_SUCCESS if the driver is able to successfully acquire the
+    value of the gBorderRouterFlag variable and place it into the request's
+    output buffer. Otherwise, returns an appropriate NTSTATUS error code.
+
+--*/
+{
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "%!FUNC! Entry");
+
+    NTSTATUS status = STATUS_SUCCESS;
+
+    UINT32* outputBuffer;
+
+    //
+    // Step 1
+    // Retrieve the output buffer of the request and verify it is the correct
+    // size to receive an int
+    //
+    status = WdfRequestRetrieveOutputBuffer(Request,
+                                            sizeof(UINT32),
+                                            (PVOID*)&outputBuffer,
+                                            NULL
+                                            );
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_QUEUE, "Retrieving output buffer from WDFREQUEST failed during %!FUNC! with %!STATUS!", status);
+        goto Exit;
+    }
+
+    //
+    // Step 2
+    // Set the output buffer according to the value of the gBorderRouterFlag
+    //
+    if (gBorderRouterFlag)
+    {
+        *outputBuffer = 1;
+    }
+    else
+    {
+        *outputBuffer = 0;
+    }   
+
+    *bytesTransferred = sizeof(UINT32);
+
+Exit:
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_QUEUE, "%!FUNC! Exit");
+
+    return status;
 }

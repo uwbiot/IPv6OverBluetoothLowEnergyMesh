@@ -92,6 +92,10 @@ WDFSPINLOCK gListenRequestQueueLock; // Lock to access listen request queue
 //
 // Objects for kernel mode network I/O
 //
+HANDLE gNdisIfProviderHandle;       // Handle to register as an NDIS inferface 
+                                    // provider
+UINT32 gNdisIfNetLuidIndex;          // 24-bit NET_LUID index value for being an
+                                    // NDIS inferface provider
 NDIS_POOL_DATA* gNdisPoolData;	    // NDIS memory pools (see Helpers_NDIS.h) 
 
 //

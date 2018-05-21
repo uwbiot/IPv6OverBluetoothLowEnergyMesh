@@ -226,7 +226,7 @@
     </Link>
     <PkgGen />
     <PkgGen>
-      <Version>1.0.0.2</Version>
+      <Version>1.0.0.3</Version>
     </PkgGen>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">

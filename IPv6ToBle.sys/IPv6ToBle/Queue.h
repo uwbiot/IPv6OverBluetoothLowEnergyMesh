@@ -70,4 +70,17 @@ IPv6ToBleQueueInjectNetworkComplete(
     _In_    BOOLEAN             dispatchLevel
 );
 
+//-----------------------------------------------------------------------------
+// Function to retrieve the mesh role (i.e. border router or not) and report it
+//-----------------------------------------------------------------------------
+
+_IRQL_requires_min_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+NTSTATUS
+IPv6ToBleQueueReportMeshRole(
+    _In_    WDFREQUEST  Request,
+    _Out_   ULONG_PTR*  info
+);
+
 EXTERN_C_END

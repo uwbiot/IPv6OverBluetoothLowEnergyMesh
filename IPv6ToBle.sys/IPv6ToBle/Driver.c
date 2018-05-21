@@ -156,6 +156,16 @@ Return Value:
 
     //
     // Step 8
+    // Register as an NDIS interface provider for inbound injection purposes
+    //
+    //status = IPv6ToBleNDISRegisterAsIfProvider();
+    //if (!NT_SUCCESS(status))
+    //{
+    //    goto Exit;
+    //}
+
+    //
+    // Step 9
     // Create the injection handle for packet injection. We do that here
     // because, on the border router device, we may not register callouts right away
     // if loading lists from the registry fails. But we still want to create
@@ -175,7 +185,7 @@ Return Value:
 	if (gBorderRouterFlag)
 	{
 		//
-		// Step 9
+		// Step 10
 		// Initialize and start the periodic timer. This applies only to the border
 		// router.
 		//
@@ -186,7 +196,7 @@ Return Value:
 		}
 
 		//
-		// Step 10
+		// Step 11
 		// Populate the device context with runtime information about the white 
 		// list and mesh list if applicable. These function calls open and close
 		// the registry keys as needed.
@@ -235,7 +245,7 @@ Return Value:
 	}
 
 	//
-	// Step 11
+	// Step 12
 	// Register the callout(s) and filter. 
     //
     // BORDER_ROUTER device
@@ -546,6 +556,14 @@ Return Value:
     // Clean up the NDIS memory pool data structure
     //
     IPv6ToBleNDISPoolDataDestroy(gNdisPoolData);
+
+    //
+    // Step 4
+    // Deregister the NDIS interface provider handle
+    /*if (gNdisIfProviderHandle)
+    {
+        NdisIfDeregisterProvider(gNdisIfProviderHandle);
+    }*/
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 

@@ -102,6 +102,7 @@ Return Value:
 
     WDFREQUEST outRequest = NULL;
     BOOLEAN requestRetrieved = FALSE;
+    ULONG_PTR bytesTransferred = 0;
 
     UINT32 ipHeaderSize = inMetaValues->ipHeaderSize;
     UINT32 transportHeaderSize = inMetaValues->transportHeaderSize;
@@ -287,7 +288,7 @@ Return Value:
     // Retrieve the output buffer
     size_t outputBufferLength = 0;
     status = WdfRequestRetrieveOutputBuffer(outRequest,
-                                            sizeof(BYTE) * 49,  // Min 49 bytes
+                                            sizeof(BYTE) * 48,  // Min 48 bytes
                                             (PVOID*)&outputBuffer,
                                             &outputBufferLength
                                             );
@@ -313,6 +314,11 @@ Return Value:
                                       outputBuffer,
                                       (UINT32*)&outputBufferLength
                                       );
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
+
     if (outputBufferLength > 1280)
     {
 
@@ -321,11 +327,13 @@ Return Value:
         goto Exit;
     }
 
+    bytesTransferred = outputBufferLength;
+
 Exit:
 
     if (requestRetrieved)
     {
-        WdfRequestComplete(outRequest, status);
+        WdfRequestCompleteWithInformation(outRequest, status, bytesTransferred);
     }
 
     //
@@ -442,7 +450,8 @@ Return Value:
     BYTE* outputBuffer = 0;
     
     WDFREQUEST outRequest = NULL;
-    BOOLEAN requestRetrieved = FALSE;    
+    BOOLEAN requestRetrieved = FALSE;   
+    ULONG_PTR bytesTransferred = 0;
 
     UINT32 transportHeaderSize = inMetaValues->transportHeaderSize;
 
@@ -630,7 +639,7 @@ Return Value:
     // Retrieve the output buffer
     size_t outputBufferLength = 0;
     status = WdfRequestRetrieveOutputBuffer(outRequest,
-                                            sizeof(BYTE) * 49,  // Min 49 bytes
+                                            sizeof(BYTE) * 48,  // Min 48 bytes
                                             (PVOID*)&outputBuffer,
                                             &outputBufferLength
                                             );
@@ -659,6 +668,11 @@ Return Value:
                                       outputBuffer,
                                       (UINT32*)&outputBufferLength
                                       );
+    if (!NT_SUCCESS(status))
+    {
+        goto Exit;
+    }
+
     if (outputBufferLength > 1280)
     {
 
@@ -667,11 +681,13 @@ Return Value:
         goto Exit;
     }
 
+    bytesTransferred = outputBufferLength;
+
 Exit:
 
     if (requestRetrieved)
     {
-        WdfRequestComplete(outRequest, status);
+        WdfRequestCompleteWithInformation(outRequest, status, bytesTransferred);
     }
 
     //
