@@ -96,19 +96,19 @@ namespace PacketProcessingTestUWP
             // Step 1
             // Acquire this device's IPv6 address from the local Bluetooth radio
             //
-            generatedLocalIPv6AddressForNode = await IPv6AddressFromBluetoothAddress.GenerateAsync(2);
-            if (generatedLocalIPv6AddressForNode == null)
-            {
-                overallStatusBox.Text = "Could not generate the local IPv6 address.";
-                throw new Exception();
-            }
-
-            //localIPv6AddressesForDesktop = GetLocalIPv6AddressesOnDesktop();
-            //if (localIPv6AddressesForDesktop == null)
+            //generatedLocalIPv6AddressForNode = await IPv6AddressFromBluetoothAddress.GenerateAsync(2);
+            //if (generatedLocalIPv6AddressForNode == null)
             //{
-            //    overallStatusBox.Text = "Could not acquire the local IPv6 address(es).";
+            //    overallStatusBox.Text = "Could not generate the local IPv6 address.";
             //    throw new Exception();
             //}
+
+            localIPv6AddressesForDesktop = GetLocalIPv6AddressesOnDesktop();
+            if (localIPv6AddressesForDesktop == null)
+            {
+                overallStatusBox.Text = "Could not acquire the local IPv6 address(es).";
+                throw new Exception();
+            }
 
             //
             // Step 3
@@ -153,7 +153,7 @@ namespace PacketProcessingTestUWP
             //
             for(int i = 0; i < 10; i++)
             {
-                overallStatusBox.Text = $"Sending listening request {++count}";
+                Debug.WriteLine($"Sending listening request {++count}");
                 SendListenRequestToDriver();
                 Thread.Sleep(100); // Wait 1/10 second to start another one
             }
@@ -377,8 +377,9 @@ namespace PacketProcessingTestUWP
             }
             catch (Win32Exception e)
             {
-                overallStatusBox.Text = "Error opening handle to the driver. " +
-                                        "Error code: " + e.NativeErrorCode;
+                Debug.WriteLine("Error opening handle to the driver. " +
+                                "Error code: " + e.NativeErrorCode
+                                );
                 return;
             }
 
@@ -386,7 +387,7 @@ namespace PacketProcessingTestUWP
             // Step 2
             // Begin an asynchronous operation to get a packet from the driver
             //
-            IAsyncResult listenResult = DeviceIO.BeginGetPacketFromDriverAsync(
+            IAsyncResult listenResult = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(
                                             device,
                                             IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6,
                                             1280, // 1280 bytes max
@@ -395,7 +396,7 @@ namespace PacketProcessingTestUWP
                                         );    
             if(listenResult == null)
             {
-                overallStatusBox.Text = "Invalid input for listening for a packet.";
+                Debug.WriteLine("Invalid request to listen for a packet.");
             }
         }
 
@@ -418,7 +419,21 @@ namespace PacketProcessingTestUWP
             // Step 1
             // Retrieve the async result's...result
             //
-            byte[] packet = DeviceIO.EndGetPacketFromDriverAsync(result);
+            byte[] packet;
+            try
+            {
+                packet = DeviceIO.EndGetPacketFromDriverAsync<byte>(result);
+            }
+            catch(Exception e)
+            {
+                Debug.WriteLine("Exception occurred. Source: " +
+                                 e.Source + " " + "Message: " +
+                                 e.Message + " " + "Stack trace: " +
+                                 e.StackTrace
+                                 );
+                return;
+            }
+            
 
             //
             // Step 2
@@ -427,9 +442,12 @@ namespace PacketProcessingTestUWP
             if(packet != null)
             {
                 IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
-                SendPacketOverBluetoothLE(packet,
-                                          destinationAddress
-                                          );
+                if (destinationAddress != null)
+                {
+                    SendPacketOverBluetoothLE(packet,
+                                              destinationAddress
+                                              );
+                }
             }
             else
             {
@@ -442,7 +460,7 @@ namespace PacketProcessingTestUWP
             // Step 3
             // Send another listening request to the driver to replace this one
             //
-            overallStatusBox.Text = $"Sending listening request {++count}";
+            Debug.WriteLine($"Sending listening request {++count}");
             SendListenRequestToDriver();
         }
 
@@ -461,8 +479,9 @@ namespace PacketProcessingTestUWP
             }
             catch (Win32Exception e)
             {
-                overallStatusBox.Text = "Error opening handle to the driver. " +
-                                        "Error code: " + e.NativeErrorCode;
+                Debug.WriteLine("Error opening handle to the driver. " +
+                                "Error code: " + e.NativeErrorCode
+                                );
                 return;
             }
 
@@ -530,17 +549,25 @@ namespace PacketProcessingTestUWP
 
         public IPAddress GetDestinationAddressFromPacket(byte[] packet)
         {
-            // Get the destination IPv6 address from the packet.
-            // The destination address is the last 16 bytes of the
-            // 40-byte long IPv6 header, so it is bytes 23-39
-            byte[] destinationAddressBytes = new byte[16];
-            Array.ConstrainedCopy(packet,
-                                  23,
-                                  destinationAddressBytes,
-                                  0,
-                                  16
-                                  );
-            return new IPAddress(destinationAddressBytes);
+            if (packet.Length >= 49)
+            {
+                // Get the destination IPv6 address from the packet.
+                // The destination address is the last 16 bytes of the
+                // 40-byte long IPv6 header, so it is bytes 23-39
+                byte[] destinationAddressBytes = new byte[16];
+                Array.ConstrainedCopy(packet,
+                                      23,
+                                      destinationAddressBytes,
+                                      0,
+                                      16
+                                      );
+                return new IPAddress(destinationAddressBytes);
+            }
+
+            Debug.WriteLine("Packet was not long enough to extract " +
+                            " IPv6 destination address."
+                            );
+            return null;
         }
         #endregion
     }

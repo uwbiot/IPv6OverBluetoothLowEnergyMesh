@@ -73,8 +73,11 @@
         <Button x:Name="Button_9_Purge_Mesh_List" Content="Purge mesh list" Grid.Column="2" Grid.Row="3"
             Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
             Width="195" FontSize="18" FontWeight="Normal" Click="Button_9_Purge_Mesh_List_Click"/>
-        <Button x:Name="Button_10_send_udp_packet" Content="Send UDP Packet" Grid.Column="2"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Margin="0,0,0,0" Click="Button_10_send_udp_packet_Click"/>
+        <Button x:Name="Button_10_send_udp_packet" Content="Send UDP Packet"
+            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Height="96" 
+            Width="195" FontSize="18" FontWeight="Normal" Margin="409,220,0,0" Click="Button_10_send_udp_packet_Click" Grid.ColumnSpan="2" Grid.RowSpan="2" Grid.Row="1"/>
+        <Button x:Name="Button_11_query_mesh_role" Content="Query mesh role"
+            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Height="96" 
+            Width="195" FontSize="18" FontWeight="Normal" Margin="404,220,0,0" Grid.ColumnSpan="2" Grid.RowSpan="2" Grid.Row="1" Grid.Column="1" Click="Button_11_query_mesh_role_Click"/>
     </Grid>
 </Page>

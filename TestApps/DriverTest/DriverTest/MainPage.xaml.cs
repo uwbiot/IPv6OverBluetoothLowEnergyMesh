@@ -446,19 +446,100 @@ namespace DriverTest
 
         private void Button_10_send_udp_packet_Click(object sender, RoutedEventArgs e)
         {
-            Socket sock = new Socket(AddressFamily.InterNetworkV6, 
-                                     SocketType.Dgram,
-                                     ProtocolType.Udp
-                                     );
+            //Socket sock = new Socket(AddressFamily.InterNetworkV6,
+            //                         SocketType.Dgram,
+            //                         ProtocolType.Udp
+            //                         );
 
-            IPAddress serverAddr = IPAddress.Parse("fe80::3ff8:d2ff:feeb:27b8%2");
+            //IPAddress serverAddr = IPAddress.Parse("fe80::3ff8:d2ff:feeb:27b8%2");
 
-            IPEndPoint endPoint = new IPEndPoint(serverAddr, 11000);
+            //IPEndPoint endPoint = new IPEndPoint(serverAddr, 11000);
 
-            string text = "Hello";
-            byte[] send_buffer = Encoding.ASCII.GetBytes(text);
+            //string text = "Hello";
+            //byte[] send_buffer = Encoding.ASCII.GetBytes(text);
 
-            sock.SendTo(send_buffer, endPoint);
+            //sock.SendTo(send_buffer, endPoint);
+
+            SendUdp(11000, "fe80::3ff8:d2ff:feeb:27b8%2", 11000, Encoding.ASCII.GetBytes("Hello"));
+        }
+
+        private static void SendUdp(
+            int     sourcePort,
+            String  destinationIPv6Address,
+            int     destinationPort,
+            byte[]  packet
+        )
+        {
+            using (UdpClient client = new UdpClient(sourcePort))
+            {
+                client.Send(packet,
+                            packet.Length,
+                            destinationIPv6Address,
+                            destinationPort
+                            );
+            }
+        }
+
+        private void Button_11_query_mesh_role_Click(object sender, RoutedEventArgs e)
+        {
+            //
+            // Step 1
+            // Open the handle to the driver for synchronous I/O
+            //
+            SafeFileHandle device = null;
+            try
+            {
+                device = DeviceIO.OpenDevice("\\\\.\\IPv6ToBle", false);
+            }
+            catch
+            {
+                int code = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Could not open a handle to the driver, " +
+                                    "error code: " + code.ToString()
+                                    );
+                return;
+            }
+
+            //
+            // Step 2
+            // Ask the driver what this device's role is
+
+            // Send the IOCTL
+            bool isBorderRouter = false;
+            bool result = false;
+            try
+            {
+                result = DeviceIO.SynchronousControl(device,
+                                                      IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_QUERY_MESH_ROLE,
+                                                      out isBorderRouter
+                                                      );
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            
+            if (!result)
+            {
+                int error = Marshal.GetLastWin32Error();
+
+                DisplayErrorDialog("Querying driver for mesh role failed " +
+                                   "with this error code: " + error.ToString()
+                                   );
+            }
+            else
+            {
+                // The operation succeeded, now check the role
+                if (isBorderRouter)
+                {
+                    DisplayErrorDialog("This device is a border router.");
+                }
+                else
+                {
+                    DisplayErrorDialog("This device is not a border router.");
+                }
+            }
         }
     }
 }
