@@ -459,9 +459,12 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             {
                 Debug.WriteLine("Got a packet! Contents: " + Utilities.BytesToString(packet));
                 IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
-                SendPacketOverBluetoothLE(packet,
-                                          destinationAddress
-                                          );
+                if(destinationAddress != null)
+                {
+                    SendPacketOverBluetoothLE(packet,
+                                              destinationAddress
+                                              );
+                }                
             }
             else
             {
@@ -513,17 +516,24 @@ namespace IPv6ToBlePacketProcessingForIoTCore
 
         internal IPAddress GetDestinationAddressFromPacket(byte[] packet)
         {
-            // Get the destination IPv6 address from the packet.
-            // The destination address is the last 16 bytes of the
-            // 40-byte long IPv6 header, so it is bytes 23-39
-            byte[] destinationAddressBytes = new byte[16];
-            Array.ConstrainedCopy(packet,
-                                  23,
-                                  destinationAddressBytes,
-                                  0,
-                                  16
-                                  );
-            return new IPAddress(destinationAddressBytes);
+            if(packet.Length >= 49)
+            {
+                // Get the destination IPv6 address from the packet.
+                // The destination address is the last 16 bytes of the
+                // 40-byte long IPv6 header, so it is bytes 23-39
+                byte[] destinationAddressBytes = new byte[16];
+                Array.ConstrainedCopy(packet,
+                                      23,
+                                      destinationAddressBytes,
+                                      0,
+                                      16
+                                      );
+                return new IPAddress(destinationAddressBytes);
+            }
+
+            Debug.WriteLine("Packet was not long enough to extract an IPv6 " +
+                            "destination address.");
+            return null;
         }
         #endregion
     }
