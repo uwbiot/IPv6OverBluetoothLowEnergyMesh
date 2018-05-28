@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -78,8 +79,21 @@ namespace IPv6ToBleAdvLibraryForUWP
             // the publisher
             publisher.StatusChanged += OnPublisherStatusChanged;
 
-            // Start the publisher
+            // Start the publisher if resources are available to do so. It may
+            // take a second to get started. This cannot run if other code is
+            // using the Bluetooth radio, such as the GATT server.
             publisher.Start();
+
+            if (publisher.Status == BluetoothLEAdvertisementPublisherStatus.Started)
+            {
+                Debug.WriteLine("Packet receiver advertisement publisher started.");
+            }
+            else
+            {
+                Debug.WriteLine("An error occurred when starting the advertisement" +
+                                "publisher. Status: " + publisher.Status.ToString()
+                                );
+            }
         }
 
         // Stops publishing advertisements
@@ -105,6 +119,7 @@ namespace IPv6ToBleAdvLibraryForUWP
         {
             if(eventArgs.Status == BluetoothLEAdvertisementPublisherStatus.Aborted)
             {
+                Debug.WriteLine("Advertisemen publisher aborted. Restarting.");
                 publisher.Start();
             }
         }

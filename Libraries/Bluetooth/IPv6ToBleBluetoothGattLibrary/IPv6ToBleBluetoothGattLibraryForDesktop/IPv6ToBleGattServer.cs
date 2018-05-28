@@ -35,11 +35,10 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         // Boolean trackers to verify the GATT server device's radio supports
         // the GAP peripheral and central roles
         private bool isPeripheralRoleSupported;
-        private bool isCentralRoleSupported;
 
         // Our two services
-        InternetProtocolSupportService internetProtocolSupportService = new InternetProtocolSupportService();
-        IPv6ToBlePacketProcessingService packetProcessingService = new IPv6ToBlePacketProcessingService();
+        public InternetProtocolSupportService InternetProtocolSupportService = new InternetProtocolSupportService();
+        public IPv6ToBlePacketProcessingService PacketProcessingService = new IPv6ToBlePacketProcessingService();
 
         #endregion
 
@@ -70,8 +69,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             // Step 2
             // Initialize the IPSS
             //
-            await internetProtocolSupportService.InitAsync();
-            if(internetProtocolSupportService == null)
+            await InternetProtocolSupportService.InitAsync();
+            if(InternetProtocolSupportService == null)
             {
                 Debug.WriteLine("Error creating the Internet Protocol Support" +
                                 " Service."
@@ -83,8 +82,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             // Step 3
             // Initialize the packet processing service
             //
-            await packetProcessingService.InitAsync();
-            if(packetProcessingService == null)
+            await PacketProcessingService.InitAsync();
+            if(PacketProcessingService == null)
             {
                 Debug.WriteLine("Error creating the IPv6ToBle packet " +
                                 "processing service."
@@ -96,8 +95,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
             // Step 4
             // Start advertising the services
             //
-            internetProtocolSupportService.Start(isPeripheralRoleSupported);
-            packetProcessingService.Start(isPeripheralRoleSupported);
+            InternetProtocolSupportService.Start(isPeripheralRoleSupported);
+            PacketProcessingService.Start(isPeripheralRoleSupported);
 
             return true;
         }
@@ -106,8 +105,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
         public void Stop()
         {
             // Stop the services
-            internetProtocolSupportService.Stop();
-            packetProcessingService.Stop();
+            InternetProtocolSupportService.Stop();
+            PacketProcessingService.Stop();
         }
 
         #endregion

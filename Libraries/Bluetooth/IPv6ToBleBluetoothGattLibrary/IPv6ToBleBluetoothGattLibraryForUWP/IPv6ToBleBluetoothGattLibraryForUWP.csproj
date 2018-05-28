@@ -109,13 +109,14 @@
     <Compile Include="Characteristics\GenericGattCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBleIPv6AddressCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBlePacketWriteCharacteristic.cs" />
+    <Compile Include="Client\PacketWriter.cs" />
     <Compile Include="Helpers\BluetoothRoleSupport.cs" />
     <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\CreateServiceException.cs" />
     <Compile Include="Helpers\GattHelpers.cs" />
     <Compile Include="Helpers\Utilities.cs" />
-    <Compile Include="IPv6ToBleGattPairing.cs" />
-    <Compile Include="IPv6ToBleGattServer.cs" />
+    <Compile Include="Client\DeviceEnumerator.cs" />
+    <Compile Include="Server\GattServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\GenericGattService.cs" />
     <Compile Include="Services\InternetProtocolSupportService.cs" />

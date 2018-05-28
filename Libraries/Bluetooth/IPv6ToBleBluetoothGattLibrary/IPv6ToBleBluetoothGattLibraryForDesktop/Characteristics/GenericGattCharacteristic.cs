@@ -213,6 +213,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
                             $"Offset: {request.Offset}"
                             );
 
+            deferral.Complete();
+
             Debug.WriteLine("base.Characteristic_ReadRequested Exit");
         }
 
@@ -282,6 +284,8 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop.Characteristics
             {
                 Debug.WriteLine($"Write completed; value is now {Utilities.BytesToString(data)}");
             }
+
+            deferral.Complete();
 
             Debug.WriteLine("base.Characteristic_WriteRequested Exit");
         }

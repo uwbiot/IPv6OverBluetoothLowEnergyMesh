@@ -1,54 +1,76 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Net;
 
-namespace IPv6ToBleBluetoothGattLibraryForUWP
+//
+// Namespaces in this project
+//
+using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
+
+//
+// Bluetooth and device enumeration namespaces
+//
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using Windows.Devices.Enumeration;
+
+namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 {
-    //
-    // Namespaces in this project
-    //
-    using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
-
-    //
-    // Bluetooth and device enumeration namespaces
-    //
-    using Windows.Devices.Bluetooth;
-    using Windows.Devices.Bluetooth.GenericAttributeProfile;
-    using Windows.Devices.Enumeration;
-    using Windows.Storage.Streams;
-
-
     /// <summary>
-    /// This class represents GATT client functionality for non-advertisement
-    /// needs. Primarily, this would be used by the GUI provisioning agent app.
+    /// This class represents GATT client functionality to search for and
+    /// connect to nearby GATT servers. It also filters out supported devices;
+    /// that is, devices that are running the IPv6ToBle packet processing
+    /// service and the Internet Protocol Support Service (IPSS).
+    /// 
+    /// Callers use this class upon startup to discover nearby supported
+    /// devices, facilitating subsequent connections to discovered devices
+    /// later in an on-demand fashion.
     /// </summary>
-    public class IPv6ToBleGattPairing
+    public class DeviceEnumerator
     {
 
         #region Local Variables
         //---------------------------------------------------------------------
-        // Local variables for device discovery
+        // Variables for device discovery
         //---------------------------------------------------------------------
 
         // List to store found devices
         private List<DeviceInformation> foundDevices = new List<DeviceInformation>();
 
         // Bool to track if enumeration is complete for caller
-        private bool isEnumerationComplete = false;
+        private bool enumerationComplete = false;
 
         // Getter for isEnumerationComplete
-        public bool IsEnumerationComplete
+        private bool EnumerationComplete
         {
             get
             {
-                return isEnumerationComplete;
+                return enumerationComplete;
             }
-            private set { }
+            set
+            {
+                if(enumerationComplete != value)
+                {
+                    enumerationComplete = value;
+                    EnumerationCompleteChanged(new PropertyChangedEventArgs("EnumerationComplete"));
+                }
+            }
         }
+
+        // Callback to invoke public event to signify that enumeration is 
+        // complete
+        private void EnumerationCompleteChanged(PropertyChangedEventArgs args)
+        {
+            EnumerationCompleted?.Invoke(this, args);
+        }
+
+        // Public event to let a caller know when enumeration is complete
+        public event PropertyChangedEventHandler EnumerationCompleted;
 
         // Counter for number of found devices
         private int count = 0;
@@ -57,16 +79,16 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
         private DeviceWatcher deviceWatcher;
 
         //---------------------------------------------------------------------
-        // Local variables for enumerating GATT services
+        // Variables for filtering found devices
         //---------------------------------------------------------------------
 
         // Dictionary of Bluetooth LE device objects and their IP addresses to 
         // match found device information
-        private Dictionary<DeviceInformation, IPAddress> supportedBleDevices = new Dictionary<DeviceInformation, IPAddress>();
+        private Dictionary<IPAddress, DeviceInformation> supportedBleDevices = new Dictionary<IPAddress, DeviceInformation>();
 
         // Getter and setter for list of supported BLE devices (available to
         // caller)
-        public Dictionary<DeviceInformation, IPAddress> SupportedBleDevices
+        public Dictionary<IPAddress, DeviceInformation> SupportedBleDevices
         {
             get
             {
@@ -84,7 +106,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
 
         #endregion
 
-        #region Device Discovery for Pairing
+        #region Device Discovery
         //---------------------------------------------------------------------
         // Methods for device discovery
         //---------------------------------------------------------------------
@@ -183,7 +205,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
                 // Make sure the device isn't already in the list
                 if(!foundDevices.Contains(deviceInfo))
                 {
-                    foundDevices[count] = deviceInfo;
+                    foundDevices.Add(deviceInfo);
                     count++;
                 }
             }
@@ -255,9 +277,13 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             DeviceWatcher   sender,
             object          args
         )
-        {
-            isEnumerationComplete = true;
+        {            
             Debug.WriteLine("Enumeration complete.");
+
+            EnumerationComplete = true;
+
+            // Reset count for next time
+            count = 0;
         }
         #endregion
 
@@ -272,7 +298,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
         // services, then only adds devices to the list that support both the
         // IPSSS and our IPv6ToBle packet writing service. This method is 
         // called after the initial device discovery phase.
-        public async void PopulateSupportedDevices()
+        public async Task PopulateSupportedDevices()
         {
             //
             // Step 1
@@ -431,9 +457,16 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
                     // dictionary
                     if (ipv6Address != null)
                     {
-                        supportedBleDevices.Add(deviceInfo, ipv6Address);
+                        supportedBleDevices.Add(ipv6Address, deviceInfo);
                     }
                 }
+
+                // Dispose of the device so Windows doesn't maintain a
+                // connection; the caller will reconnect later if needed
+                //if (currentDevice != null)
+                //{
+                //    currentDevice.Dispose();
+                //}
             }
         }
         #endregion

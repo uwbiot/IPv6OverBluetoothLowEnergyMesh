@@ -13,7 +13,7 @@ using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 
-namespace IPv6ToBleBluetoothGattLibraryForUWP
+namespace IPv6ToBleBluetoothGattLibraryForUWP.Server
 {
     /// <summary>
     /// Class for setting up and running GATT services on any device acting as
@@ -25,7 +25,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
     /// This class spins up and runs the Internet Protocol Support Service
     /// (IPSS) and the IPv6ToBlePacketProcessingService.
     /// </summary>
-    public class IPv6ToBleGattServer
+    public class GattServer
     {
         #region Local variables
         //---------------------------------------------------------------------
@@ -35,11 +35,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
         // Boolean trackers to verify the GATT server device's radio supports
         // the GAP peripheral and central roles
         private bool isPeripheralRoleSupported;
-        private bool isCentralRoleSupported;
 
         // Our two services
-        InternetProtocolSupportService internetProtocolSupportService = new InternetProtocolSupportService();
-        IPv6ToBlePacketProcessingService packetProcessingService = new IPv6ToBlePacketProcessingService();
+        public InternetProtocolSupportService InternetProtocolSupportService = new InternetProtocolSupportService();
+        public IPv6ToBlePacketProcessingService PacketProcessingService = new IPv6ToBlePacketProcessingService();
 
         #endregion
 
@@ -71,8 +70,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             // Step 2
             // Initialize the IPSS
             //
-            await internetProtocolSupportService.InitAsync();
-            if(internetProtocolSupportService == null)
+            await InternetProtocolSupportService.InitAsync();
+            if(InternetProtocolSupportService == null)
             {
                 Debug.WriteLine("Error creating the Internet Protocol Support" +
                                 " Service."
@@ -84,8 +83,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             // Step 3
             // Initialize the packet processing service
             //
-            await packetProcessingService.InitAsync();
-            if(packetProcessingService == null)
+            await PacketProcessingService.InitAsync();
+            if(PacketProcessingService == null)
             {
                 Debug.WriteLine("Error creating the IPv6ToBle packet " +
                                 "processing service."
@@ -97,8 +96,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
             // Step 4
             // Start advertising the services
             //
-            internetProtocolSupportService.Start(isPeripheralRoleSupported);
-            packetProcessingService.Start(isPeripheralRoleSupported);
+            InternetProtocolSupportService.Start(false);
+            PacketProcessingService.Start(isPeripheralRoleSupported);
 
             return true;
         }
@@ -107,8 +106,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP
         public void Stop()
         {
             // Stop the services
-            internetProtocolSupportService.Stop();
-            packetProcessingService.Stop();
+            InternetProtocolSupportService.Stop();
+            PacketProcessingService.Stop();
         }
 
         #endregion

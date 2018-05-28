@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 
-namespace IPv6ToBleBluetoothGattLibraryForDesktop
+namespace IPv6ToBleBluetoothGattLibraryForDesktop.Helpers
 {
     /// <summary>
     /// Constant definitions for the IPv6ToBle packet writing service

@@ -26,7 +26,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
     /// This class represents GATT client functionality for non-advertisement
     /// needs. Primarily, this would be used by the GUI provisioning agent app.
     /// </summary>
-    public class IPv6ToBleGattPairing
+    public class IPv6ToBleDeviceEnumerator
     {
 
         #region Local Variables
@@ -84,7 +84,7 @@ namespace IPv6ToBleBluetoothGattLibraryForDesktop
 
         #endregion
 
-        #region Device Discovery for Pairing
+        #region Device Discovery
         //---------------------------------------------------------------------
         // Methods for device discovery
         //---------------------------------------------------------------------

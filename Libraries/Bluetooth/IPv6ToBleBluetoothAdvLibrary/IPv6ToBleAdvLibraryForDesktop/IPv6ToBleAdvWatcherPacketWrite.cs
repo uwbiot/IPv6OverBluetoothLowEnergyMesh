@@ -147,8 +147,8 @@ namespace IPv6ToBleAdvLibraryForDesktop
         /// <param name="destinationAddress">The destination address of the packet.</param>
         /// <param name="staticRoutingTable">The local host's static routing table of devices in the subnet.</param>
         public void Start(
-            byte[]                                  packet,
-            IPAddress                               destinationAddress
+            byte[]      packet,
+            IPAddress   destinationAddress
         )
         {
             //
@@ -220,12 +220,13 @@ namespace IPv6ToBleAdvLibraryForDesktop
         // will keep running forever, leak resources, and consume power.
         public void Stop()
         {
-            // Stop the watcher
-            watcher.Stop();
-
             // Unhook event handlers to prevent resource leaks
             watcher.Received -= OnAdvertisementReceived;
             watcher.Stopped -= OnAdvertisementStopped;
+
+            // Stop the watcher
+            watcher.Stop();
+            watcher = null;
         }
 
         #endregion
@@ -281,10 +282,12 @@ namespace IPv6ToBleAdvLibraryForDesktop
             {
                 // There should only be one if it's one of our advertisements
                 BluetoothLEManufacturerData manufacturerData = manufacturerDataList[0];
-                
+
                 // Verify it's the IPv6ToBle manufacturer name
-                string manufacturerDataString = manufacturerData.CompanyId.ToString();
-                if(manufacturerDataString != "IPv6ToBle")
+                string manufacturerDataCompanyId = string.Format("0x{0}",
+                                                                 manufacturerData.CompanyId.ToString("X")
+                                                                 );
+                if (manufacturerDataCompanyId != "0xDEDE")
                 {
                     status = BluetoothError.OtherError;
                     Debug.WriteLine("Manufacturer Company ID did not match " +

@@ -129,7 +129,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Services
             //
 
             // Generate the device's link-local IPv6 address
-            IPAddress address = await IPv6AddressFromBluetoothAddress.GenerateAsync(2);
+            IPAddress address = await StatelessAddressConfiguration.GenerateLinkLocalAddressFromBlThRadioIdAsync(2);
             if(address == null)
             {
                 Debug.WriteLine("Could not generate a link-local IPv6 address" +
