@@ -226,7 +226,7 @@
     </Link>
     <PkgGen />
     <PkgGen>
-      <Version>1.0.0.3</Version>
+      <Version>1.0.0.4</Version>
     </PkgGen>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
@@ -258,6 +258,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <PkgGen Include="Package.pkg.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

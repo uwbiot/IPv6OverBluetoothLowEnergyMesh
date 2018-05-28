@@ -87,4 +87,7 @@
   <ItemGroup>
     <Text Include="..\ReadMe.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <PkgGen Include="Package.pkg.xml" />
+  </ItemGroup>
 </Project>
