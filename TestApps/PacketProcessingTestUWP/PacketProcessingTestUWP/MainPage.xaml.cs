@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 
 using Microsoft.Win32.SafeHandles;
 
+using Windows.Devices.Enumeration;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI.Xaml;
@@ -26,8 +27,8 @@ using Windows.ApplicationModel.Background;
 //
 // Namespaces for this project
 //
-using IPv6ToBleBluetoothGattLibraryForUWP;
-using IPv6ToBleAdvLibraryForUWP;
+using IPv6ToBleBluetoothGattLibraryForUWP.Client;
+using IPv6ToBleBluetoothGattLibraryForUWP.Server;
 using IPv6ToBleBluetoothGattLibraryForUWP.Characteristics;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using IPv6ToBleSixLowPanLibraryForUWP;
@@ -46,11 +47,6 @@ namespace PacketProcessingTestUWP
         // General variables
         //---------------------------------------------------------------------
 
-        // Booleans to track whether the packet has finished transmitting, and
-        // whether it was successful
-        private bool packetTransmissionFinished = false;
-        private bool packetTransmittedSuccessfully = false;
-
         // A list of this device's link-local IPv6 addresses (in case it has
         // more than one adapter with an IPv6 address)
         private List<IPAddress> localIPv6AddressesForDesktop = null;
@@ -64,17 +60,32 @@ namespace PacketProcessingTestUWP
 
         // The GATT server to receive packets and provide information to
         // remote devices
-        private IPv6ToBleGattServer gattServer = null;
+        //private IPv6ToBleGattServer gattServer = null;
 
-        // A Bluetooth Advertisement publisher to let nearby devices know we 
-        // can receive a packet
-        private IPv6ToBleAdvPublisherPacketReceive packetReceiver = null;
+        // The local packet write characteristic, part of the packet processing
+        // service in the GATT server
+        //private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
 
         // A FIFO queue of recent messages/packets to use with managed flooding
         private Queue<byte[]> messageCache = null;
 
+        // A lock for sending a packet over BLE, to prevent race conditions
+        // where multiple threads receiving packets from the driver try to 
+        // send packets out
+        private object bleSendingLock = new object();
+
         // Testing count for sending requests
         private int count = 0;
+
+        // A device enumerator to find nearby devices on startup
+        private DeviceEnumerator enumerator;
+
+        // Dictionary of Bluetooth LE device objects and their IP addresses to 
+        // match found device information
+        private Dictionary<IPAddress, DeviceInformation> supportedBleDevices = new Dictionary<IPAddress, DeviceInformation>();
+
+        // Tracker to know when device enumeration is complete
+        private bool enumerationCompleted = false;
 
         #endregion
 
@@ -119,7 +130,7 @@ namespace PacketProcessingTestUWP
             //bool gattServerStarted = false;
             //try
             //{
-            //    gattServerStarted = Task.Run(gattServer.StartAsync).Result;
+            //    gattServerStarted = await gattServer.StartAsync();
             //}
             //catch (Exception ex)
             //{
@@ -132,26 +143,35 @@ namespace PacketProcessingTestUWP
             //    overallStatusBox.Text = "Could not start the GATT server.";
             //    throw new Exception();
             //}
+            //else
+            //{
+            //    Debug.WriteLine("GATT server started.");
+            //}
+
+            //// Get a handle to the local packet write characteristic
+            //localPacketWriteCharacteristic = gattServer.PacketProcessingService.PacketWriteCharacteristic;
+
+            //// Subscribe to the characteristic's "packet received" event
+            //localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;
 
             //
             // Step 4
-            // Set up the Bluetooth advertiser to let neighbors know we can
-            // receive a packet if need be. For testing, this is always on.
+            // Enumerate nearby supported devices
             //
-            //packetReceiver = new IPv6ToBleAdvPublisherPacketReceive();
-            //packetReceiver.Start();
+            await EnumerateNearbySupportedDevices();
 
             //
-            // Step 6
+            // Step 5
             // Initialize the message cache for 10 messages
             //
             messageCache = new Queue<byte[]>(10);
-            
+
             //
-            // Step 7
+            // Step 6
             // Send 10 initial listening requests to the driver
             //
-            for(int i = 0; i < 10; i++)
+            //for(int i = 0; i < 10; i++)
+            for (int i = 0; i < 1; i++)
             {
                 Debug.WriteLine($"Sending listening request {++count}");
                 SendListenRequestToDriver();
@@ -167,40 +187,98 @@ namespace PacketProcessingTestUWP
             // Step 1
             // Shut down Bluetooth resources upon exit
             //
-            if (packetReceiver != null)
+
+            // Unsubscribe from the local packet write characteristic's
+            // packet received event
+            // localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+
+            //
+            // Step 2
+            // Stop device enumeration if it is still in progress when this
+            // background app is canceled
+            //
+            if (enumerator != null)
             {
-                packetReceiver.Stop();
+                enumerator.StopSupportedDeviceEnumerator();
+                enumerator.EnumerationCompleted -= WatchForEnumerationCompletion;
             }
 
             overallStatusBox.Text = "Stopped.";
         }
         #endregion
 
-        #region Bluetooth advertisement event listeners
+        #region Device discovery helpers
 
         /// <summary>
-        /// Awaits the asynchronous packet transmission operations by listening
-        /// for the event from the Adv watcher that signals whether the packet
-        /// transmitted successfully.
-        /// 
-        /// This is so a client can know when the packet has finished the
-        /// transmission process.
+        /// Finds nearby devices that are running the Internet Protocol Support
+        /// Service (IPSS) and the IPv6ToBle packet processing service.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="eventArgs"></param>
-        /// <returns></returns>
-        private void WatchForPacketTransmission(
-            IPv6ToBleAdvWatcherPacketWrite sender,
-            PropertyChangedEventArgs eventArgs
-        )
+        private async Task EnumerateNearbySupportedDevices()
         {
-            if (eventArgs.PropertyName == "TransmittedSuccessfully")
+            // Start the supported device enumerator and subscribe to the
+            // EnumerationCompleted event
+            enumerator = new DeviceEnumerator();
+
+            Debug.WriteLine("Looking for nearby supported devices...");
+
+            enumerator.EnumerationCompleted += WatchForEnumerationCompletion;
+            enumerator.StartSupportedDeviceEnumerator();
+
+            // Spin while enumeration is in progress
+            while (!enumerationCompleted) ;
+
+            Debug.WriteLine("Enumeration of nearby supported devices" +
+                            " complete."
+                            );            
+
+            // Stop the device watcher            
+            enumerator.StopSupportedDeviceEnumerator();
+
+            // Filter found devices for supported ones
+            Debug.WriteLine("Filtering devices for supported services...");
+
+            await enumerator.PopulateSupportedDevices();
+
+            Debug.WriteLine("Filtering for supported devices complete.");
+
+            if (enumerator.SupportedBleDevices != null)
             {
-                packetTransmissionFinished = true;
-                packetTransmittedSuccessfully = sender.TransmittedSuccessfully;
+                supportedBleDevices = enumerator.SupportedBleDevices;
+                Debug.WriteLine($"Found {supportedBleDevices.Count} devices");
+            }
+            else
+            {
+                Debug.WriteLine("No nearby supported devices found.");
             }
 
+            if (enumerator != null)
+            {
+                enumerator.EnumerationCompleted -= WatchForEnumerationCompletion;
+                enumerator = null;
+            }
         }
+
+        /// <summary>
+        /// A small helper method to watch for the device watcher's enumeration
+        /// completion event.
+        /// </summary>
+        private void WatchForEnumerationCompletion(
+            object                      sender,
+            PropertyChangedEventArgs    eventArgs
+        )
+        {
+            if(sender.GetType() == typeof(DeviceEnumerator))
+            {
+                if (eventArgs.PropertyName == "EnumerationComplete")
+                {
+                    enumerationCompleted = true;
+                }
+            }            
+        }
+
+        #endregion
+
+        #region Packet event listeners
 
         /// <summary>
         /// Awaits the reception of a packet on the packet write characteristic
@@ -212,92 +290,91 @@ namespace PacketProcessingTestUWP
         /// <param name="sender"></param>
         /// <param name="eventArgs"></param>
         private void WatchForPacketReception(
-            IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic,
-            PropertyChangedEventArgs eventArgs
+            object                      sender,
+            PropertyChangedEventArgs    eventArgs
         )
         {
-            if (eventArgs.PropertyName == "Packet")
-            {
-                byte[] packet = localPacketWriteCharacteristic.Packet;
+            //if (sender == localPacketWriteCharacteristic)
+            //{
+            //    if (eventArgs.PropertyName == "Packet")
+            //    {
+            //        byte[] packet = localPacketWriteCharacteristic.Packet;
 
-                // Only send it back out if this device is not the destination;
-                // in other words, if this device is a middle router in the
-                // subnet
-                IPAddress destinationAddress = GetDestinationAddressFromPacket(
-                                                    packet
-                                                );
+            //        Debug.WriteLine("Received this packet over " +
+            //                         "Bluetooth: " + Utilities.BytesToString(packet));
 
-                // Check if the packet is NOT for this device
-                bool packetIsForThisDevice = false;
+            //        // Only send it back out if this device is not the destination;
+            //        // in other words, if this device is a middle router in the
+            //        // subnet
+            //        IPAddress destinationAddress = GetDestinationAddressFromPacket(
+            //                                            packet
+            //                                        );
 
-                packetIsForThisDevice = IPAddress.Equals(destinationAddress, generatedLocalIPv6AddressForNode);
+            //        // Check if the packet is NOT for this device
+            //        bool packetIsForThisDevice = false;
 
-                //foreach (IPAddress address in localIPv6AddressesForDesktop)
-                //{
-                //    if (IPAddress.Equals(address, destinationAddress))
-                //    {
-                //        packetIsForThisDevice = true;
-                //    }
-                //}
+            //        packetIsForThisDevice = IPAddress.Equals(destinationAddress, generatedLocalIPv6AddressForNode);
 
-                if (!packetIsForThisDevice)
-                {
-                    // Check if the message is in the local message cache or not
-                    if (messageCache.Contains(packet))
-                    {
-                        Debug.WriteLine("This packet has been seen before.");
-                        return;
-                    }
+            //        if (!packetIsForThisDevice)
+            //        {
+            //            // Check if the message is in the local message cache or not
+            //            if (messageCache.Contains(packet))
+            //            {
+            //                Debug.WriteLine("This packet is not for this device and" +
+            //                                " has been seen before."
+            //                                );
+            //                return;
+            //            }
 
-                    // If this message has not been seen before, add it to the
-                    // message queue and remove the oldest if there would now
-                    // be more than 10
-                    if (messageCache.Count < 10)
-                    {
-                        messageCache.Enqueue(packet);
-                    }
-                    else
-                    {
-                        messageCache.Dequeue();
-                        messageCache.Enqueue(packet);
-                    }
+            //            // If this message has not been seen before, add it to the
+            //            // message queue and remove the oldest if there would now
+            //            // be more than 10
+            //            if (messageCache.Count < 10)
+            //            {
+            //                messageCache.Enqueue(packet);
+            //            }
+            //            else
+            //            {
+            //                messageCache.Dequeue();
+            //                messageCache.Enqueue(packet);
+            //            }
 
-                    SendPacketOverBluetoothLE(packet, destinationAddress);
-                }
-                else
-                {
-                    // It's for this device. Check if it has been seen before
-                    // or not.
+            //           await SendPacketOverBluetoothLE(packet,
+            //                                           destinationAddress
+            //                                           );
+            //        }
+            //        else
+            //        {
+            //            // It's for this device. Check if it has been seen before
+            //            // or not.
 
-                    // Check if the message is in the local message cache or not
-                    if (messageCache.Contains(packet))
-                    {
-                        //Debug.WriteLine("This packet has been seen before.");
-                        overallStatusBox.Text = "This packet has been seen before.";
-                        return;
-                    }
+            //            // Check if the message is in the local message cache or not
+            //            if (messageCache.Contains(packet))
+            //            {
+            //                Debug.WriteLine("This packet is for this device, but " +
+            //                                "has been seen before."
+            //                                );
+            //                return;
+            //            }
 
-                    // If this message has not been seen before, add it to the
-                    // message queue and remove the oldest if there would now
-                    // be more than 10
-                    if (messageCache.Count < 10)
-                    {
-                        messageCache.Enqueue(packet);
-                    }
-                    else
-                    {
-                        messageCache.Dequeue();
-                        messageCache.Enqueue(packet);
-                    }
+            //            // If this message has not been seen before, add it to the
+            //            // message queue and remove the oldest if there would now
+            //            // be more than 10
+            //            if (messageCache.Count < 10)
+            //            {
+            //                messageCache.Enqueue(packet);
+            //            }
+            //            else
+            //            {
+            //                messageCache.Dequeue();
+            //                messageCache.Enqueue(packet);
+            //            }
 
-                    // DISPLAY THE PACKET!!
-                    packetContentBox.Text = "Received this packet over " +
-                                            "Bluetooth: " + Utilities.BytesToString(packet);
-
-                    // Send the packet to the driver for inbound injection
-                    SendPacketToDriverForInboundInjection(packet);
-                }
-            }
+            //            // Send the packet to the driver for inbound injection
+            //            SendPacketToDriverForInboundInjection(packet);
+            //        }
+            //    }
+            // }
         }
 
         #endregion
@@ -308,55 +385,134 @@ namespace PacketProcessingTestUWP
         /// for advertisements from nearby servers who can receive the packet.
         /// </summary>
         /// <param name="packet"></param>
-        public void SendPacketOverBluetoothLE(
+        internal async Task SendPacketOverBluetoothLE(
             byte[] packet,
             IPAddress destinationAddress
         )
         {
-            overallStatusBox.Text = "Starting to send packet over BLE.";
+            Debug.WriteLine("Starting to send packet over BLE.");
 
-            // Create a packet watcher to watch for nearby recipients of the
-            // packet
-            IPv6ToBleAdvWatcherPacketWrite packetWriter = new IPv6ToBleAdvWatcherPacketWrite();
-
-            // Start the watcher. This causes it to write the
-            // packet when it finds a suitable recipient.
-            packetWriter.Start(packet,
-                               destinationAddress
-                               );
-
-            // Wait for the watcher to signal the event that the
-            // packet has transmitted. This should happen after the
-            // watcher receives an advertisement(s) OR a timeout of
-            // 5 seconds occurs.
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
-            while (stopwatch.Elapsed < TimeSpan.FromSeconds(5)) ;
-            stopwatch.Stop();
-
-            // Check transmission status
-            if (!packetTransmittedSuccessfully)
+            // 
+            // Step 1
+            // Check if there are any supported devices to which to write
+            //
+            if(supportedBleDevices == null || supportedBleDevices.Count == 0)
             {
-                transmissionStatusBox.Text = "Could not transmit this packet: " +
-                                            Utilities.BytesToString(packet) +
-                                            " to this address: " +
-                                            destinationAddress.ToString();
-            }
-            else
-            {
-                // We successfully transmitted the packet! Cue fireworks.
-                transmissionStatusBox.Text = "Successfully transmitted this " +
-                               "packet:" + Utilities.BytesToString(packet) +
-                                "to this address:" +
-                                destinationAddress.ToString();
+                // Re-scan if there is no one on record to which to send (as
+                // another device may have come online since the last time)
+                Debug.WriteLine("There were no remote devices to which to " +
+                                "write this packet. Re-scanning in case new" +
+                                " ones have come online since the last time."
+                                );
+
+                await EnumerateNearbySupportedDevices();
+
+                // If still nothing, then do nothing
+                if(supportedBleDevices == null || supportedBleDevices.Count == 0)
+                {
+                    Debug.WriteLine("Still no remote devices to which to " +
+                                    "write this packet. Aborting attempt."
+                                    );
+                    return;
+                }                
             }
 
-            // Stop the watcher
-            packetWriter.Stop();
+            //
+            // Step 2
+            // Check if the packet is for a device immediately in range of
+            // this device (optimization to avoid unnecessary future
+            // broadcasts if target is a neighbor of this device)
+            //
+            bool targetIsNeighbor = false;
+            bool packetTransmittedSuccessfully = false;
 
-            // Reset the packet booleans for next time
-            packetTransmissionFinished = false;
-            packetTransmittedSuccessfully = false;
+            foreach (IPAddress address in supportedBleDevices.Keys)
+            {
+                if(IPAddress.Equals(address, destinationAddress))
+                {
+                    targetIsNeighbor = true;
+
+                    try
+                    {
+                        // Send the packet to the device if it is the target
+                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(supportedBleDevices[address],
+                                                                                            packet
+                                                                                            );
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("Exception ocurred while trying to " +
+                                        "transmit the packet over BLE. \n" +
+                                        "Exception: " + e.Message
+                                        );
+                    }
+
+                    // Check transmission status
+                    if (!packetTransmittedSuccessfully)
+                    {
+                        Debug.WriteLine("Could not transmit this packet: " +
+                                        Utilities.BytesToString(packet) +
+                                        " to this address: " +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+                    else
+                    {
+                        // We successfully transmitted the packet! Cue fireworks.
+                        Debug.WriteLine("Successfully transmitted this " +
+                                        "packet:" + Utilities.BytesToString(packet) +
+                                        "to this address:" +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+
+                    break;
+                }
+            }
+
+            //
+            // Step 3
+            // Send the packet to all devices in range if the target is not an
+            // immediate neighbor
+            //
+            if(!targetIsNeighbor)
+            {
+                foreach(DeviceInformation device in supportedBleDevices.Values)
+                {
+                    try
+                    {
+                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
+                                                                                            packet
+                                                                                            );
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("Exception ocurred while trying to " +
+                                        "transmit the packet over BLE. \n" +
+                                        "Exception: " + e.Message
+                                        );
+                    }                    
+
+                    // Check transmission status
+                    if (!packetTransmittedSuccessfully)
+                    {
+                        Debug.WriteLine("Could not transmit this packet: " +
+                                        Utilities.BytesToString(packet) +
+                                        " to this address: " +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+                    else
+                    {
+                        // We successfully transmitted the packet! Cue fireworks.
+                        Debug.WriteLine("Successfully transmitted this " +
+                                       "packet:" + Utilities.BytesToString(packet) +
+                                        " to this address:" +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+                }
+            }            
         }
         #endregion
 
@@ -411,7 +567,7 @@ namespace PacketProcessingTestUWP
         /// This method is invoked by the thread pool thread that was waiting
         /// on the operation.
         /// </summary>
-        private unsafe void PacketListenCompletionCallback(
+        private async void PacketListenCompletionCallback(
             IAsyncResult result
         )
         {
@@ -428,8 +584,7 @@ namespace PacketProcessingTestUWP
             {
                 Debug.WriteLine("Exception occurred. Source: " +
                                  e.Source + " " + "Message: " +
-                                 e.Message + " " + "Stack trace: " +
-                                 e.StackTrace
+                                 e.Message
                                  );
                 return;
             }
@@ -444,15 +599,23 @@ namespace PacketProcessingTestUWP
                 IPAddress destinationAddress = GetDestinationAddressFromPacket(packet);
                 if (destinationAddress != null)
                 {
-                    SendPacketOverBluetoothLE(packet,
-                                              destinationAddress
-                                              );
+                    Debug.WriteLine("Packet received from driver. Packet length: " +
+                                    packet.Length + ", Destination: " + 
+                                    destinationAddress.ToString() + ", Contents: " +
+                                    Utilities.BytesToString(packet)
+                                    );
+
+                    await SendPacketOverBluetoothLE(packet,
+                                                    destinationAddress
+                                                    );
                 }
             }
             else
             {
-                overallStatusBox.Text = "Packet was null. Some error must have" +
-                                        "occurred. Nothing to send over BLE.";
+                Debug.WriteLine("Packet received from driver was null. Some " +
+                                "error must have occurred. Nothing to send over " +
+                                "BLE."
+                                );
                 return;
             }
 
@@ -460,11 +623,11 @@ namespace PacketProcessingTestUWP
             // Step 3
             // Send another listening request to the driver to replace this one
             //
-            Debug.WriteLine($"Sending listening request {++count}");
-            SendListenRequestToDriver();
+            //Debug.WriteLine($"Sending listening request {++count}");
+            //SendListenRequestToDriver();
         }
 
-        private unsafe void SendPacketToDriverForInboundInjection(byte[] packet)
+        private void SendPacketToDriverForInboundInjection(byte[] packet)
         {
             //
             // Step 1
