@@ -15,11 +15,12 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
     /// A class to construct a 128-bit link local IPv6 address from the local
     /// Bluetooth radio.
     /// </summary>
-    public class IPv6AddressFromBluetoothAddress
+    public static class StatelessAddressConfiguration
     {
         /// <summary>
-        /// Generates an IPv6 address from the 48-bit local Bluetooth radio
-        /// ID. 
+        /// Generates a 64-bit EUI IPv6 address suffix from the 
+        /// 48-bit local Bluetooth radio ID. This will be used later to be
+        /// appended to the border router's 64-bit prefix.
         /// 
         /// The basic principle is as follows:
         /// 
@@ -41,7 +42,9 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// because I'm terrible at bitwise operations so I don't use them.
         /// </summary>
         /// <returns></returns>
-        public static async Task<IPAddress> GenerateAsync(int scopeId)
+        public static async Task<IPAddress> GenerateLinkLocalAddressFromBlThRadioIdAsync(
+            int scopeId
+        )
         {
             //
             // Step 1

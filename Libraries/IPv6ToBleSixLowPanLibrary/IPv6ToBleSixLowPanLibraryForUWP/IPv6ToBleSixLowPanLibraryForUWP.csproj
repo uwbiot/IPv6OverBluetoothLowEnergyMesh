@@ -106,7 +106,8 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="IPv6AddressFromBluetoothAddress.cs" />
+    <Compile Include="HeaderCompression.cs" />
+    <Compile Include="StatelessAddressConfiguration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\IPv6ToBleSixLowPanLibraryForUWP.rd.xml" />
   </ItemGroup>

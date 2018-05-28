@@ -50,8 +50,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IPv6AddressFromBluetoothAddress.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StatelessAddressConfiguration.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
