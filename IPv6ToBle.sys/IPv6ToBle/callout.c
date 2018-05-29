@@ -1263,11 +1263,10 @@ Return Value:
     NTSTATUS status = STATUS_SUCCESS;
 
     // Node devices only filter outbound, so ignore direction flag
-#ifndef BORDER_ROUTER
-
-    UNREFERENCED_PARAMETER(direction);
-
-#endif  // BORDER_ROUTER
+    if (!gBorderRouterFlag)
+    {
+        UNREFERENCED_PARAMETER(direction);
+    }
 
     //
     // Step 1
@@ -1363,7 +1362,21 @@ Return Value:
 	}
 	else
 	{
-		filter.filterCondition = 0;
+        // For the non-border router, this will shunt ALL IPv6 outbound traffic
+        // to the callout
+
+        FWPM_FILTER_CONDITION0 filterCondition = { 0 };
+
+        filterCondition.fieldKey = FWPM_CONDITION_IP_DESTINATION_ADDRESS;
+        filterCondition.matchType = FWP_MATCH_EQUAL;
+        filterCondition.conditionValue.type = FWP_V6_ADDR_MASK;
+
+        // Zeroing out the address and mask ensures that ALL traffic is affected
+        FWP_V6_ADDR_AND_MASK localAddressAndMask = { 0 };
+        filterCondition.conditionValue.v6AddrMask = &localAddressAndMask;
+
+        // Add the filter condition to the filter
+        filter.filterCondition = &filterCondition;
 	}
 
     //
