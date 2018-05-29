@@ -443,7 +443,7 @@ namespace PacketProcessingTestUWP
                     {
                         Debug.WriteLine("Exception ocurred while trying to " +
                                         "transmit the packet over BLE. \n" +
-                                        "Exception: " + e.Message
+                                        "\tException message: " + e.Message
                                         );
                     }
 
@@ -452,7 +452,7 @@ namespace PacketProcessingTestUWP
                     {
                         Debug.WriteLine("Could not transmit this packet: " +
                                         Utilities.BytesToString(packet) +
-                                        " to this address: " +
+                                        "\n\t to this address: " +
                                         destinationAddress.ToString()
                                         );
                     }
@@ -461,7 +461,7 @@ namespace PacketProcessingTestUWP
                         // We successfully transmitted the packet! Cue fireworks.
                         Debug.WriteLine("Successfully transmitted this " +
                                         "packet:" + Utilities.BytesToString(packet) +
-                                        "to this address:" +
+                                        "\n\t to this address:" +
                                         destinationAddress.ToString()
                                         );
                     }

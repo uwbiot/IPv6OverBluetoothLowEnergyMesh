@@ -24,6 +24,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using System.ComponentModel;
 
 namespace DriverTest
 {
@@ -36,6 +37,40 @@ namespace DriverTest
         {
             this.InitializeComponent();
         }
+
+        // Private variables for performance testing
+        private volatile bool isTesting = false;
+        private Stopwatch stopwatch = new Stopwatch();
+
+        private volatile int numPacketsReceived = 0;
+        private object numPacketsReceivedLock = new object();
+
+        private volatile int numThreadsActive = 0;
+        private object numThreadsActiveLock = new object();
+
+        public int NumThreadsActive
+        {
+            get
+            {
+                return numThreadsActive;
+            }
+            set
+            {
+                if(numThreadsActive != value)
+                {
+                    numThreadsActive = value;
+                }
+                OnNumThreadsActiveChanged(new PropertyChangedEventArgs("NumThreadsActive"));
+            }
+        }
+
+        // Event to notify when the number of threads has changed
+        private void OnNumThreadsActiveChanged(PropertyChangedEventArgs args)
+        {
+            NumThreadsActiveChanged?.Invoke(this, args);
+        }
+
+        public event PropertyChangedEventHandler NumThreadsActiveChanged;
 
         /// <summary>
         /// Displays an error dialog since UI apps don't have console access.
@@ -57,12 +92,37 @@ namespace DriverTest
             });
         }
 
+        private bool isInputValid(out int desiredNumber)
+        {
+            bool isInputValid = int.TryParse(packetNumberInputBox.Text, out desiredNumber);
+            if (!isInputValid)
+            {
+                DisplayErrorDialog("Testing was not started or the number of" +
+                                   " desired packets was invalid. Try again."
+                                    );
+            }
+
+            return isInputValid;
+        }
+
         /// <summary>
         /// Sends IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 to the driver.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private unsafe void Button_1_Listen_Click(object sender, RoutedEventArgs e)
+        {
+            int desiredNumber;
+            if(isInputValid(out desiredNumber) && isTesting)
+            {
+                for (int i = 0; i < desiredNumber; i++)
+                {
+                    SendListeningRequestToDriver();
+                }
+            }            
+        }
+
+        private void SendListeningRequestToDriver()
         {
             //
             // Step 1
@@ -83,6 +143,11 @@ namespace DriverTest
                 return;
             }
 
+            lock (numThreadsActiveLock)
+            {
+                NumThreadsActive++;
+            }
+
             IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
         }
 
@@ -97,6 +162,11 @@ namespace DriverTest
             IAsyncResult result
         )
         {
+            lock(numThreadsActiveLock)
+            {
+                NumThreadsActive--;
+            }            
+
             //
             // Step 1
             // Retrieve the async result's...result
@@ -117,9 +187,17 @@ namespace DriverTest
             // Step 2
             // Send the packet over Bluetooth provided it's not null
             //
+
             if (packet != null)
             {
-                Debug.WriteLine("Successfully got a packet from the driver.");
+                lock (numPacketsReceivedLock)
+                {
+                    numPacketsReceived++;
+                    Debug.WriteLine($"Received packet {numPacketsReceived}" +
+                                    $" from the driver."
+                                    );
+                }
+
             }
             else
             {
@@ -127,27 +205,49 @@ namespace DriverTest
                 return;
             }
 
-            // Test: Send another listening request to the driver
-            //
-            // Step 1
-            // Open the handle to the driver with Overlapped async I/O flagged
-            //
-            SafeFileHandle device = null;
-            try
-            {
-                device = DeviceIO.OpenDevice("\\\\.\\IPv6ToBle", true);
-            }
-            catch
-            {
-                int code = Marshal.GetLastWin32Error();
+            // Test: Send another listening request to the driver. Comment out
+            // if sending a fixed number in the first place; uncomment if
+            // sending and testing an arbitrarily large number of packets.
 
-                DisplayErrorDialog("Could not open a handle to the driver, " +
-                                    "error code: " + code.ToString()
-                                    );
-                return;
+            if (isTesting)
+            {
+                SendListeningRequestToDriver();
             }
+        }
 
-            IAsyncResult newResult = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
+        /// <summary>
+        /// Private function to watch for when the number of active threads
+        /// reaches 0
+        /// </summary>
+        private void ListenForBackgroundThreadCompletion(
+            object sender,
+            PropertyChangedEventArgs args
+         )
+        {
+            if(args.PropertyName == "NumThreadsActive")
+            {
+                lock(numThreadsActiveLock)
+                {
+                    if (NumThreadsActive == 0)
+                    {
+                        stopwatch.Stop();                        
+
+                        lock(numPacketsReceivedLock)
+                        {
+                            Debug.WriteLine($"Test complete. Received {numPacketsReceived}" +
+                                           $" packets from the driver in" +
+                                           $" {stopwatch.Elapsed.Seconds}" +
+                                           $" seconds."
+                                           );
+                            numPacketsReceived = 0;
+                        }
+                        
+                        stopwatch = new Stopwatch();
+                    }
+
+                    NumThreadsActiveChanged -= ListenForBackgroundThreadCompletion;
+                }                
+            }
         }
 
         /// <summary>
@@ -446,37 +546,26 @@ namespace DriverTest
 
         private void Button_10_send_udp_packet_Click(object sender, RoutedEventArgs e)
         {
-            //Socket sock = new Socket(AddressFamily.InterNetworkV6,
-            //                         SocketType.Dgram,
-            //                         ProtocolType.Udp
-            //                         );
-
-            //IPAddress serverAddr = IPAddress.Parse("fe80::3ff8:d2ff:feeb:27b8%2");
-
-            //IPEndPoint endPoint = new IPEndPoint(serverAddr, 11000);
-
-            //string text = "Hello";
-            //byte[] send_buffer = Encoding.ASCII.GetBytes(text);
-
-            //sock.SendTo(send_buffer, endPoint);
-
-            SendUdp(11000, "fe80::3ff8:d2ff:feeb:27b8%2", 11000, Encoding.ASCII.GetBytes("Hello"));
-        }
-
-        private static void SendUdp(
-            int     sourcePort,
-            String  destinationIPv6Address,
-            int     destinationPort,
-            byte[]  packet
-        )
-        {
-            using (UdpClient client = new UdpClient(sourcePort))
+            using (UdpClient client = new UdpClient(AddressFamily.InterNetworkV6))
             {
-                client.Send(packet,
-                            packet.Length,
-                            destinationIPv6Address,
-                            destinationPort
-                            );
+                int desiredNumber;
+                if (isInputValid(out desiredNumber) && isTesting)
+                {
+                    byte[] test = Encoding.ASCII.GetBytes("Test");
+
+                    IPAddress multicastAddress = IPAddress.Parse("ff02::1");
+                    IPEndPoint endPoint = new IPEndPoint(multicastAddress, 11000);
+                    client.JoinMulticastGroup(multicastAddress);
+
+                    // Start timing, assuming listening requests have been sent
+                    // previously
+                    stopwatch.Start();
+
+                    for (int i = 0; i < desiredNumber; i++)
+                    {                        
+                        client.Send(test, test.Length, endPoint);
+                    }
+                }                
             }
         }
 
@@ -540,6 +629,18 @@ namespace DriverTest
                     DisplayErrorDialog("This device is not a border router.");
                 }
             }
+        }
+
+        private void button_12_stop_packet_test_Click(object sender, RoutedEventArgs e)
+        {
+            isTesting = false;
+        }
+
+        private void button_13_start_packet_test_Click(object sender, RoutedEventArgs e)
+        {
+            isTesting = true;
+
+            NumThreadsActiveChanged += ListenForBackgroundThreadCompletion;
         }
     }
 }

@@ -263,6 +263,7 @@ namespace PacketProcessingTestUWP
                         {
                             // Remove the device
                             foundDevices.RemoveAt(newCount);
+                            break;
                         }
                     }
                     newCount++;
@@ -317,13 +318,6 @@ namespace PacketProcessingTestUWP
             //
             foreach (DeviceInformation deviceInfo in foundDevices)
             {
-                // Check if the device has previously been paired; ignore it if
-                // so
-                if(deviceInfo.Pairing.IsPaired)
-                {
-                    Debug.WriteLine("Device was previously paired. Ignoring.");
-                    return;
-                }
 
                 BluetoothLEDevice currentDevice = null;
                 GattDeviceService ipv6ToBlePacketProcessingService = null;
@@ -467,30 +461,6 @@ namespace PacketProcessingTestUWP
                     {
                         supportedBleDevices.Add(ipv6Address, deviceInfo);
                     }
-
-                    //// Pair the device now that we know it's supported
-                    //Debug.WriteLine("Attempting basic pairing of device.");
-
-                    //DevicePairingResult pairingResult = null;
-                    //if(!deviceInfo.Pairing.IsPaired)
-                    //{
-                    //    pairingResult = await deviceInfo.Pairing.PairAsync();
-                    //}
-                    
-                    //if(pairingResult != null &&
-                    //   pairingResult.Status == DevicePairingResultStatus.Paired)
-                    //{
-                    //    Debug.WriteLine("Pairing succeeded with device " +
-                    //                    deviceInfo.Name
-                    //                    );
-                    //}
-                    //else
-                    //{
-                    //    Debug.WriteLine("Pairing device " + deviceInfo.Name +
-                    //                    "failed with this error: " +
-                    //                    pairingResult.Status
-                    //                    );
-                    //}
                 }
 
                 // Dispose of the device so Windows doesn't maintain a
