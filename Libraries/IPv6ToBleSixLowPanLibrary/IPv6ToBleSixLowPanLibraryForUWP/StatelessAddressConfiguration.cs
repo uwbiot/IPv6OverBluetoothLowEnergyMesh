@@ -17,8 +17,59 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
     /// </summary>
     public static class StatelessAddressConfiguration
     {
+        
+        public static async Task<IPAddress> GenerateLinkLocalAddressFromBlThRadioIdAsync(
+            int scopeId
+        )
+        {
+            //
+            // Step 1
+            // Get the 64-bit IID from the local Bluetooth radio address
+            //
+            byte[] sixtyFourBitAddress = await GenerateIidFromBlthRadioIdAsync();
+
+            if(sixtyFourBitAddress == null)
+            {
+                return null;
+            }
+
+            //
+            // Step 2
+            // Build the IPv6 address string from the bytes
+            //
+            StringBuilder builder = new StringBuilder();
+            builder.Append("fe80::");
+            for(int i = 0; i < 8; i += 2)
+            {
+                builder.Append($"{sixtyFourBitAddress[i]:X2}");
+                builder.Append($"{sixtyFourBitAddress[i + 1]:X2}");
+                if(i < 6)
+                {
+                    builder.Append(":");
+                }
+            }
+            builder.Append("%" + scopeId.ToString());
+
+            //
+            // Step 3
+            // Generate the IPAddress from the string form
+            //
+            string generatedAddressString = builder.ToString();
+
+            IPAddress generatedAddress;
+
+            if (IPAddress.TryParse(generatedAddressString, out generatedAddress))
+            {
+                return generatedAddress;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
         /// <summary>
-        /// Generates a 64-bit EUI IPv6 address suffix from the 
+        /// Generates a 64-bit EUI Interface Identifier (IID) suffix from the 
         /// 48-bit local Bluetooth radio ID. This will be used later to be
         /// appended to the border router's 64-bit prefix.
         /// 
@@ -31,8 +82,8 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// Details are in RFC 2464, RFC 4944, and here:
         /// http://www.tcpipguide.com/free/t_IPv6InterfaceIdentifiersandPhysicalAddressMapping-2.htm
         /// 
-        /// The downside of generating an IPv6 address this way is that if the
-        /// physical hardware changes, so does the IPv6 address. This may not
+        /// The downside of generating a 64-bit IID this way is that if the
+        /// physical hardware changes, so does the IID. This may not
         /// be an issue if a device has an embedded Bluetooth radio, but for
         /// devices that may have USB-based Bluetooth dongles, swapping it out
         /// would mean the address is different and mess with any kind of
@@ -41,10 +92,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// Note: This algorithm is probably way slower than it should be 
         /// because I'm terrible at bitwise operations so I don't use them.
         /// </summary>
-        /// <returns></returns>
-        public static async Task<IPAddress> GenerateLinkLocalAddressFromBlThRadioIdAsync(
-            int scopeId
-        )
+        public static async Task<byte[]> GenerateIidFromBlthRadioIdAsync()
         {
             //
             // Step 1
@@ -76,7 +124,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                                 "retrieve local radio address."
                                 );
                 return null;
-            }            
+            }
 
             // Convert the address into byte form (returns an 8-byte array with
             // padded zeroes at the end)
@@ -86,56 +134,24 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             // Step 2
             // Insert FFFE into the middle of the address
             //
-            byte[] sixtyFourBitAddress = new byte[8];
-            for(int i = 0; i < 3; i++)
+            byte[] sixtyFourBitIid = new byte[8];
+            for (int i = 0; i < 3; i++)
             {
-                sixtyFourBitAddress[i] = radioAddressBytes[i];
+                sixtyFourBitIid[i] = radioAddressBytes[i];
             }
-            sixtyFourBitAddress[3] = 0xFF;
-            sixtyFourBitAddress[4] = 0xFE;
-            for(int i = 5; i < 8; i++)
+            sixtyFourBitIid[3] = 0xFF;
+            sixtyFourBitIid[4] = 0xFE;
+            for (int i = 5; i < 8; i++)
             {
-                sixtyFourBitAddress[i] = radioAddressBytes[i - 2];
+                sixtyFourBitIid[i] = radioAddressBytes[i - 2];
             }
             //
             // Step 3
             // Flip the seventh bit from 0 to 1 by XOR-ing the 2 column
             //
-            sixtyFourBitAddress[0] ^= 0x02;
+            sixtyFourBitIid[0] ^= 0x02;
 
-            //
-            // Step 4
-            // Build the IPv6 address string from the bytes
-            //
-            StringBuilder builder = new StringBuilder();
-            builder.Append("fe80::");
-            for(int i = 0; i < 8; i += 2)
-            {
-                builder.Append($"{sixtyFourBitAddress[i]:X2}");
-                builder.Append($"{sixtyFourBitAddress[i + 1]:X2}");
-                if(i < 6)
-                {
-                    builder.Append(":");
-                }
-            }
-            builder.Append("%" + scopeId.ToString());
-
-            //
-            // Step 5
-            // Generate the IPAddress from the string form
-            //
-            string generatedAddressString = builder.ToString();
-
-            IPAddress generatedAddress;
-
-            if (IPAddress.TryParse(generatedAddressString, out generatedAddress))
-            {
-                return generatedAddress;
-            }
-            else
-            {
-                return null;
-            }
+            return sixtyFourBitIid;
         }
     }
 }
