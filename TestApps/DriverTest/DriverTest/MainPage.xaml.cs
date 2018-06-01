@@ -43,7 +43,6 @@ namespace DriverTest
         private Stopwatch stopwatch = new Stopwatch();
 
         private volatile int numPacketsReceived = 0;
-        private object numPacketsReceivedLock = new object();
 
         private volatile int numThreadsActive = 0;
         private object numThreadsActiveLock = new object();
@@ -143,10 +142,10 @@ namespace DriverTest
                 return;
             }
 
-            lock (numThreadsActiveLock)
+            lock(numThreadsActiveLock)
             {
                 NumThreadsActive++;
-            }
+            }            
 
             IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
         }
@@ -190,14 +189,10 @@ namespace DriverTest
 
             if (packet != null)
             {
-                lock (numPacketsReceivedLock)
-                {
-                    numPacketsReceived++;
-                    Debug.WriteLine($"Received packet {numPacketsReceived}" +
-                                    $" from the driver."
-                                    );
-                }
-
+                numPacketsReceived++;
+                //Debug.WriteLine($"Received packet {numPacketsReceived}" +
+                //                $" from the driver."
+                //                );
             }
             else
             {
@@ -209,10 +204,10 @@ namespace DriverTest
             // if sending a fixed number in the first place; uncomment if
             // sending and testing an arbitrarily large number of packets.
 
-            if (isTesting)
-            {
-                SendListeningRequestToDriver();
-            }
+            //if (isTesting)
+            //{
+            //    SendListeningRequestToDriver();
+            //}
         }
 
         /// <summary>
@@ -230,22 +225,17 @@ namespace DriverTest
                 {
                     if (NumThreadsActive == 0)
                     {
-                        stopwatch.Stop();                        
+                        stopwatch.Stop();
 
-                        lock(numPacketsReceivedLock)
-                        {
-                            Debug.WriteLine($"Test complete. Received {numPacketsReceived}" +
+                        Debug.WriteLine($"Test complete. Received {numPacketsReceived}" +
                                            $" packets from the driver in" +
-                                           $" {stopwatch.Elapsed.Seconds}" +
-                                           $" seconds."
+                                           $" {stopwatch.Elapsed.Milliseconds}" +
+                                           $" milliseconds."
                                            );
-                            numPacketsReceived = 0;
-                        }
-                        
+                        numPacketsReceived = 0;
+
                         stopwatch = new Stopwatch();
                     }
-
-                    NumThreadsActiveChanged -= ListenForBackgroundThreadCompletion;
                 }                
             }
         }
@@ -634,6 +624,8 @@ namespace DriverTest
         private void button_12_stop_packet_test_Click(object sender, RoutedEventArgs e)
         {
             isTesting = false;
+
+            NumThreadsActiveChanged -= ListenForBackgroundThreadCompletion;
         }
 
         private void button_13_start_packet_test_Click(object sender, RoutedEventArgs e)
