@@ -100,6 +100,12 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
 
         #endregion
 
+        #region IPv6 header field extraction helper function
+
+
+
+        #endregion
+
         #region Encoding definitions/constants for compression and uncompression
 
         /// <summary>
@@ -608,22 +614,35 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             byte[] sourcePacket,
             byte[] linkLayerDestinationAddress
         )
-        {
-            // Local variables for temp purposes, as well as the two compressed
-            // header bytes
-            byte temp, iphc0, iphc1;
-
-            // The compressed packet to return
+        {    
+            // The compressed packet to return. Start out at the same length
+            // as the original because we need to manipulate pointers in the
+            // new one as we go
             byte[] compressedPacket = new byte[sourcePacket.Length];
             
             fixed(byte* compressedPacketPtr = &compressedPacket[0])
             {
+                // Local variables for temp purposes, as well as the two compressed
+                // header bytes
+                byte temp, iphc0, iphc1;
+
                 // Set the header compression pointer to the beginning of the new
                 // compressed packet, + 2 for the 2 compressed bytes
                 byte* headerCompressionPtr = compressedPacketPtr + 2;
 
                 iphc0 = 0x60; // 011xxxxx = ... 
                 iphc1 = 0;
+
+                // Check if destination context exists, for possibly allocating
+                // a third byte
+                if(LookupAddressContextByPrefix())
+
+                // Traffic class and flow label. If the flow label is 0, 
+                // compress it. If traffic class is 0, compress it. The offset
+                // of the traffic class depends on the presence of the version
+                // and flow label.
+                temp = 
+
             }
 
             return compressedPacket;
