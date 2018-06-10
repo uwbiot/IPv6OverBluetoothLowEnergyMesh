@@ -54,7 +54,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             }
             set
             {
-                if(enumerationComplete != value)
+                if (enumerationComplete != value)
                 {
                     enumerationComplete = value;
                     EnumerationCompleteChanged(new PropertyChangedEventArgs("EnumerationComplete"));
@@ -97,7 +97,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
             private set
             {
-                if(supportedBleDevices != value)
+                if (supportedBleDevices != value)
                 {
                     supportedBleDevices = value;
                 }
@@ -115,7 +115,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
         // unpaired). Attaches event handlers to populate the device
         // collection.
 
-        public void StartBleDeviceWatcher()
+        public void StartSupportedDeviceEnumerator()
         {
             //
             // Step 1
@@ -165,9 +165,9 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
         }
 
         // Stop watching for nearby Bluetooth LE devices
-        public void StopBleDeviceWatcher()
+        public void StopSupportedDeviceEnumerator()
         {
-            if(deviceWatcher != null)
+            if (deviceWatcher != null)
             {
                 //
                 // Step 1
@@ -189,8 +189,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
         // Device watcher added callback
         private void DeviceWatcher_Added(
-            DeviceWatcher       sender,
-            DeviceInformation   deviceInfo
+            DeviceWatcher sender,
+            DeviceInformation deviceInfo
         )
         {
             Debug.WriteLine(String.Format("Added {0}{1}",
@@ -200,10 +200,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
             // Protect against the race condition if the task runs after the
             // caller stopped the deviceWatcher
-            if(sender == deviceWatcher)
+            if (sender == deviceWatcher)
             {
                 // Make sure the device isn't already in the list
-                if(!foundDevices.Contains(deviceInfo))
+                if (!foundDevices.Contains(deviceInfo))
                 {
                     foundDevices.Add(deviceInfo);
                     count++;
@@ -213,7 +213,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
         // Device watcher updated callback
         private void DeviceWatcher_Updated(
-            DeviceWatcher           sender,
+            DeviceWatcher sender,
             DeviceInformationUpdate deviceInfoUpdate
         )
         {
@@ -263,6 +263,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                         {
                             // Remove the device
                             foundDevices.RemoveAt(newCount);
+                            break;
                         }
                     }
                     newCount++;
@@ -274,10 +275,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
         // Device watcher enumeration completed callback
         private void DeviceWatcher_EnumerationCompleted(
-            DeviceWatcher   sender,
-            object          args
+            DeviceWatcher sender,
+            object args
         )
-        {            
+        {
             Debug.WriteLine("Enumeration complete.");
 
             EnumerationComplete = true;
@@ -317,6 +318,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             //
             foreach (DeviceInformation deviceInfo in foundDevices)
             {
+
                 BluetoothLEDevice currentDevice = null;
                 GattDeviceService ipv6ToBlePacketProcessingService = null;
                 GattCharacteristic ipv6AddressCharacteristic = null;
@@ -353,7 +355,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                     {
                         var services = servicesResult.Services;
                         Debug.WriteLine($"Found {services.Count} services for" +
-                                        $"device {deviceInfo.Id}"
+                                        $" device {deviceInfo.Id}"
                                         );
 
                         // Iterate through the list of services and check if
@@ -408,7 +410,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                             else
                             {
                                 Debug.WriteLine("Could not access the packet" +
-                                                "processing service."
+                                                " processing service."
                                                 );
                                 // On error, act as if there were no characteristics
                                 characteristics = new List<GattCharacteristic>();
@@ -427,7 +429,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                     catch (Exception e)
                     {
                         Debug.WriteLine("Could not read characteristics due to" +
-                                        "permissions issues. " + e.Message
+                                        " permissions issues. " + e.Message
                                         );
                         // On error, act as if there were no characteristics
                         characteristics = new List<GattCharacteristic>();
@@ -461,12 +463,22 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                     }
                 }
 
-                // Dispose of the device so Windows doesn't maintain a
-                // connection; the caller will reconnect later if needed
-                //if (currentDevice != null)
-                //{
-                //    currentDevice.Dispose();
-                //}
+                // Dispose of the service and device that we accessed, then force
+                // a garbage collection to destroy the objects and fully disconnect
+                // from the remote GATT server and device. This is as a workaround
+                // for a current Windows bug that doesn't properly disconnect
+                // devices, as well as a workaround for the Broadcomm Bluetooth LE
+                // driver on the Raspberry Pi 3 that can't handle multiple connects
+                // and reconnects if it thinks it's still occupied.
+                //
+                // Additionally, at this step, if you had connected any events
+                // to the services or characteristics, you'd have to do that first.
+                // But we didn't do that here, so no need.
+
+                //ipv6ToBlePacketProcessingService?.Dispose();
+                //currentDevice?.Dispose();
+                //currentDevice = null;
+                //GC.Collect();
             }
         }
         #endregion

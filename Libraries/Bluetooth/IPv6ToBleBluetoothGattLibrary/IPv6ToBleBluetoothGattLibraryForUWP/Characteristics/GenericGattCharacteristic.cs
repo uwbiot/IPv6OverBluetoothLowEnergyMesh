@@ -258,6 +258,15 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
             //
             request = await args.GetRequestAsync();
 
+            if(request == null)
+            {
+                Debug.WriteLine("Could not retrieve request from the " +
+                                "GattWriteRequestedEventArgs. Request was " +
+                                "null."
+                                );
+                goto Exit;
+            }
+
             // Set the value
             Value = request.Value;
 
@@ -284,6 +293,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
             {
                 Debug.WriteLine($"Write completed; value is now {Utilities.BytesToString(data)}");
             }
+
+            Exit:
 
             deferral.Complete();
 

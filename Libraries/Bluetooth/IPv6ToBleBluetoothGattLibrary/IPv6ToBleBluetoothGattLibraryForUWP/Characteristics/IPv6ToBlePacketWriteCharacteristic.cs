@@ -21,32 +21,6 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
     public class IPv6ToBlePacketWriteCharacteristic : GenericGattCharacteristic
     {
         //---------------------------------------------------------------------
-        // Local variables
-        //---------------------------------------------------------------------
-
-        // An IPv6 packet. Max size is 1280 bytes, the MTU for Bluetooth in
-        // general.
-        private byte[] packet = new byte[1280];
-
-        // Getter and setter for the packet
-        public byte[] Packet
-        {
-            get
-            {
-                return packet;
-            }
-
-            private set
-            {
-                if(!Utilities.PacketsEqual(value, packet))
-                {
-                    packet = value;
-                    OnPropertyChanged(new PropertyChangedEventArgs("Packet"));
-                }
-            }
-        }
-
-        //---------------------------------------------------------------------
         // Constructor
         //---------------------------------------------------------------------
 
@@ -62,16 +36,12 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
         //---------------------------------------------------------------------
 
         protected override void Characteristic_WriteRequested(
-            GattLocalCharacteristic sender, 
+            GattLocalCharacteristic sender,
             GattWriteRequestedEventArgs args
         )
         {
             // Receive the Write request into this characteristic's Value buffer
             base.Characteristic_WriteRequested(sender, args);
-
-            // Set the packet byte array to the received value for others to
-            // read or retrieve
-            Packet = GattHelpers.ConvertBufferToByteArray(Value);
 
             // Caller does something with the packet after this
         }

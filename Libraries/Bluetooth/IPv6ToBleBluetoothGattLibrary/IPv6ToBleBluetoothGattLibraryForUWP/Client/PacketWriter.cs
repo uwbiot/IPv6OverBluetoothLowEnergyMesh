@@ -9,6 +9,7 @@ using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
 
+using IPv6ToBleBluetoothGattLibraryForUWP;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 
 namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
@@ -23,8 +24,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
         /// </summary>
         /// <returns></returns>
         public static async Task<bool> WritePacketAsync(
-            DeviceInformation   targetDevice,
-            byte[]              packet
+            DeviceInformation targetDevice,
+            byte[] packet
         )
         {
             BluetoothError status = BluetoothError.Success;
@@ -69,12 +70,14 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             if (device != null)
             {
                 // Retrieve the list of services from the device (uncached)
-                GattDeviceServicesResult servicesResult = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+                GattDeviceServicesResult servicesResult = await device.GetGattServicesAsync(BluetoothCacheMode.Cached);
 
                 if (servicesResult.Status == GattCommunicationStatus.Success)
                 {
                     var services = servicesResult.Services;
-                    Debug.WriteLine($"Found {services.Count} services");
+                    Debug.WriteLine($"Found {services.Count} services when " +
+                                    "querying services for packet writing."
+                                    );
 
                     // Iterate through the list of services and check if
                     // both services we require are there
@@ -116,7 +119,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                 {
                     // Enumerate the characteristics
                     GattCharacteristicsResult characteristicsResult =
-                        await ipv6ToBlePacketProcessingService.GetCharacteristicsAsync(BluetoothCacheMode.Uncached);
+                        await ipv6ToBlePacketProcessingService.GetCharacteristicsAsync(BluetoothCacheMode.Cached);
 
                     if (characteristicsResult.Status == GattCommunicationStatus.Success)
                     {
@@ -146,7 +149,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             {
                 status = BluetoothError.DeviceNotConnected;
                 Debug.WriteLine("Could not read characteristics due to " +
-                                "permissions issues. " + e.Message
+                                " permissions issues. " + e.Message
                                 );
                 goto Exit;
             }
@@ -167,9 +170,9 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             if (ipv6PacketWriteCharacteristic == null)
             {
                 status = BluetoothError.OtherError;
-                Debug.WriteLine("Could not access the IPv6 address" +
-                                " characteristic and the packet write" +
-                                " characteristic.");
+                Debug.WriteLine("Could not access the packet write" +
+                                " characteristic."
+                                );
                 goto Exit;
             }
 
@@ -190,12 +193,22 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
             Exit:
 
-            // Dispose of the device so Windows doesn't maintain a
-            // connection; the caller will reconnect later if needed
-            if (device != null)
-            {
-                device.Dispose();
-            }
+            // Dispose of the service and device that we accessed, then force
+            // a garbage collection to destroy the objects and fully disconnect
+            // from the remote GATT server and device. This is as a workaround
+            // for a current Windows bug that doesn't properly disconnect
+            // devices, as well as a workaround for the Broadcomm Bluetooth LE
+            // driver on the Raspberry Pi 3 that can't handle multiple connects
+            // and reconnects if it thinks it's still occupied.
+            //
+            // Additionally, at this step, if you had connected any events
+            // to the services or characteristics, you'd have to do that first.
+            // But we didn't do that here, so no need.
+
+            ipv6ToBlePacketProcessingService?.Dispose();
+            device?.Dispose();
+            device = null;
+            GC.Collect();
 
             if (status != BluetoothError.Success)
             {
