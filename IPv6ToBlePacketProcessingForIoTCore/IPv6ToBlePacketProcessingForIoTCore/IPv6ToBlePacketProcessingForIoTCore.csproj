@@ -140,15 +140,18 @@
     <Reference Include="IPv6ToBleAdvLibraryForUWP">
       <HintPath>..\..\Libraries\Bluetooth\IPv6ToBleBluetoothAdvLibrary\IPv6ToBleAdvLibraryForUWP\bin\Release\IPv6ToBleAdvLibraryForUWP.dll</HintPath>
     </Reference>
-    <Reference Include="IPv6ToBleBluetoothGattLibraryForUWP">
-      <HintPath>..\..\Libraries\Bluetooth\IPv6ToBleBluetoothGattLibrary\IPv6ToBleBluetoothGattLibraryForUWP\bin\Release\IPv6ToBleBluetoothGattLibraryForUWP.dll</HintPath>
-    </Reference>
     <Reference Include="IPv6ToBleDriverInterfaceForUWP">
       <HintPath>..\..\Libraries\DriverInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>
     </Reference>
     <Reference Include="IPv6ToBleSixLowPanLibraryForUWP">
       <HintPath>..\..\Libraries\IPv6ToBleSixLowPanLibrary\IPv6ToBleSixLowPanLibraryForUWP\bin\Release\IPv6ToBleSixLowPanLibraryForUWP.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\Bluetooth\IPv6ToBleBluetoothGattLibrary\IPv6ToBleBluetoothGattLibraryForUWP\IPv6ToBleBluetoothGattLibraryForUWP.csproj">
+      <Project>{7b548406-32d8-482a-af87-8a54a19fa75e}</Project>
+      <Name>IPv6ToBleBluetoothGattLibraryForUWP</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0' ">
     <VisualStudioVersion>15.0</VisualStudioVersion>

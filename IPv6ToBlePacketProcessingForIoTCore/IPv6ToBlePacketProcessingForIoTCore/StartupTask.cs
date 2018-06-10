@@ -75,14 +75,35 @@ namespace IPv6ToBlePacketProcessingForIoTCore
 
         // The local packet write characteristic, part of the packet processing
         // service in the GATT server
-        static IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
-
-        // A Bluetooth Advertisement watcher to write packets received from the
-        // driver over Bluetooth LE
-        //static IPv6ToBleAdvWatcherPacketWrite packetWriter;
+        private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
 
         // A FIFO queue of recent messages/packets to use with managed flooding
         private Queue<byte[]> messageCache = null;
+
+        //---------------------------------------------------------------------
+        // IPv6 packet variables
+        //---------------------------------------------------------------------
+
+        // An IPv6 packet. Max size is 1280 bytes, the MTU for Bluetooth in
+        // general.
+        private byte[] packet = new byte[1280];
+
+        // Getter and setter for the packet
+        public byte[] Packet
+        {
+            get
+            {
+                return packet;
+            }
+
+            private set
+            {
+                if (!Utilities.PacketsEqual(value, packet))
+                {
+                    packet = value;
+                }
+            }
+        }
 
         #endregion
 
@@ -162,7 +183,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 4
             // Enumerate nearby supported devices
             //
-            //await EnumerateNearbySupportedDevices();            
+            await EnumerateNearbySupportedDevices();            
 
             //
             // Step 5
@@ -219,9 +240,27 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             //
             if(enumerator != null)
             {
-                enumerator.StopBleDeviceWatcher();
+                enumerator.StopSupportedDeviceEnumerator();
                 enumerator.EnumerationCompleted -= WatchForEnumerationCompletion;
             }
+
+            switch (reason)
+            {
+                case BackgroundTaskCancellationReason.Abort:
+                    //app unregistered background task (amoung other reasons).
+                    Debug.WriteLine("Background task aborted. Reason: " + reason.ToString());
+                    break;
+                case BackgroundTaskCancellationReason.Terminating:
+                    //system shutdown
+                    Debug.WriteLine("Background task terminating. Reason: " + reason.ToString());
+                    break;
+                case BackgroundTaskCancellationReason.ConditionLoss:
+                    Debug.WriteLine("Background task cancelled because of condition loss. Reason: " + reason.ToString());
+                    break;
+                case BackgroundTaskCancellationReason.SystemPolicy:
+                    Debug.WriteLine("Background task cancelled because of system policy. Reason: " + reason.ToString());
+                    break;
+            }            
 
             //
             // Step 2
@@ -247,7 +286,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             Debug.WriteLine("Looking for nearby supported devices...");
 
             enumerator.EnumerationCompleted += WatchForEnumerationCompletion;
-            enumerator.StartBleDeviceWatcher();
+            enumerator.StartSupportedDeviceEnumerator();
 
             // Spin while enumeration is in progress
             while (!enumerationCompleted) ;
@@ -262,7 +301,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             Debug.WriteLine("Filtering for supported devices complete.");
 
             // Stop the device watcher            
-            enumerator.StopBleDeviceWatcher();
+            enumerator.StopSupportedDeviceEnumerator();
 
             if (enumerator.SupportedBleDevices != null)
             {
@@ -320,9 +359,11 @@ namespace IPv6ToBlePacketProcessingForIoTCore
         {
             if(sender == localPacketWriteCharacteristic)
             {
-                if (eventArgs.PropertyName == "Packet")
+                if (eventArgs.PropertyName == "Value")
                 {
-                    byte[] packet = localPacketWriteCharacteristic.Packet;
+                    // Set the packet byte array to the received value for others to
+                    // read or retrieve
+                    Packet = GattHelpers.ConvertBufferToByteArray(localPacketWriteCharacteristic.Value);
 
                     Debug.WriteLine("Received this packet over " +
                                      "Bluetooth: " + Utilities.BytesToString(packet));
@@ -439,6 +480,14 @@ namespace IPv6ToBlePacketProcessingForIoTCore
                                     );
                     return;
                 }
+            }
+
+            if (supportedBleDevices == null || supportedBleDevices.Count == 0)
+            {
+                Debug.WriteLine("No supported devices in range to which to " +
+                                "transmit this packet. Aborting."
+                                );
+                return;
             }
 
             //
