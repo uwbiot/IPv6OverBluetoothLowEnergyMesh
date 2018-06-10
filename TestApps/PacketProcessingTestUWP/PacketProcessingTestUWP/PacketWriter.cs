@@ -193,12 +193,22 @@ namespace PacketProcessingTestUWP
 
             Exit:
 
-            // Dispose of the device so Windows doesn't maintain a
-            // connection; the caller will reconnect later if needed
-            //if (device != null)
-            //{
-            //    device.Dispose();
-            //}
+            // Dispose of the service and device that we accessed, then force
+            // a garbage collection to destroy the objects and fully disconnect
+            // from the remote GATT server and device. This is as a workaround
+            // for a current Windows bug that doesn't properly disconnect
+            // devices, as well as a workaround for the Broadcomm Bluetooth LE
+            // driver on the Raspberry Pi 3 that can't handle multiple connects
+            // and reconnects if it thinks it's still occupied.
+            //
+            // Additionally, at this step, if you had connected any events
+            // to the services or characteristics, you'd have to do that first.
+            // But we didn't do that here, so no need.
+
+            ipv6ToBlePacketProcessingService?.Dispose();
+            device?.Dispose();
+            device = null;
+            GC.Collect();
 
             if (status != BluetoothError.Success)
             {

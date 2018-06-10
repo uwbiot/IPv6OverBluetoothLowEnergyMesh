@@ -60,19 +60,14 @@ namespace PacketProcessingTestUWP
 
         // The GATT server to receive packets and provide information to
         // remote devices
-        //private IPv6ToBleGattServer gattServer = null;
+        private GattServer gattServer = null;
 
         // The local packet write characteristic, part of the packet processing
         // service in the GATT server
-        //private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
+        private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
 
         // A FIFO queue of recent messages/packets to use with managed flooding
         private Queue<byte[]> messageCache = null;
-
-        // A lock for sending a packet over BLE, to prevent race conditions
-        // where multiple threads receiving packets from the driver try to 
-        // send packets out
-        private object bleSendingLock = new object();
 
         // Testing count for sending requests
         private int count = 0;
@@ -86,6 +81,31 @@ namespace PacketProcessingTestUWP
 
         // Tracker to know when device enumeration is complete
         private bool enumerationCompleted = false;
+
+        //---------------------------------------------------------------------
+        // IPv6 packet variables
+        //---------------------------------------------------------------------
+
+        // An IPv6 packet. Max size is 1280 bytes, the MTU for Bluetooth in
+        // general.
+        private byte[] packet = new byte[1280];
+
+        // Getter and setter for the packet
+        public byte[] Packet
+        {
+            get
+            {
+                return packet;
+            }
+
+            private set
+            {
+                if (!Utilities.PacketsEqual(value, packet))
+                {
+                    packet = value;
+                }
+            }
+        }
 
         #endregion
 
@@ -126,7 +146,7 @@ namespace PacketProcessingTestUWP
             // Spin up the GATT server service to listen for later replies
             // over Bluetooth LE
             //
-            //gattServer = new IPv6ToBleGattServer();
+            //gattServer = new GattServer();
             //bool gattServerStarted = false;
             //try
             //{
@@ -170,13 +190,8 @@ namespace PacketProcessingTestUWP
             // Step 6
             // Send 10 initial listening requests to the driver
             //
-            //for(int i = 0; i < 10; i++)
-            for (int i = 0; i < 1; i++)
-            {
-                Debug.WriteLine($"Sending listening request {++count}");
-                SendListenRequestToDriver();
-                Thread.Sleep(100); // Wait 1/10 second to start another one
-            }
+            Debug.WriteLine($"Sending listening request {++count}");
+            SendListenRequestToDriver();
 
             overallStatusBox.Text = "Finished starting.";
         }
@@ -190,7 +205,7 @@ namespace PacketProcessingTestUWP
 
             // Unsubscribe from the local packet write characteristic's
             // packet received event
-            // localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+            //localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
 
             //
             // Step 2
@@ -289,92 +304,92 @@ namespace PacketProcessingTestUWP
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="eventArgs"></param>
-        private void WatchForPacketReception(
+        private async void WatchForPacketReception(
             object                      sender,
             PropertyChangedEventArgs    eventArgs
         )
         {
-            //if (sender == localPacketWriteCharacteristic)
-            //{
-            //    if (eventArgs.PropertyName == "Packet")
-            //    {
-            //        byte[] packet = localPacketWriteCharacteristic.Packet;
+            if (sender == localPacketWriteCharacteristic)
+            {
+                if (eventArgs.PropertyName == "Value")
+                {
+                    Packet = GattHelpers.ConvertBufferToByteArray(localPacketWriteCharacteristic.Value);
 
-            //        Debug.WriteLine("Received this packet over " +
-            //                         "Bluetooth: " + Utilities.BytesToString(packet));
+                    Debug.WriteLine("Received this packet over " +
+                                     "Bluetooth: " + Utilities.BytesToString(packet));
 
-            //        // Only send it back out if this device is not the destination;
-            //        // in other words, if this device is a middle router in the
-            //        // subnet
-            //        IPAddress destinationAddress = GetDestinationAddressFromPacket(
-            //                                            packet
-            //                                        );
+                    // Only send it back out if this device is not the destination;
+                    // in other words, if this device is a middle router in the
+                    // subnet
+                    IPAddress destinationAddress = GetDestinationAddressFromPacket(
+                                                        packet
+                                                    );
 
-            //        // Check if the packet is NOT for this device
-            //        bool packetIsForThisDevice = false;
+                    // Check if the packet is NOT for this device
+                    bool packetIsForThisDevice = false;
 
-            //        packetIsForThisDevice = IPAddress.Equals(destinationAddress, generatedLocalIPv6AddressForNode);
+                    packetIsForThisDevice = IPAddress.Equals(destinationAddress, generatedLocalIPv6AddressForNode);
 
-            //        if (!packetIsForThisDevice)
-            //        {
-            //            // Check if the message is in the local message cache or not
-            //            if (messageCache.Contains(packet))
-            //            {
-            //                Debug.WriteLine("This packet is not for this device and" +
-            //                                " has been seen before."
-            //                                );
-            //                return;
-            //            }
+                    if (!packetIsForThisDevice)
+                    {
+                        // Check if the message is in the local message cache or not
+                        if (messageCache.Contains(packet))
+                        {
+                            Debug.WriteLine("This packet is not for this device and" +
+                                            " has been seen before."
+                                            );
+                            return;
+                        }
 
-            //            // If this message has not been seen before, add it to the
-            //            // message queue and remove the oldest if there would now
-            //            // be more than 10
-            //            if (messageCache.Count < 10)
-            //            {
-            //                messageCache.Enqueue(packet);
-            //            }
-            //            else
-            //            {
-            //                messageCache.Dequeue();
-            //                messageCache.Enqueue(packet);
-            //            }
+                        // If this message has not been seen before, add it to the
+                        // message queue and remove the oldest if there would now
+                        // be more than 10
+                        if (messageCache.Count < 10)
+                        {
+                            messageCache.Enqueue(packet);
+                        }
+                        else
+                        {
+                            messageCache.Dequeue();
+                            messageCache.Enqueue(packet);
+                        }
 
-            //           await SendPacketOverBluetoothLE(packet,
-            //                                           destinationAddress
-            //                                           );
-            //        }
-            //        else
-            //        {
-            //            // It's for this device. Check if it has been seen before
-            //            // or not.
+                        await SendPacketOverBluetoothLE(packet,
+                                                        destinationAddress
+                                                        );
+                    }
+                    else
+                    {
+                        // It's for this device. Check if it has been seen before
+                        // or not.
 
-            //            // Check if the message is in the local message cache or not
-            //            if (messageCache.Contains(packet))
-            //            {
-            //                Debug.WriteLine("This packet is for this device, but " +
-            //                                "has been seen before."
-            //                                );
-            //                return;
-            //            }
+                        // Check if the message is in the local message cache or not
+                        if (messageCache.Contains(packet))
+                        {
+                            Debug.WriteLine("This packet is for this device, but " +
+                                            "has been seen before."
+                                            );
+                            return;
+                        }
 
-            //            // If this message has not been seen before, add it to the
-            //            // message queue and remove the oldest if there would now
-            //            // be more than 10
-            //            if (messageCache.Count < 10)
-            //            {
-            //                messageCache.Enqueue(packet);
-            //            }
-            //            else
-            //            {
-            //                messageCache.Dequeue();
-            //                messageCache.Enqueue(packet);
-            //            }
+                        // If this message has not been seen before, add it to the
+                        // message queue and remove the oldest if there would now
+                        // be more than 10
+                        if (messageCache.Count < 10)
+                        {
+                            messageCache.Enqueue(packet);
+                        }
+                        else
+                        {
+                            messageCache.Dequeue();
+                            messageCache.Enqueue(packet);
+                        }
 
-            //            // Send the packet to the driver for inbound injection
-            //            SendPacketToDriverForInboundInjection(packet);
-            //        }
-            //    }
-            // }
+                        // Send the packet to the driver for inbound injection
+                        SendPacketToDriverForInboundInjection(packet);
+                    }
+                }
+            }
         }
 
         #endregion
@@ -623,8 +638,8 @@ namespace PacketProcessingTestUWP
             // Step 3
             // Send another listening request to the driver to replace this one
             //
-            //Debug.WriteLine($"Sending listening request {++count}");
-            //SendListenRequestToDriver();
+            Debug.WriteLine($"Sending listening request {++count}");
+            SendListenRequestToDriver();
         }
 
         private void SendPacketToDriverForInboundInjection(byte[] packet)
