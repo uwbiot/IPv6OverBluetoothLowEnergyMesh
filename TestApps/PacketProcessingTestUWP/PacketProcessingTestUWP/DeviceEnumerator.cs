@@ -127,6 +127,7 @@ namespace PacketProcessingTestUWP
             {
                 "System.Devices.Aep.DeviceAddress",
                 "System.Devices.Aep.IsConnected",
+                "System.Devices.Aep.ProtocolId",
                 "System.Devices.Aep.Bluetooth.Le.IsConnectable"
             };
 

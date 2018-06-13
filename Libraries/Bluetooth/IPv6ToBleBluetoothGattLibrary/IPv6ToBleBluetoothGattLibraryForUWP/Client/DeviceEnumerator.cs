@@ -18,6 +18,7 @@ using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
+using Windows.Foundation;
 
 namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 {
@@ -475,10 +476,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                 // to the services or characteristics, you'd have to do that first.
                 // But we didn't do that here, so no need.
 
-                //ipv6ToBlePacketProcessingService?.Dispose();
-                //currentDevice?.Dispose();
-                //currentDevice = null;
-                //GC.Collect();
+                ipv6ToBlePacketProcessingService?.Dispose();
+                currentDevice?.Dispose();
+                currentDevice = null;
+                GC.Collect();
             }
         }
         #endregion

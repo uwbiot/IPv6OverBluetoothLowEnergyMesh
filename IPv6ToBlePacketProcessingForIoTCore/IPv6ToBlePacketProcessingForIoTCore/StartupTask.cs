@@ -147,6 +147,12 @@ namespace IPv6ToBlePacketProcessingForIoTCore
 
             //
             // Step 3
+            // Enumerate nearby supported devices
+            //
+            await EnumerateNearbySupportedDevices();
+
+            //
+            // Step 4
             // Spin up the GATT server service to listen for later replies
             // over Bluetooth LE
             //
@@ -177,13 +183,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             localPacketWriteCharacteristic = gattServer.PacketProcessingService.PacketWriteCharacteristic;
 
             // Subscribe to the characteristic's "packet received" event
-            localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;
-
-            //
-            // Step 4
-            // Enumerate nearby supported devices
-            //
-            await EnumerateNearbySupportedDevices();            
+            localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;            
 
             //
             // Step 5
@@ -227,11 +227,12 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             if (gattServer != null)
             {
                 gattServer.Stop();
-            }
 
-            // Unsubscribe from the local packet write characteristic's
-            // packet received event
-            localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+                // Unsubscribe from the local packet write characteristic's
+                // packet received event
+                localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+            }
+            
 
             //
             // Step 2
@@ -357,7 +358,7 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             PropertyChangedEventArgs    eventArgs
         )
         {
-            if(sender == localPacketWriteCharacteristic)
+            if (sender == localPacketWriteCharacteristic)
             {
                 if (eventArgs.PropertyName == "Value")
                 {
@@ -461,34 +462,34 @@ namespace IPv6ToBlePacketProcessingForIoTCore
             // Step 1
             // Check if there are any supported devices to which to write
             //
-            if (supportedBleDevices == null || supportedBleDevices.Count == 0)
-            {
-                // Re-scan if there is no one on record to which to send (as
-                // another device may have come online since the last time)
-                Debug.WriteLine("There were no remote devices to which to " +
-                                "write this packet. Re-scanning in case new" +
-                                " ones have come online since the last time."
-                                );
+            //if (supportedBleDevices == null || supportedBleDevices.Count == 0)
+            //{
+            //    // Re-scan if there is no one on record to which to send (as
+            //    // another device may have come online since the last time)
+            //    Debug.WriteLine("There were no remote devices to which to " +
+            //                    "write this packet. Re-scanning in case new" +
+            //                    " ones have come online since the last time."
+            //                    );
 
-                await EnumerateNearbySupportedDevices();
+            //    await EnumerateNearbySupportedDevices();
 
-                // If still nothing, then do nothing
-                if (supportedBleDevices == null || supportedBleDevices.Count == 0)
-                {
-                    Debug.WriteLine("Still no remote devices to which to " +
-                                    "write this packet. Aborting attempt."
-                                    );
-                    return;
-                }
-            }
+            //    // If still nothing, then do nothing
+            //    if (supportedBleDevices == null || supportedBleDevices.Count == 0)
+            //    {
+            //        Debug.WriteLine("Still no remote devices to which to " +
+            //                        "write this packet. Aborting attempt."
+            //                        );
+            //        return;
+            //    }
+            //}
 
-            if (supportedBleDevices == null || supportedBleDevices.Count == 0)
-            {
-                Debug.WriteLine("No supported devices in range to which to " +
-                                "transmit this packet. Aborting."
-                                );
-                return;
-            }
+            //if (supportedBleDevices == null || supportedBleDevices.Count == 0)
+            //{
+            //    Debug.WriteLine("No supported devices in range to which to " +
+            //                    "transmit this packet. Aborting."
+            //                    );
+            //    return;
+            //}
 
             //
             // Step 2
