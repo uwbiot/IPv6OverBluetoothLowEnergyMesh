@@ -291,7 +291,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
             }
             else
             {
-                Debug.WriteLine($"Write completed; value is now {Utilities.BytesToString(data)}");
+                Debug.WriteLine($"Write completed. Received packet from {args.Session.DeviceId.ToString()}, value is now {Utilities.BytesToString(data)}");
             }
 
             Exit:

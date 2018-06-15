@@ -62,6 +62,9 @@ namespace PacketProcessingTestUWP
         // remote devices
         private GattServer gattServer = null;
 
+        // A bool to track when the GATT server is started or not
+        private bool gattServerStarted = false;
+
         // The local packet write characteristic, part of the packet processing
         // service in the GATT server
         private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
@@ -143,42 +146,26 @@ namespace PacketProcessingTestUWP
 
             //
             // Step 3
+            // Enumerate nearby supported devices
+            //
+            await EnumerateNearbySupportedDevices();
+
+            //
+            // Step 4
             // Spin up the GATT server service to listen for later replies
             // over Bluetooth LE
             //
             //gattServer = new GattServer();
-            //bool gattServerStarted = false;
-            //try
-            //{
-            //    gattServerStarted = await gattServer.StartAsync();
-            //}
-            //catch (Exception ex)
-            //{
-            //    overallStatusBox.Text = "Error starting GATT server with this" +
-            //                            "message: " + ex.Message;
-            //}
+
+            //gattServerStarted = await StartGattServer();
 
             //if (!gattServerStarted)
             //{
-            //    overallStatusBox.Text = "Could not start the GATT server.";
-            //    throw new Exception();
-            //}
-            //else
-            //{
-            //    Debug.WriteLine("GATT server started.");
-            //}
-
-            //// Get a handle to the local packet write characteristic
-            //localPacketWriteCharacteristic = gattServer.PacketProcessingService.PacketWriteCharacteristic;
-
-            //// Subscribe to the characteristic's "packet received" event
-            //localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;
-
-            //
-            // Step 4
-            // Enumerate nearby supported devices
-            //
-            await EnumerateNearbySupportedDevices();
+            //    Debug.WriteLine("Aborting Init() because GATT server could " +
+            //                    "not be started."
+            //                    );
+            //    return;
+            //}            
 
             //
             // Step 5
@@ -196,16 +183,64 @@ namespace PacketProcessingTestUWP
             overallStatusBox.Text = "Finished starting.";
         }
 
+        /// <summary>
+        /// A helper method to start the local GATT server.
+        /// </summary>
+        private async Task<bool> StartGattServer()
+        {
+            bool started = false;
+            try
+            {
+                started = await gattServer.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Error starting GATT server with this" +
+                                 "message: " + ex.Message);
+            }
+
+            if (!started)
+            {
+                Debug.WriteLine("Could not start the GATT server.");
+            }
+            else
+            {
+                Debug.WriteLine("GATT server started.");
+            }
+
+            // Get a handle to the local packet write characteristic
+            localPacketWriteCharacteristic = gattServer.PacketProcessingService.PacketWriteCharacteristic;
+
+            // Subscribe to the characteristic's "packet received" event
+            localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;
+
+            return started;
+        }
+
+        /// <summary>
+        /// A helper method to stop the local GATT server.
+        /// </summary>
+        private void StopGattServer()
+        {
+            if (gattServerStarted)
+            {
+                gattServer.Stop();
+
+                gattServerStarted = false;
+
+                // Unsubscribe from the local packet write characteristic's
+                // packet received event
+                localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+            }
+        }
+
         private void stopButton_Click(object sender, RoutedEventArgs e)
         {
             //
             // Step 1
             // Shut down Bluetooth resources upon exit
             //
-
-            // Unsubscribe from the local packet write characteristic's
-            // packet received event
-            //localPacketWriteCharacteristic.PropertyChanged -= WatchForPacketReception;
+            StopGattServer();
 
             //
             // Step 2
@@ -407,11 +442,22 @@ namespace PacketProcessingTestUWP
         {
             Debug.WriteLine("Starting to send packet over BLE.");
 
-            // 
+            //
             // Step 1
+            // Stop the GATT server so we can switch to client operations
+            //
+            if(gattServerStarted)
+            {
+                Debug.WriteLine("Stopping GATT server...");
+                StopGattServer();
+                Debug.WriteLine("GATT server stopped.");
+            }            
+
+            // 
+            // Step 2
             // Check if there are any supported devices to which to write
             //
-            if(supportedBleDevices == null || supportedBleDevices.Count == 0)
+            if (supportedBleDevices == null || supportedBleDevices.Count == 0)
             {
                 // Re-scan if there is no one on record to which to send (as
                 // another device may have come online since the last time)
@@ -423,17 +469,25 @@ namespace PacketProcessingTestUWP
                 await EnumerateNearbySupportedDevices();
 
                 // If still nothing, then do nothing
-                if(supportedBleDevices == null || supportedBleDevices.Count == 0)
+                if (supportedBleDevices == null || supportedBleDevices.Count == 0)
                 {
                     Debug.WriteLine("Still no remote devices to which to " +
                                     "write this packet. Aborting attempt."
                                     );
-                    return;
-                }                
+                    goto Exit;
+                }
+            }
+
+            if (supportedBleDevices == null || supportedBleDevices.Count == 0)
+            {
+                Debug.WriteLine("No supported devices in range to which to " +
+                                "transmit this packet. Aborting."
+                                );
+                goto Exit;
             }
 
             //
-            // Step 2
+            // Step 3
             // Check if the packet is for a device immediately in range of
             // this device (optimization to avoid unnecessary future
             // broadcasts if target is a neighbor of this device)
@@ -443,7 +497,7 @@ namespace PacketProcessingTestUWP
 
             foreach (IPAddress address in supportedBleDevices.Keys)
             {
-                if(IPAddress.Equals(address, destinationAddress))
+                if (IPAddress.Equals(address, destinationAddress))
                 {
                     targetIsNeighbor = true;
 
@@ -458,55 +512,9 @@ namespace PacketProcessingTestUWP
                     {
                         Debug.WriteLine("Exception ocurred while trying to " +
                                         "transmit the packet over BLE. \n" +
-                                        "\tException message: " + e.Message
-                                        );
-                    }
-
-                    // Check transmission status
-                    if (!packetTransmittedSuccessfully)
-                    {
-                        Debug.WriteLine("Could not transmit this packet: " +
-                                        Utilities.BytesToString(packet) +
-                                        "\n\t to this address: " +
-                                        destinationAddress.ToString()
-                                        );
-                    }
-                    else
-                    {
-                        // We successfully transmitted the packet! Cue fireworks.
-                        Debug.WriteLine("Successfully transmitted this " +
-                                        "packet:" + Utilities.BytesToString(packet) +
-                                        "\n\t to this address:" +
-                                        destinationAddress.ToString()
-                                        );
-                    }
-
-                    break;
-                }
-            }
-
-            //
-            // Step 3
-            // Send the packet to all devices in range if the target is not an
-            // immediate neighbor
-            //
-            if(!targetIsNeighbor)
-            {
-                foreach(DeviceInformation device in supportedBleDevices.Values)
-                {
-                    try
-                    {
-                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
-                                                                                            packet
-                                                                                            );
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.WriteLine("Exception ocurred while trying to " +
-                                        "transmit the packet over BLE. \n" +
                                         "Exception: " + e.Message
                                         );
-                    }                    
+                    }
 
                     // Check transmission status
                     if (!packetTransmittedSuccessfully)
@@ -522,12 +530,87 @@ namespace PacketProcessingTestUWP
                         // We successfully transmitted the packet! Cue fireworks.
                         Debug.WriteLine("Successfully transmitted this " +
                                        "packet:" + Utilities.BytesToString(packet) +
-                                        " to this address:" +
+                                        "to this address:" +
                                         destinationAddress.ToString()
                                         );
                     }
+
+                    break;
                 }
-            }            
+            }
+
+            //
+            // Step 4
+            // Send the packet to all devices in range if the target is not an
+            // immediate neighbor
+            //
+            if (!targetIsNeighbor)
+            {
+                foreach (DeviceInformation device in supportedBleDevices.Values)
+                {
+                    try
+                    {
+                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
+                                                                                            packet
+                                                                                            );
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("Exception ocurred while trying to " +
+                                        "transmit the packet over BLE. \n" +
+                                        "Exception: " + e.Message
+                                        );
+                    }
+
+                    // Check transmission status
+                    if (!packetTransmittedSuccessfully)
+                    {
+                        Debug.WriteLine("Could not transmit this packet: " +
+                                        Utilities.BytesToString(packet) +
+                                        " to this address: " +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+                    else
+                    {
+                        // We successfully transmitted the packet! Cue fireworks.
+                        Debug.WriteLine("Successfully transmitted this " +
+                                       "packet:" + Utilities.BytesToString(packet) +
+                                        "to this address:" +
+                                        destinationAddress.ToString()
+                                        );
+                    }
+
+                    // Wait until sending the packet to the next target so as
+                    // not to run over other devices trying to write to it
+                    Thread.Sleep(1000);
+                }
+            }
+
+            //
+            // Step 5
+            // Re-start the GATT server so we can receive another packet
+            //
+
+            Exit:
+
+            return;
+
+            //if(!gattServerStarted)
+            //{
+            //    gattServerStarted = await StartGattServer();
+
+            //    if (!gattServerStarted)
+            //    {
+            //        Debug.WriteLine("Error ocurred during SendPacketOverBluetoothLe" +
+            //                        " when trying to restart the GATT server."
+            //                        );
+            //    }
+            //    else
+            //    {
+            //        Debug.WriteLine("GATT server restarted for next packet.");
+            //    }
+            //}            
         }
         #endregion
 
