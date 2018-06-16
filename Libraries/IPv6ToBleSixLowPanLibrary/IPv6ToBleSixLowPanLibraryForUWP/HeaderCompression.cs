@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -100,9 +103,162 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
 
         #endregion
 
-        #region IPv6 header field extraction helper function
+        #region IPv6 header and UDP header parser classes and functions
 
+        /// <summary>
+        /// A class to represent a full, uncompressed IPv6 header (40 bytes).
+        /// This class is used to parse an IPv6 header out of a full IPv6
+        /// packet in byte array form.
+        /// </summary>
+        private class Ipv6Header
+        {
+            public byte     versionTrafficClass,    // byte 0 = 4 bits version, 4 bits traffic class
+                            trafficClassFlow;       // byte 1 = 4 bits traffic class, 4 bits flow label
+            public UInt16   flow;                   // bytes 2 and 3 = rest of flow label (20 bits total)
+            public UInt16   payloadLength;          // bytes 4 and 5 = payload length
+            public byte     nextHeader,             // byte 6 = next header
+                            hopLimit;               // byte 7 = hop limit
+            public byte[]   sourceAddress,          // bytes 8-23 = source address
+                            destinationAddress;     // bytes 24-39 = destination address
 
+            public Ipv6Header()
+            {
+                versionTrafficClass = 0;
+                trafficClassFlow = 0;
+                flow = 0;
+                payloadLength = 0;
+                nextHeader = 0;
+                hopLimit = 0;
+                sourceAddress = new byte[16];
+                destinationAddress = new byte[16];
+            }
+        }
+
+        /// <summary>
+        /// A helper function to extract IPv6 header fields into a container
+        /// structure, for easy access during header compression or
+        /// decompression. 
+        /// </summary>
+        /// <param name="sourcePacket">The uncompressed IPv6 packet in
+        /// byte array form.</param>
+        /// <returns></returns>
+        private Ipv6Header ParseIPv6HeaderFromByteArray(byte[] sourcePacket)
+        {
+            Ipv6Header parsedHeader = new Ipv6Header();
+
+            try
+            {
+                // Create a MemoryStream out of the received bytes
+                MemoryStream memoryStream = new MemoryStream(sourcePacket,
+                                                             0, // index 0
+                                                             40 // IPv6 header length
+                                                             );
+
+                // Create a BinaryReader out of the memory stream
+                BinaryReader binaryReader = new BinaryReader(memoryStream);
+
+                //
+                // Extract the fields one at a time
+                //
+
+                // Byte 0 = 4 bits version, 4 bits traffic class
+                parsedHeader.versionTrafficClass = binaryReader.ReadByte();
+
+                // Byte 1 = 4 bits traffic class, 4 bits flow label
+                parsedHeader.trafficClassFlow = binaryReader.ReadByte();
+
+                // Bytes 2 and 3 = remainder of flow label (20 bits total)
+                parsedHeader.flow = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+
+                // Bytes 4 and 5 = payload length
+                parsedHeader.payloadLength = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+
+                // Byte 6 = next header
+                parsedHeader.nextHeader = binaryReader.ReadByte();
+
+                // Byte 7 = hop limit
+                parsedHeader.hopLimit = binaryReader.ReadByte();
+
+                // Bytes 8-23 = source address
+                for(int i = 0; i < 16; i++)
+                {
+                    parsedHeader.sourceAddress[i] = binaryReader.ReadByte();
+                }
+
+                // Bytes 24-39 = destination address
+                for(int i = 0; i < 16; i++)
+                {
+                    parsedHeader.destinationAddress[i] = binaryReader.ReadByte();
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Error occurred while extracting the IPv6" +
+                                " header. Exception: " + e.Message
+                                );
+                return null;
+            }
+
+            return parsedHeader;
+        }
+
+        /// <summary>
+        /// A struct to represent an uncompressed UDP header.
+        /// </summary>
+        private class UdpHeader
+        {
+            public UInt16 sourcePort;
+            public UInt16 destinationPort;
+            public UInt16 length;
+            public UInt16 checksum;
+        }
+
+        /// <summary>
+        /// Same as ParseIPv6HeaderFromByteArray, but for a UDP header.
+        /// </summary>
+        /// <param name="sourcePacket">The uncompressed IPv6 source packet.</param>
+        /// <returns></returns>
+        private UdpHeader ParseUdpHeaderFromByteArray(byte[] sourcePacket)
+        {
+            UdpHeader parsedHeader = new UdpHeader();
+
+            try
+            {
+                // Create a MemoryStream out of the received bytes
+                MemoryStream memoryStream = new MemoryStream(sourcePacket,
+                                                             40, // index 40
+                                                             8   // UDP header length
+                                                             );
+
+                // Create a BinaryReader out of the memory stream
+                BinaryReader binaryReader = new BinaryReader(memoryStream);
+
+                //
+                // Extract the fields one at a time
+                //
+
+                // Bytes 0 and 1 = source port
+                parsedHeader.sourcePort = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+
+                // Bytes 2 and 3 = destination port
+                parsedHeader.destinationPort = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+
+                // Bytes 4 and 5 = length
+                parsedHeader.length = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+
+                // Bytes 6 and 7 = checksum
+                parsedHeader.checksum = (ushort)IPAddress.NetworkToHostOrder(binaryReader.ReadInt16());
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Error occurred while extracting the UDP " +
+                                "header. Exception: " + e.Message
+                                );
+                return null;
+            }
+
+            return parsedHeader;
+        }
 
         #endregion
 
@@ -124,7 +280,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// For more info, see section 3.1 of RFC 6282:
         /// https://tools.ietf.org/html/rfc6282#section-3.1
         /// </summary>
-        private enum IPHC : uint
+        private enum IPHC : byte
         {
             //
             // Values of fields within the IPHC encoding first byte. C stands
@@ -186,7 +342,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// For UDP LOWPAN_NHC, see section 4.3.3:
         /// https://tools.ietf.org/html/rfc6282#section-4.3.3
         /// </summary>
-        private enum NHC : uint
+        private enum NHC : byte
         {
             //
             // NHC_EXT_HDR (extension header)
@@ -208,7 +364,18 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             UDP_CS_P_00 = 0xF0, // All inline
             UDP_CS_P_01 = 0xF1, // Source = 16 bit inline, dest = 0xF0 + 8 bit inline
             UDP_CS_P_10 = 0xF2, // Source = 0xF0 + 8 bit inline, dest = 16 bit inline
-            UDP_CS_P_11 = 0xF3  // Source and dest = 0xF0B + 4 bit inline
+            UDP_CS_P_11 = 0xF3  // Source and dest = 0xF0B + 4 bit inline           
+        }
+
+        /// <summary>
+        /// Minimum and maximum compressible UDP ports (from HC06).
+        /// </summary>
+        private enum UdpPort : UInt16
+        {
+            UDP_4_BIT_PORT_MIN = 0xF0B0,
+            UDP_4_BIT_PORT_MAX = 0xF0BF,    // F0B0 + 15
+            UDP_8_BIT_PORT_MIN = 0xF000,
+            UDP_8_BIT_PORT_MAX = 0xF0FF     // F000 + 255
         }
 
         private int IPV6_HEADER_LENGTH = 1;   // One byte
@@ -438,6 +605,61 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                    );
         }
 
+        /// <summary>
+        /// Determines if an IP address is the unspecified address (all zeroes).
+        /// </summary>
+        /// <param name="ipAddress"></param>
+        /// <returns></returns>
+        private bool IsAddressUnspecified(
+            byte[] address
+        )
+        {
+            return (address[0] == 0 &&
+                    address[1] == 0 &&
+                    address[2] == 0 &&
+                    address[3] == 0 &&
+                    address[4] == 0 &&
+                    address[5] == 0 &&
+                    address[6] == 0 &&
+                    address[7] == 0 &&
+                    address[8] == 0 &&
+                    address[9] == 0 &&
+                    address[10] == 0 &&
+                    address[11] == 0 &&
+                    address[12] == 0 &&
+                    address[13] == 0 &&
+                    address[14] == 0 &&
+                    address[15] == 0
+                    );
+        }
+
+        /// <summary>
+        /// Checks if an address is a link local unicast address. In other
+        /// words, if address is on prefix FE80::/10.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        private bool IsAddressLinkLocal(
+            byte[] address
+        )
+        {
+            return (address[0] == 0xFE &&
+                    address[1] == 0x80
+                    );
+        }
+
+        /// <summary>
+        /// Checks if an address is a multicast address. See RFC 4291.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        private bool IsAddressMulticast(
+            byte [] address
+        )
+        {
+            return (address[0] == 0xFF);
+        }
+
         #endregion
 
         #region Address compression/decompression functions
@@ -577,7 +799,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 ipAddress[8] ^= 0x02;
             }
         }
-         
+
         #endregion
 
         #region Header compression
@@ -612,13 +834,36 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// needed to compress the IP destination address.</param>
         public unsafe byte[] CompressHeaderIPHC(
             byte[] sourcePacket,
-            byte[] linkLayerDestinationAddress
+            byte[] linkLayerDestinationAddress,
+            out int processedHeaderLength
         )
         {    
             // The compressed packet to return. Start out at the same length
             // as the original because we need to manipulate pointers in the
             // new one as we go
             byte[] compressedPacket = new byte[sourcePacket.Length];
+
+            // Extract the IPv6 header from the original packet
+            Ipv6Header sourceIpv6Header = ParseIPv6HeaderFromByteArray(sourcePacket);
+            if(sourceIpv6Header == null)
+            {
+                Debug.WriteLine("Could not extract the IPv6 header from the " +
+                                "source packet."
+                                );
+                processedHeaderLength = 0;
+                return null;
+            }
+
+            // Extract the UDP header from the original packet
+            UdpHeader sourceUdpHeader = ParseUdpHeaderFromByteArray(sourcePacket);
+            if(sourceUdpHeader == null)
+            {
+                Debug.WriteLine("Could not extract the UDP header from the " +
+                                "source packet."
+                                );
+                processedHeaderLength = 0;
+                return null;
+            }
             
             fixed(byte* compressedPacketPtr = &compressedPacket[0])
             {
@@ -635,14 +880,335 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
 
                 // Check if destination context exists, for possibly allocating
                 // a third byte
-                if(LookupAddressContextByPrefix())
+                if(LookupAddressContextByPrefix(sourceIpv6Header.destinationAddress) != null &&
+                   LookupAddressContextByPrefix(sourceIpv6Header.sourceAddress) != null)
+                {
+                    // Set the context flag and increase the header compression pointer
+                    Debug.WriteLine("IPHC: compressing destination or source address - setting CID.");
+                    iphc1 |= (byte)IPHC.CID;
+                    headerCompressionPtr++;
+                }
 
+                //
                 // Traffic class and flow label. If the flow label is 0, 
                 // compress it. If traffic class is 0, compress it. The offset
                 // of the traffic class depends on the presence of the version
                 // and flow label.
-                temp = 
+                //
+                temp = (byte)((sourceIpv6Header.versionTrafficClass << 4) | (sourceIpv6Header.trafficClassFlow >> 4));
+                temp = (byte)(((temp & 0x03) << 6) | (temp >> 2));
 
+                if(((sourceIpv6Header.trafficClassFlow & 0x0F) == 0) &&
+                    (sourceIpv6Header.flow == 0))
+                {
+                    // Flow label can be compressed
+                    iphc0 |= (byte)IPHC.FL_C;
+                    if(((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
+                        ((sourceIpv6Header.trafficClassFlow & 0xF0) == 0))
+                    {
+                        // Compress (elide) all
+                        iphc0 |= (byte)IPHC.TC_C;
+                    }
+                    else
+                    {
+                        // Compress only the flow label
+                        *headerCompressionPtr = temp;
+                        headerCompressionPtr++;
+                    }
+                }
+                else
+                {
+                    // Flow label cannot be compressed
+                    if(((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
+                        ((sourceIpv6Header.trafficClassFlow & 0xF0) == 0))
+                    {
+                        // Compress only the traffic class
+                        iphc0 |= (byte)IPHC.TC_C;
+                        *headerCompressionPtr = (byte)((temp & 0xC0) | (sourceIpv6Header.trafficClassFlow & 0x0F));
+                        fixed(byte* tfc = &sourceIpv6Header.trafficClassFlow)
+                        {
+                            memcpy(headerCompressionPtr + 1, tfc, 2);
+                        }
+                        headerCompressionPtr += 3;
+                    }
+                    else
+                    {
+                        // Compress nothing
+                        fixed(byte* vtc = &sourceIpv6Header.versionTrafficClass)
+                        {
+                            memcpy(headerCompressionPtr, vtc, 4);
+                        }
+
+                        // But replace the top byte with the new ECN | DSCP format
+                        *headerCompressionPtr = temp;
+                        headerCompressionPtr += 4;
+                    }
+                }
+
+                // The payload length is always compressed, nothing to do here
+
+                //
+                // Next header. Normally this is only compressed if the packet
+                // is UDP in a general 6LoWPAN scenario, but the IPv6 over
+                // Bluetooth LE project only deals with UDP packets so we
+                // always do it.
+                //
+                iphc0 |= (byte)IPHC.NH_C;
+
+                if((iphc0 & (byte)IPHC.NH_C) == 0)
+                {
+                    *headerCompressionPtr = sourceIpv6Header.nextHeader;
+                    headerCompressionPtr++;
+                }
+
+                //
+                // Hop limit
+                // If 1, compress and encoding is 01
+                // If 64, compress and encoding is 10.
+                // If 255, compress and encoding is 11.
+                // Else, do not compress.
+                //
+                switch(sourceIpv6Header.hopLimit)
+                {
+                    case 1:
+                        iphc0 |= (byte)IPHC.TTL_1;
+                        break;
+                    case 64:
+                        iphc0 |= (byte)IPHC.TTL_64;
+                        break;
+                    case 255:
+                        iphc0 |= (byte)IPHC.TTL_255;
+                        break;
+                    default:
+                        *headerCompressionPtr = sourceIpv6Header.hopLimit;
+                        headerCompressionPtr++;
+                        break;
+                }
+
+                //
+                // Source address. Cannot be multicast.
+                //
+                if(IsAddressUnspecified(sourceIpv6Header.sourceAddress))
+                {
+                    Debug.WriteLine("IPHC: compressing unspecified. Setting SAC.");
+                    iphc1 |= (byte)IPHC.SAC;
+                    iphc1 |= (byte)IPHC.SAM_00;
+                }
+                else if((context = LookupAddressContextByPrefix(sourceIpv6Header.sourceAddress)) != null)
+                {
+                    // Elide the prefix. Indicate by the CID and set context + SAC
+                    Debug.WriteLine("IPHC: compressing source address with context - setting CID and SAC with context number " + context.number);
+                    iphc1 |= (byte)(IPHC.CID | IPHC.SAC);
+                    compressedPacket[2] |= (byte)(context.number << 4);
+
+                    // Compression compares with this node's address (source)
+                    iphc1 |= CompressAddress64((byte)IPHC.SAM_BIT,
+                                                sourceIpv6Header.sourceAddress,
+                                                StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
+                                                headerCompressionPtr
+                                                );
+                }
+                else if(IsAddressLinkLocal(sourceIpv6Header.sourceAddress) &&
+                        sourceIpv6Header.destinationAddress[2] == 0 &&
+                        sourceIpv6Header.destinationAddress[3] == 0 &&
+                        sourceIpv6Header.destinationAddress[4] == 0 &&
+                        sourceIpv6Header.destinationAddress[5] == 0 &&
+                        sourceIpv6Header.destinationAddress[6] == 0 &&
+                        sourceIpv6Header.destinationAddress[7] == 0)
+                {
+                    // No context is found for this address
+                    iphc1 |= CompressAddress64((byte)IPHC.SAM_BIT,
+                                                sourceIpv6Header.sourceAddress,
+                                                StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
+                                                headerCompressionPtr
+                                                );
+                }
+                else
+                {
+                    // Send the full address. SAC = 0, SAM = 00.
+                    iphc1 |= (byte)IPHC.SAM_00; // 128 bits
+                    fixed(byte* srcipaddr = &sourceIpv6Header.sourceAddress[0])
+                    {
+                        memcpy(headerCompressionPtr, srcipaddr, 16);
+                    }
+                    headerCompressionPtr += 16;
+                }
+
+                //
+                // Destination address
+                //
+                if(IsAddressMulticast(sourceIpv6Header.destinationAddress))
+                {
+                    // Address is multicast. Try to compress.
+                    iphc1 |= (byte)IPHC.M;
+                    if(IsMulticastAddressCompressable8(sourceIpv6Header.destinationAddress))
+                    {
+                        iphc1 |= (byte)IPHC.DAM_11;
+
+                        // Use the last byte
+                        *headerCompressionPtr = sourceIpv6Header.destinationAddress[15];
+                        headerCompressionPtr++;
+                    }
+                    else if(IsMulticastAddressCompressable32(sourceIpv6Header.destinationAddress))
+                    {
+                        iphc1 |= (byte)IPHC.DAM_10;
+
+                        // Use the second byte + the last three bytes
+                        *headerCompressionPtr = sourceIpv6Header.destinationAddress[1];
+                        fixed(byte* destPtr = &sourceIpv6Header.destinationAddress[13])
+                        {
+                            memcpy(headerCompressionPtr, destPtr, 3);
+                        }
+                        headerCompressionPtr += 4;
+                    } else if(IsMulticastAddressCompressable48(sourceIpv6Header.destinationAddress))
+                    {
+                        iphc1 |= (byte)IPHC.DAM_01;
+
+                        // Use the second byte + the last five bytes
+                        *headerCompressionPtr = sourceIpv6Header.destinationAddress[1];
+                        fixed (byte* destPtr = &sourceIpv6Header.destinationAddress[11])
+                        {
+                            memcpy(headerCompressionPtr, destPtr, 5);
+                        }
+                        headerCompressionPtr += 6;
+                    }
+                    else
+                    {
+                        // The full address
+                        fixed(byte* destAddrPtr = &sourceIpv6Header.destinationAddress[0])
+                        {
+                            memcpy(headerCompressionPtr, destAddrPtr, 16);
+                        }
+                        headerCompressionPtr += 16;
+                    }
+                }
+                else
+                {
+                    // Address is unicast. Try to compress.
+                    if((context = LookupAddressContextByPrefix(sourceIpv6Header.destinationAddress)) != null)
+                    {
+                        // Elide the prefix
+                        iphc1 |= (byte)IPHC.DAC;
+                        compressedPacket[2] |= context.number;
+
+                        // Compression compare with link address (destination)
+                        iphc1 |= CompressAddress64((byte)IPHC.DAM_BIT,
+                                                    sourceIpv6Header.destinationAddress,
+                                                    linkLayerDestinationAddress,
+                                                    headerCompressionPtr
+                                                    );
+                    } else if(IsAddressLinkLocal(sourceIpv6Header.destinationAddress) &&
+                              sourceIpv6Header.destinationAddress[2] == 0 &&
+                              sourceIpv6Header.destinationAddress[3] == 0 &&
+                              sourceIpv6Header.destinationAddress[4] == 0 &&
+                              sourceIpv6Header.destinationAddress[5] == 0 &&
+                              sourceIpv6Header.destinationAddress[6] == 0 &&
+                              sourceIpv6Header.destinationAddress[7] == 0)
+                    {
+                        // No context found for this address
+                        iphc1 |= CompressAddress64((byte)IPHC.DAM_BIT,
+                                                    sourceIpv6Header.destinationAddress,
+                                                    linkLayerDestinationAddress,
+                                                    headerCompressionPtr
+                                                    );
+                    }
+                    else
+                    {
+                        // Send the full address
+                        iphc1 |= (byte)IPHC.DAM_00; // 128 bits
+                        fixed(byte* destPtr = &sourceIpv6Header.destinationAddress[0])
+                        {
+                            memcpy(headerCompressionPtr, destPtr, 16);
+                        }
+                        headerCompressionPtr += 16;
+                    }
+                }
+
+                //
+                // UDP header compression. Again, the IPv6 over BLE project
+                // only deals with UDP packets so we do this every time.
+                //
+
+                byte uncompressedHeaderLength = 40;
+
+                // Mask out the last 4 bits (can be used as a mask)
+                if(((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN) &&
+                    ((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN) )
+                {
+                    // We can compress 12 bits of both source and destination
+                    *headerCompressionPtr = (byte)NHC.UDP_CS_P_11;
+                    Debug.WriteLine("IPHC: Removed 12 bits of both source and " +
+                                    "destination with prefix 0xF0B"
+                                    );
+                    *(headerCompressionPtr + 1) = (byte)((byte)(((ushort)IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) -
+                                                                 (ushort)UdpPort.UDP_4_BIT_PORT_MIN) << 4) +
+                                                         (byte)(((ushort)IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) -
+                                                                 (ushort)UdpPort.UDP_4_BIT_PORT_MIN)));
+                    headerCompressionPtr += 2;
+                }
+                else if((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFF00) == (ushort)UdpPort.UDP_8_BIT_PORT_MIN)
+                {
+                    // We can compress 8 bits of the destination. Leave the source.
+                    *headerCompressionPtr = (byte)NHC.UDP_CS_P_01;
+                    Debug.WriteLine("IPHC: Leaving source. Removed 8 bits of destination " +
+                                    "with prefix 0xF0."
+                                    );
+                    fixed(ushort* srcPort = &sourceUdpHeader.sourcePort)
+                    {
+                        memcpy(headerCompressionPtr + 1, srcPort, 2);
+                    }
+                    *(headerCompressionPtr + 3) = (byte)((ushort)IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) -
+                                                         (ushort)UdpPort.UDP_8_BIT_PORT_MIN);
+                    headerCompressionPtr += 4;
+                }
+                else if ((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) & 0xFF00) == (ushort)UdpPort.UDP_8_BIT_PORT_MIN)
+                {
+                    // We can compress 8 bits of the source. Leave the destination.
+                    // Copy the compressed port.
+                    *headerCompressionPtr = (byte)NHC.UDP_CS_P_10;
+                    Debug.WriteLine("IPHC: Leaving dest. Removed 8 bits of source " +
+                                    "with prefix 0xF0."
+                                    );                    
+                    *(headerCompressionPtr + 1) = (byte)((ushort)IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) -
+                                                         (ushort)UdpPort.UDP_8_BIT_PORT_MIN);
+                    fixed (ushort* destPort = &sourceUdpHeader.destinationPort)
+                    {
+                        memcpy(headerCompressionPtr + 1, destPort, 2);
+                    }
+                    headerCompressionPtr += 4;
+                }
+                else
+                {
+                    // We cannot compress. Copy uncompressed ports, full checksum.
+                    *headerCompressionPtr = (byte)NHC.UDP_CS_P_00;
+                    Debug.WriteLine("IPHC: Can't compress UDP header.");
+                    fixed(ushort* srcPort = &sourceUdpHeader.sourcePort)
+                    {
+                        memcpy(headerCompressionPtr + 1, srcPort, 4);
+                    }
+                    headerCompressionPtr += 5;
+                }
+
+                // Always inline the checksum
+                fixed(ushort* checksumPtr = &sourceUdpHeader.checksum)
+                {
+                    memcpy(headerCompressionPtr, checksumPtr, 2);
+                }
+                headerCompressionPtr += 2;
+
+                uncompressedHeaderLength += 8;  // add size of UDP header
+
+                //
+                // Calculate the total length of the processed headers
+                //
+                processedHeaderLength = (int)(headerCompressionPtr - compressedPacketPtr);
+
+                //
+                // Finally, assign the compressed header bytes to the compressed
+                // packet
+                //
+                compressedPacket[0] = iphc0;
+                compressedPacket[1] = iphc1;
             }
 
             return compressedPacket;
