@@ -16,6 +16,8 @@ using Windows.UI.Xaml.Navigation;
 // IPv6ToBle Interop Library and related namespaces
 using IPv6ToBleDriverInterfaceForUWP;
 using IPv6ToBleDriverInterfaceForUWP.DeviceIO;
+using IPv6ToBleSixLowPanLibraryForUWP;
+using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 
 using Microsoft.Win32.SafeHandles;      // Safe file handles
 using System.Threading;                 // Asynchronous I/O and thread pool
@@ -198,6 +200,59 @@ namespace DriverTest
             {
                 Debug.WriteLine("Packet was null.");
                 return;
+            }
+
+            //
+            // Compress the packet (test)
+            //
+            Debug.WriteLine("Original packet size: " + packet.Length);
+            Debug.WriteLine("Original packet contents: " + Utilities.BytesToString(packet));
+            Debug.WriteLine("Compressing packet...");
+
+            HeaderCompression compression = new HeaderCompression();
+
+            int processedHeaderLength = 0;
+            int payloadLength = 0;
+            byte[] compressedPacket = compression.CompressHeaderIphc(packet,
+                                                                     out processedHeaderLength,
+                                                                     out payloadLength
+                                                                     );
+
+            Debug.WriteLine("Compression of packet complete.");
+
+            if(compressedPacket == null)
+            {
+                Debug.WriteLine("Error occurred during packet compression. " +
+                                "Unable to compress."
+                                );
+            }
+            else
+            {
+                Debug.WriteLine("Compressed packet size: " + compressedPacket.Length);
+                Debug.WriteLine("Compressed packet contents: " + Utilities.BytesToString(compressedPacket));
+            }
+
+            //
+            // Decompress the compressed packet back into its original form (test)
+            //
+            Debug.WriteLine("Decompressing packet...");
+
+            byte[] uncompressedPacket = compression.UncompressHeaderIphc(compressedPacket,
+                                                                         processedHeaderLength,
+                                                                         payloadLength
+                                                                         );
+
+            if (uncompressedPacket == null)
+            {
+                Debug.WriteLine("Error occurred during packet decompression.");
+            }
+            else
+            {
+                Debug.WriteLine("Uncompressed packet size: " + uncompressedPacket.Length);
+                Debug.WriteLine("Uncompressed packet contents: " + Utilities.BytesToString(uncompressedPacket));
+
+                Debug.WriteLine("Decompressed packet size is same as original: " + (packet.Length == uncompressedPacket.Length));
+                Debug.WriteLine("Decompressed packet is identical to the original: " + (Utilities.PacketsEqual(packet, uncompressedPacket)));
             }
 
             // Test: Send another listening request to the driver. Comment out

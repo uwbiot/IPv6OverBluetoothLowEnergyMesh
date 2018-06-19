@@ -87,7 +87,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// Memcmp import from native C++ library using P/Invoke.
         /// </summary>
         /// <returns></returns>
-        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("msvcrt.dll", EntryPoint = "memcmp", CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
         private static extern int memcmp(byte[] b1, byte[] b2, long count);
 
         /// <summary>
@@ -112,14 +112,14 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// </summary>
         private class Ipv6Header
         {
-            public byte     versionTrafficClass,    // byte 0 = 4 bits version, 4 bits traffic class
-                            trafficClassFlow;       // byte 1 = 4 bits traffic class, 4 bits flow label
-            public UInt16   flow;                   // bytes 2 and 3 = rest of flow label (20 bits total)
-            public UInt16   payloadLength;          // bytes 4 and 5 = payload length
-            public byte     nextHeader,             // byte 6 = next header
-                            hopLimit;               // byte 7 = hop limit
-            public byte[]   sourceAddress,          // bytes 8-23 = source address
-                            destinationAddress;     // bytes 24-39 = destination address
+            public byte versionTrafficClass,    // byte 0 = 4 bits version, 4 bits traffic class
+                        trafficClassFlow;       // byte 1 = 4 bits traffic class, 4 bits flow label
+            public UInt16 flow;                 // bytes 2 and 3 = rest of flow label (20 bits total)
+            public UInt16 payloadLength;        // bytes 4 and 5 = payload length
+            public byte nextHeader,             // byte 6 = next header
+                        hopLimit;               // byte 7 = hop limit
+            public byte[] sourceAddress,        // bytes 8-23 = source address
+                          destinationAddress;   // bytes 24-39 = destination address
 
             public Ipv6Header()
             {
@@ -180,13 +180,13 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 parsedHeader.hopLimit = binaryReader.ReadByte();
 
                 // Bytes 8-23 = source address
-                for(int i = 0; i < 16; i++)
+                for (int i = 0; i < 16; i++)
                 {
                     parsedHeader.sourceAddress[i] = binaryReader.ReadByte();
                 }
 
                 // Bytes 24-39 = destination address
-                for(int i = 0; i < 16; i++)
+                for (int i = 0; i < 16; i++)
                 {
                     parsedHeader.destinationAddress[i] = binaryReader.ReadByte();
                 }
@@ -203,7 +203,9 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         }
 
         /// <summary>
-        /// A struct to represent an uncompressed UDP header.
+        /// A class to represent an uncompressed UDP header. Using a class
+        /// instead of a struct because we need to be able to return NULL on
+        /// error, and a struct is non-nullable.
         /// </summary>
         private class UdpHeader
         {
@@ -258,6 +260,116 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             }
 
             return parsedHeader;
+        }
+
+        /// <summary>
+        /// Copies a fully populated IPv6 header object's fields into a
+        /// byte array (packet).
+        /// </summary>
+        /// <param name="header">A populated IPv6 header object.</param>
+        /// <param name="buffer">An empty buffer into which to copy the header.</param>
+        private void CopyIpv6HeaderToBuffer(
+            Ipv6Header header,
+            ref byte[] buffer
+        )
+        {
+            try
+            {
+                // Create a MemoryStream out of the buffer
+                MemoryStream memoryStream = new MemoryStream(buffer,
+                                                                0, // index 0
+                                                                40 // IPv6 header length
+                                                                );
+
+                // Create a BinaryReader out of the memory stream
+                BinaryWriter binaryWriter = new BinaryWriter(memoryStream);
+
+                //
+                // Write the fields one at a time
+                //
+
+                // Byte 0 = 4 bits version, 4 bits traffic class
+                binaryWriter.Write(header.versionTrafficClass);
+
+                // Byte 1 = 4 bits traffic class, 4 bits flow label
+                binaryWriter.Write(header.trafficClassFlow);
+
+                // Bytes 2 and 3 = remainder of flow label (20 bits total)
+                binaryWriter.Write(header.flow);
+
+                // Bytes 4 and 5 = payload length
+                binaryWriter.Write(header.payloadLength);
+
+                // Byte 6 = next header
+                binaryWriter.Write(header.nextHeader);
+
+                // Byte 7 = hop limit
+                binaryWriter.Write(header.hopLimit);
+
+                // Bytes 8-23 = source address
+                for (int i = 0; i < 16; i++)
+                {
+                    binaryWriter.Write(header.sourceAddress[i]);
+                }
+
+                // Bytes 24-39 = destination address
+                for (int i = 0; i < 16; i++)
+                {
+                    binaryWriter.Write(header.destinationAddress[i]);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Error occurred while writing the IPv6" +
+                                " header. Exception: " + e.Message
+                                );
+            }
+        }
+
+        /// <summary>
+        /// Copies a fully populated UDP header object's fields into a
+        /// byte array (packet).
+        /// </summary>
+        /// <param name="header">A populated UDP header object.</param>
+        /// <param name="buffer">An buffer into which to copy the header.</param>
+        private void CopyUdpHeaderToBuffer(
+            UdpHeader header,
+            ref byte[] buffer
+        )
+        {
+            try
+            {
+                // Create a MemoryStream out of the buffer
+                MemoryStream memoryStream = new MemoryStream(buffer,
+                                                             40, // index 40
+                                                             8   // UDP header length
+                                                             );
+
+                // Create a BinaryReader out of the memory stream
+                BinaryWriter binaryWriter = new BinaryWriter(memoryStream);
+
+                //
+                // Write the fields one at a time
+                //
+
+                // Bytes 0 and 1 = source port
+                binaryWriter.Write(header.sourcePort);
+
+                // Bytes 2 and 3 = destination port
+                binaryWriter.Write(header.destinationPort);
+
+                // Bytes 4 and 5 = length
+                binaryWriter.Write(header.length);
+
+                // Bytes 6 and 7 = checksum
+                binaryWriter.Write(header.checksum);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Error occurred while writing the UDP " +
+                                "header. Exception: " + e.Message
+                                );
+            }
         }
 
         #endregion
@@ -388,7 +500,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// have up to 8 bytes. Defined as a class so it will be passed by
         /// reference, like a struct* in native code.
         /// </summary>
-        class AddressContext
+        private class AddressContext
         {
             public byte used;
             public byte number;
@@ -654,7 +766,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// <param name="address"></param>
         /// <returns></returns>
         private bool IsAddressMulticast(
-            byte [] address
+            byte[] address
         )
         {
             return (address[0] == 0xFF);
@@ -677,11 +789,11 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         }
 
         /// <summary>
-        /// Finds the context with the given number.
+        /// Finds the context corresponding to the prefix IP address.
         /// </summary>
         /// <param name="ipAddress">The IP address.</param>
         /// <returns></returns>
-        private AddressContext LookupAddressContextByPrefix(byte[] ipAddress)
+        private AddressContext AddressContextLookupByPrefix(byte[] ipAddress)
         {
             for (int i = 0; i < MAX_ADDRESS_CONTEXTS; i++)
             {
@@ -698,25 +810,53 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         }
 
         /// <summary>
+        /// Finds the context with the given number.
+        /// </summary>
+        /// <param name="number"></param>
+        /// <returns></returns>
+        private AddressContext AddressContextLookupByNumber(byte number)
+        {
+            for (int i = 0; i < MAX_ADDRESS_CONTEXTS; i++)
+            {
+                if (addressContexts[i].used == 1 &&
+                    addressContexts[i].number == number)
+                {
+                    return addressContexts[i];
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Compresses a 64-bit IID if possible.
+        /// 
+        /// Note: The linkLayerAddress parameter is used by the Contiki OS
+        /// code, but that is because the 6LowPAN module is used as part of the
+        /// OS network stack and they have access to the destination MAC
+        /// address. We are manipulating IPv6 packets that are not encapsulated
+        /// in a L2 frame; essentially, they are in isolation. We have no way
+        /// of getting the L2 destination MAC address so we're commenting it
+        /// out for now.
         /// </summary>
         private unsafe byte CompressAddress64(
             byte bitPosition,
             byte[] ipAddress,
-            byte[] linkLayerAddress,
+            //byte[] linkLayerAddress,
             byte* headerCompressionPtr
         )
         {
             // Check if the 64-bit IID is based on the supplied MAC address-
             // generated link local address
-            if(IsAddressBasedOnMacAddress(ipAddress, linkLayerAddress))
-            {
-                return (byte)(3 << bitPosition);    // 0 bits
-            }
-            else if(IsIid16BitCompressable(ipAddress))
+            //if(IsAddressBasedOnMacAddress(ipAddress, linkLayerAddress))
+            //{
+            //    return (byte)(3 << bitPosition);    // 0 bits
+            //}
+            //else if(IsIid16BitCompressable(ipAddress))
+            if (IsIid16BitCompressable(ipAddress))
             {
                 // Compress the IID to 16 bits: xxxx::0000:00ff:fe00:XXXX
-                fixed(byte* source = &ipAddress[14])
+                fixed (byte* source = &ipAddress[14])
                 {
                     memcpy(headerCompressionPtr, source, 2);
                 }
@@ -726,7 +866,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             else
             {
                 // Do not compress the IID. xxxx::IID
-                fixed(byte* source = &ipAddress[8])
+                fixed (byte* source = &ipAddress[8])
                 {
                     memcpy(headerCompressionPtr, source, 8);
                 }
@@ -739,13 +879,21 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// Uncompresses an address based on a prefix and a postfix with zeroes
         /// in between. If the postfix is zero in length, it will use the link
         /// address to configure the IP address.
+        /// 
+        ///  Note: The linkLayerAddress parameter is used by the Contiki OS
+        /// code, but that is because the 6LowPAN module is used as part of the
+        /// OS network stack and they have access to the destination MAC
+        /// address. We are manipulating IPv6 packets that are not encapsulated
+        /// in a L2 frame; essentially, they are in isolation. We have no way
+        /// of getting the L2 destination MAC address so we're commenting it
+        /// out for now.
         /// </summary>
         private unsafe void UncompressAddress(
-            byte[] ipAddress,
+            ref byte[] ipAddress,
             byte[] prefix,
             byte prefixPostfixCount,
-            byte[] linkLayerAddress,
-            byte* headerCompressionPtr
+            //byte[] linkLayerAddress,
+            byte* uncompressionPtr
         )
         {
             byte prefixCount = (byte)(prefixPostfixCount >> 4);
@@ -755,49 +903,49 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
             prefixCount = (byte)(prefixCount == 15 ? 16 : prefixCount);
             postfixCount = (byte)(postfixCount == 15 ? 16 : postfixCount);
 
-            if(prefixCount > 0)
+            if (prefixCount > 0)
             {
-                fixed(byte* ipAddrPtr = &ipAddress[0], prefixPtr = &prefix[0])
+                fixed (byte* ipAddrPtr = &ipAddress[0], prefixPtr = &prefix[0])
                 {
                     memcpy(ipAddrPtr, prefixPtr, prefixCount);
-                }            
+                }
             }
 
-            if(prefixCount + postfixCount < 16)
+            if (prefixCount + postfixCount < 16)
             {
-                fixed(byte* ipAddrPtr = &ipAddress[prefixCount])
+                fixed (byte* ipAddrPtr = &ipAddress[prefixCount])
                 {
                     memset(ipAddrPtr, 0, 16 - (prefixCount + postfixCount));
                 }
             }
 
-            if(postfixCount > 0)
+            if (postfixCount > 0)
             {
-                fixed(byte* ipAddrPtr = &ipAddress[16 - postfixCount])
+                fixed (byte* ipAddrPtr = &ipAddress[16 - postfixCount])
                 {
-                    memcpy(ipAddrPtr, headerCompressionPtr, postfixCount);
+                    memcpy(ipAddrPtr, uncompressionPtr, postfixCount);
                 }
 
-                if(postfixCount == 2 && prefixCount < 11)
+                if (postfixCount == 2 && prefixCount < 11)
                 {
                     // 16-bit uncompression -> 0000:00ff:fe00:XXXX
                     ipAddress[11] = 0xff;
                     ipAddress[12] = 0xfe;
                 }
 
-                headerCompressionPtr += postfixCount;
-            } 
-            else if(prefixCount > 0)
-            {
-                // No IID-based configuration if no prefix and no data.
-                // Unspecified. Set the last 64 bits of the address to the
-                // EUI-64.
-                fixed(byte* ipAddrPtr = &ipAddress[8], llAddrPtr = &linkLayerAddress[0])
-                {
-                    memcpy(ipAddrPtr, llAddrPtr, 8);
-                }
-                ipAddress[8] ^= 0x02;
+                uncompressionPtr += postfixCount;
             }
+            //else if (prefixCount > 0)
+            //{
+            //    // No IID-based configuration if no prefix and no data.
+            //    // Unspecified. Set the last 64 bits of the address to the
+            //    // EUI-64.
+            //    fixed (byte* ipAddrPtr = &ipAddress[8], llAddrPtr = &linkLayerAddress[0])
+            //    {
+            //        memcpy(ipAddrPtr, llAddrPtr, 8);
+            //    }
+            //    ipAddress[8] ^= 0x02;
+            //}
         }
 
         #endregion
@@ -829,15 +977,24 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
         /// "The context number 00 is reserved for the link local prefix. For
         /// Unicast addresses, if we cannot compress the prefix, we neither
         /// compress the IID."
+        /// 
+        /// This method is very closely modeled after the compress_hdr_iphc
+        /// function in the sicslowpan.c module of Contiki OS. 
         /// </summary>
         /// <param name="linkLayerDestinationAddress">The L2 (link layer) destination address,
-        /// needed to compress the IP destination address.</param>
-        public unsafe byte[] CompressHeaderIPHC(
+        /// needed to compress the IP destination address. In other words, the
+        /// MAC address of the destination of the packet.
+        /// 
+        /// SEE NOTE in CompressAddress64.</param>
+        /// <param name="processedHeaderLength">The total length of the 
+        /// compressed headers after completion.</param>
+        public unsafe byte[] CompressHeaderIphc(
             byte[] sourcePacket,
-            byte[] linkLayerDestinationAddress,
-            out int processedHeaderLength
+            //byte[] linkLayerDestinationAddress,
+            out int processedHeaderLength,
+            out int payloadLength
         )
-        {    
+        {
             // The compressed packet to return. Start out at the same length
             // as the original because we need to manipulate pointers in the
             // new one as we go
@@ -845,33 +1002,38 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
 
             // Extract the IPv6 header from the original packet
             Ipv6Header sourceIpv6Header = ParseIPv6HeaderFromByteArray(sourcePacket);
-            if(sourceIpv6Header == null)
+            if (sourceIpv6Header == null)
             {
                 Debug.WriteLine("Could not extract the IPv6 header from the " +
                                 "source packet."
                                 );
                 processedHeaderLength = 0;
+                payloadLength = 0;
                 return null;
             }
 
             // Extract the UDP header from the original packet
             UdpHeader sourceUdpHeader = ParseUdpHeaderFromByteArray(sourcePacket);
-            if(sourceUdpHeader == null)
+            if (sourceUdpHeader == null)
             {
                 Debug.WriteLine("Could not extract the UDP header from the " +
                                 "source packet."
                                 );
                 processedHeaderLength = 0;
+                payloadLength = 0;
                 return null;
             }
-            
-            fixed(byte* compressedPacketPtr = &compressedPacket[0])
+
+            byte uncompressedHeaderLength = 40;
+
+            fixed (byte* compressedPacketPtr = &compressedPacket[0])
             {
                 // Local variables for temp purposes, as well as the two compressed
                 // header bytes
                 byte temp, iphc0, iphc1;
 
-                // Set the header compression pointer to the beginning of the new
+                // The pointer to walk the compressed packet buffer. Set the
+                // header compression pointer to the beginning of the new
                 // compressed packet, + 2 for the 2 compressed bytes
                 byte* headerCompressionPtr = compressedPacketPtr + 2;
 
@@ -880,8 +1042,8 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
 
                 // Check if destination context exists, for possibly allocating
                 // a third byte
-                if(LookupAddressContextByPrefix(sourceIpv6Header.destinationAddress) != null &&
-                   LookupAddressContextByPrefix(sourceIpv6Header.sourceAddress) != null)
+                if (AddressContextLookupByPrefix(sourceIpv6Header.destinationAddress) != null &&
+                   AddressContextLookupByPrefix(sourceIpv6Header.sourceAddress) != null)
                 {
                     // Set the context flag and increase the header compression pointer
                     Debug.WriteLine("IPHC: compressing destination or source address - setting CID.");
@@ -895,15 +1057,18 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 // of the traffic class depends on the presence of the version
                 // and flow label.
                 //
+                // The IPHC format of the traffic class is ECN | DSCP, whereas
+                // the original is DSCP | ECN.
+                //
                 temp = (byte)((sourceIpv6Header.versionTrafficClass << 4) | (sourceIpv6Header.trafficClassFlow >> 4));
                 temp = (byte)(((temp & 0x03) << 6) | (temp >> 2));
 
-                if(((sourceIpv6Header.trafficClassFlow & 0x0F) == 0) &&
+                if (((sourceIpv6Header.trafficClassFlow & 0x0F) == 0) &&
                     (sourceIpv6Header.flow == 0))
                 {
                     // Flow label can be compressed
                     iphc0 |= (byte)IPHC.FL_C;
-                    if(((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
+                    if (((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
                         ((sourceIpv6Header.trafficClassFlow & 0xF0) == 0))
                     {
                         // Compress (elide) all
@@ -919,13 +1084,13 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 else
                 {
                     // Flow label cannot be compressed
-                    if(((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
+                    if (((sourceIpv6Header.versionTrafficClass & 0x0F) == 0) &&
                         ((sourceIpv6Header.trafficClassFlow & 0xF0) == 0))
                     {
                         // Compress only the traffic class
                         iphc0 |= (byte)IPHC.TC_C;
                         *headerCompressionPtr = (byte)((temp & 0xC0) | (sourceIpv6Header.trafficClassFlow & 0x0F));
-                        fixed(byte* tfc = &sourceIpv6Header.trafficClassFlow)
+                        fixed (byte* tfc = &sourceIpv6Header.trafficClassFlow)
                         {
                             memcpy(headerCompressionPtr + 1, tfc, 2);
                         }
@@ -934,7 +1099,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     else
                     {
                         // Compress nothing
-                        fixed(byte* vtc = &sourceIpv6Header.versionTrafficClass)
+                        fixed (byte* vtc = &sourceIpv6Header.versionTrafficClass)
                         {
                             memcpy(headerCompressionPtr, vtc, 4);
                         }
@@ -955,7 +1120,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 //
                 iphc0 |= (byte)IPHC.NH_C;
 
-                if((iphc0 & (byte)IPHC.NH_C) == 0)
+                if ((iphc0 & (byte)IPHC.NH_C) == 0)
                 {
                     *headerCompressionPtr = sourceIpv6Header.nextHeader;
                     headerCompressionPtr++;
@@ -968,7 +1133,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 // If 255, compress and encoding is 11.
                 // Else, do not compress.
                 //
-                switch(sourceIpv6Header.hopLimit)
+                switch (sourceIpv6Header.hopLimit)
                 {
                     case 1:
                         iphc0 |= (byte)IPHC.TTL_1;
@@ -988,13 +1153,13 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 //
                 // Source address. Cannot be multicast.
                 //
-                if(IsAddressUnspecified(sourceIpv6Header.sourceAddress))
+                if (IsAddressUnspecified(sourceIpv6Header.sourceAddress))
                 {
                     Debug.WriteLine("IPHC: compressing unspecified. Setting SAC.");
                     iphc1 |= (byte)IPHC.SAC;
                     iphc1 |= (byte)IPHC.SAM_00;
                 }
-                else if((context = LookupAddressContextByPrefix(sourceIpv6Header.sourceAddress)) != null)
+                else if ((context = AddressContextLookupByPrefix(sourceIpv6Header.sourceAddress)) != null)
                 {
                     // Elide the prefix. Indicate by the CID and set context + SAC
                     Debug.WriteLine("IPHC: compressing source address with context - setting CID and SAC with context number " + context.number);
@@ -1004,11 +1169,11 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     // Compression compares with this node's address (source)
                     iphc1 |= CompressAddress64((byte)IPHC.SAM_BIT,
                                                 sourceIpv6Header.sourceAddress,
-                                                StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
+                                                //StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
                                                 headerCompressionPtr
                                                 );
                 }
-                else if(IsAddressLinkLocal(sourceIpv6Header.sourceAddress) &&
+                else if (IsAddressLinkLocal(sourceIpv6Header.sourceAddress) &&
                         sourceIpv6Header.destinationAddress[2] == 0 &&
                         sourceIpv6Header.destinationAddress[3] == 0 &&
                         sourceIpv6Header.destinationAddress[4] == 0 &&
@@ -1019,7 +1184,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     // No context is found for this address
                     iphc1 |= CompressAddress64((byte)IPHC.SAM_BIT,
                                                 sourceIpv6Header.sourceAddress,
-                                                StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
+                                                //StatelessAddressConfiguration.GenerateIidFromBlthRadioIdAsync().Result,
                                                 headerCompressionPtr
                                                 );
                 }
@@ -1027,7 +1192,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 {
                     // Send the full address. SAC = 0, SAM = 00.
                     iphc1 |= (byte)IPHC.SAM_00; // 128 bits
-                    fixed(byte* srcipaddr = &sourceIpv6Header.sourceAddress[0])
+                    fixed (byte* srcipaddr = &sourceIpv6Header.sourceAddress[0])
                     {
                         memcpy(headerCompressionPtr, srcipaddr, 16);
                     }
@@ -1037,11 +1202,11 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 //
                 // Destination address
                 //
-                if(IsAddressMulticast(sourceIpv6Header.destinationAddress))
+                if (IsAddressMulticast(sourceIpv6Header.destinationAddress))
                 {
                     // Address is multicast. Try to compress.
                     iphc1 |= (byte)IPHC.M;
-                    if(IsMulticastAddressCompressable8(sourceIpv6Header.destinationAddress))
+                    if (IsMulticastAddressCompressable8(sourceIpv6Header.destinationAddress))
                     {
                         iphc1 |= (byte)IPHC.DAM_11;
 
@@ -1049,18 +1214,19 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                         *headerCompressionPtr = sourceIpv6Header.destinationAddress[15];
                         headerCompressionPtr++;
                     }
-                    else if(IsMulticastAddressCompressable32(sourceIpv6Header.destinationAddress))
+                    else if (IsMulticastAddressCompressable32(sourceIpv6Header.destinationAddress))
                     {
                         iphc1 |= (byte)IPHC.DAM_10;
 
                         // Use the second byte + the last three bytes
                         *headerCompressionPtr = sourceIpv6Header.destinationAddress[1];
-                        fixed(byte* destPtr = &sourceIpv6Header.destinationAddress[13])
+                        fixed (byte* destPtr = &sourceIpv6Header.destinationAddress[13])
                         {
                             memcpy(headerCompressionPtr, destPtr, 3);
                         }
                         headerCompressionPtr += 4;
-                    } else if(IsMulticastAddressCompressable48(sourceIpv6Header.destinationAddress))
+                    }
+                    else if (IsMulticastAddressCompressable48(sourceIpv6Header.destinationAddress))
                     {
                         iphc1 |= (byte)IPHC.DAM_01;
 
@@ -1075,7 +1241,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     else
                     {
                         // The full address
-                        fixed(byte* destAddrPtr = &sourceIpv6Header.destinationAddress[0])
+                        fixed (byte* destAddrPtr = &sourceIpv6Header.destinationAddress[0])
                         {
                             memcpy(headerCompressionPtr, destAddrPtr, 16);
                         }
@@ -1085,7 +1251,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 else
                 {
                     // Address is unicast. Try to compress.
-                    if((context = LookupAddressContextByPrefix(sourceIpv6Header.destinationAddress)) != null)
+                    if ((context = AddressContextLookupByPrefix(sourceIpv6Header.destinationAddress)) != null)
                     {
                         // Elide the prefix
                         iphc1 |= (byte)IPHC.DAC;
@@ -1094,21 +1260,22 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                         // Compression compare with link address (destination)
                         iphc1 |= CompressAddress64((byte)IPHC.DAM_BIT,
                                                     sourceIpv6Header.destinationAddress,
-                                                    linkLayerDestinationAddress,
+                                                    //linkLayerDestinationAddress,
                                                     headerCompressionPtr
                                                     );
-                    } else if(IsAddressLinkLocal(sourceIpv6Header.destinationAddress) &&
-                              sourceIpv6Header.destinationAddress[2] == 0 &&
-                              sourceIpv6Header.destinationAddress[3] == 0 &&
-                              sourceIpv6Header.destinationAddress[4] == 0 &&
-                              sourceIpv6Header.destinationAddress[5] == 0 &&
-                              sourceIpv6Header.destinationAddress[6] == 0 &&
-                              sourceIpv6Header.destinationAddress[7] == 0)
+                    }
+                    else if (IsAddressLinkLocal(sourceIpv6Header.destinationAddress) &&
+                            sourceIpv6Header.destinationAddress[2] == 0 &&
+                            sourceIpv6Header.destinationAddress[3] == 0 &&
+                            sourceIpv6Header.destinationAddress[4] == 0 &&
+                            sourceIpv6Header.destinationAddress[5] == 0 &&
+                            sourceIpv6Header.destinationAddress[6] == 0 &&
+                            sourceIpv6Header.destinationAddress[7] == 0)
                     {
                         // No context found for this address
                         iphc1 |= CompressAddress64((byte)IPHC.DAM_BIT,
                                                     sourceIpv6Header.destinationAddress,
-                                                    linkLayerDestinationAddress,
+                                                    //linkLayerDestinationAddress,
                                                     headerCompressionPtr
                                                     );
                     }
@@ -1116,7 +1283,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     {
                         // Send the full address
                         iphc1 |= (byte)IPHC.DAM_00; // 128 bits
-                        fixed(byte* destPtr = &sourceIpv6Header.destinationAddress[0])
+                        fixed (byte* destPtr = &sourceIpv6Header.destinationAddress[0])
                         {
                             memcpy(headerCompressionPtr, destPtr, 16);
                         }
@@ -1129,11 +1296,9 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 // only deals with UDP packets so we do this every time.
                 //
 
-                byte uncompressedHeaderLength = 40;
-
                 // Mask out the last 4 bits (can be used as a mask)
-                if(((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN) &&
-                    ((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN) )
+                if (((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN) &&
+                    ((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFFF0) == (ushort)UdpPort.UDP_4_BIT_PORT_MIN))
                 {
                     // We can compress 12 bits of both source and destination
                     *headerCompressionPtr = (byte)NHC.UDP_CS_P_11;
@@ -1146,14 +1311,14 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                                                                  (ushort)UdpPort.UDP_4_BIT_PORT_MIN)));
                     headerCompressionPtr += 2;
                 }
-                else if((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFF00) == (ushort)UdpPort.UDP_8_BIT_PORT_MIN)
+                else if ((ushort)(IPAddress.HostToNetworkOrder(sourceUdpHeader.destinationPort) & 0xFF00) == (ushort)UdpPort.UDP_8_BIT_PORT_MIN)
                 {
                     // We can compress 8 bits of the destination. Leave the source.
                     *headerCompressionPtr = (byte)NHC.UDP_CS_P_01;
                     Debug.WriteLine("IPHC: Leaving source. Removed 8 bits of destination " +
                                     "with prefix 0xF0."
                                     );
-                    fixed(ushort* srcPort = &sourceUdpHeader.sourcePort)
+                    fixed (ushort* srcPort = &sourceUdpHeader.sourcePort)
                     {
                         memcpy(headerCompressionPtr + 1, srcPort, 2);
                     }
@@ -1168,7 +1333,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     *headerCompressionPtr = (byte)NHC.UDP_CS_P_10;
                     Debug.WriteLine("IPHC: Leaving dest. Removed 8 bits of source " +
                                     "with prefix 0xF0."
-                                    );                    
+                                    );
                     *(headerCompressionPtr + 1) = (byte)((ushort)IPAddress.HostToNetworkOrder(sourceUdpHeader.sourcePort) -
                                                          (ushort)UdpPort.UDP_8_BIT_PORT_MIN);
                     fixed (ushort* destPort = &sourceUdpHeader.destinationPort)
@@ -1182,7 +1347,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                     // We cannot compress. Copy uncompressed ports, full checksum.
                     *headerCompressionPtr = (byte)NHC.UDP_CS_P_00;
                     Debug.WriteLine("IPHC: Can't compress UDP header.");
-                    fixed(ushort* srcPort = &sourceUdpHeader.sourcePort)
+                    fixed (ushort* srcPort = &sourceUdpHeader.sourcePort)
                     {
                         memcpy(headerCompressionPtr + 1, srcPort, 4);
                     }
@@ -1190,7 +1355,7 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 }
 
                 // Always inline the checksum
-                fixed(ushort* checksumPtr = &sourceUdpHeader.checksum)
+                fixed (ushort* checksumPtr = &sourceUdpHeader.checksum)
                 {
                     memcpy(headerCompressionPtr, checksumPtr, 2);
                 }
@@ -1209,9 +1374,421 @@ namespace IPv6ToBleSixLowPanLibraryForUWP
                 //
                 compressedPacket[0] = iphc0;
                 compressedPacket[1] = iphc1;
+
+                //
+                // Now that we have compressed the header, copy the payload from
+                // the original packet over to the compressed packet. The
+                // original payload starts after the UDP header, so at byte 49
+                // (40 bytes for IPv6 header + 8 bytes for UDP header)
+                //
+                payloadLength = sourcePacket.Length - uncompressedHeaderLength;
+                for (int i = processedHeaderLength, j = uncompressedHeaderLength, count = 0;
+                    count < payloadLength; i++, j++, count++)
+                {
+                    compressedPacket[i] = sourcePacket[j];
+                }
+
+                // Shrink the new compressed packet to the actual contents
+                Array.Resize(ref compressedPacket, processedHeaderLength + payloadLength);
             }
 
             return compressedPacket;
+        }
+
+        #endregion
+
+        #region Header decompression
+
+        /// <summary>
+        /// Uncompresses an IPv6 packet that was previously compressed with
+        /// the CompressHeaderIPHC() method.
+        /// 
+        /// This method is very closely modeled after the uncompress_hdr_iphc
+        /// function in the sicslowpan.c module of Contiki OS. 
+        /// </summary>
+        /// <param name="compressedPacket">The compressed packet.</param>
+        /// <param name="compressedHeaderLength">The length of the compressed
+        /// header.</param>
+        /// <returns></returns>
+        public unsafe byte[] UncompressHeaderIphc(
+            byte[] compressedPacket,
+            int compressedHeaderLength,
+            int payloadLength
+        )
+        {
+            byte[] uncompressedPacket = new byte[1280];
+
+            // An IPv6 header container for the resulting uncompressed IPv6 header
+            Ipv6Header uncompressedIpv6Header = new Ipv6Header();
+
+            // A UDP header container for the resulting uncompressed UDP header
+            UdpHeader uncompressedUdpHeader = new UdpHeader();
+
+            fixed (byte* compressedPacketPtr = &compressedPacket[0])
+            {
+                byte temp, iphc0, iphc1;
+
+                // The pointer to walk the compressed packet. At least two 
+                // bytes will be used for encoding.
+                byte* uncompressionPtr = compressedPacketPtr + compressedHeaderLength + 2;
+
+                // The two bytes containing compression information
+                iphc0 = compressedPacket[0];
+                iphc1 = compressedPacket[1];
+
+                // Another byte if the CID flag is set
+                if ((iphc1 & (byte)IPHC.CID) == 1)
+                {
+                    Debug.WriteLine("IPHC: CID flag is set. Increase header by one.");
+                    uncompressionPtr++;
+                }
+
+                byte uncompressedHeaderLength = 0;
+
+                //
+                // Traffic class and flow label
+                //
+                if ((iphc0 & (byte)IPHC.FL_C) == 0)
+                {
+                    // Flow label is carried inline
+                    if ((iphc0 & (byte)IPHC.TC_C) == 0)
+                    {
+                        // Traffic class is carried inline
+                        fixed (byte* tcflowPtr = &uncompressedIpv6Header.trafficClassFlow)
+                        {
+                            memcpy(tcflowPtr, uncompressionPtr + 1, 3);
+                        }
+                        temp = *uncompressionPtr;
+                        uncompressionPtr += 4;
+
+                        // The IPHC format of traffic class is ECN | DSCP. The
+                        // original is DSCP | ECN. Set the version, then pick
+                        // the highest DSCP bits and set in the versionTrafficClass
+                        // byte
+                        uncompressedIpv6Header.versionTrafficClass = (byte)(0x60 | ((temp >> 2) & 0x0F));
+
+                        // ECN rolled down two steps + the lowest DSCP bits at
+                        // the top two bits
+                        uncompressedIpv6Header.trafficClassFlow = (byte)(((temp >> 2) & 0x30) | (temp << 6) | (uncompressedIpv6Header.trafficClassFlow & 0x0F));
+                    }
+                    else
+                    {
+                        // Traffic class is compressed. Set the version and no
+                        // traffic class.
+                        uncompressedIpv6Header.versionTrafficClass = 0x60;
+
+                        // Set the highest flow label bits + ECN bits
+                        uncompressedIpv6Header.trafficClassFlow = (byte)((*uncompressionPtr & 0x0F) | ((*uncompressionPtr >> 2) & 0x30));
+                        fixed (ushort* flowLabelPtr = &uncompressedIpv6Header.flow)
+                        {
+                            memcpy(flowLabelPtr, uncompressionPtr + 1, 2);
+                        }
+                        uncompressionPtr += 3;
+                    }
+                }
+                else
+                {
+                    // Version is always 6. Version and flow label are compressed.
+                    if ((iphc0 & (byte)IPHC.TC_C) == 0)
+                    {
+                        // Traffic class is inline
+                        uncompressedIpv6Header.versionTrafficClass = (byte)(0x60 | ((*uncompressionPtr >> 2) & 0x0F));
+                        uncompressedIpv6Header.trafficClassFlow = (byte)(((*uncompressionPtr << 6) & 0xC0) | ((*uncompressionPtr >> 2) & 0x30));
+                        uncompressedIpv6Header.flow = 0;
+                        uncompressionPtr++;
+                    }
+                    else
+                    {
+                        // Traffic class is compressed
+                        uncompressedIpv6Header.versionTrafficClass = 0x60;
+                        uncompressedIpv6Header.trafficClassFlow = 0;
+                        uncompressedIpv6Header.flow = 0;
+                    }
+                }
+
+                //
+                // Next header
+                //
+                if ((iphc0 & (byte)IPHC.NH_C) == 0)
+                {
+                    // Next header is carried inline
+                    uncompressedIpv6Header.nextHeader = *uncompressionPtr;
+                    Debug.WriteLine("IPHC: next header is inline: " + uncompressedIpv6Header.nextHeader.ToString());
+                    uncompressionPtr++;
+                }
+
+                //
+                // Hop limit
+                //
+                if ((iphc0 & 0x03) != (byte)IPHC.TTL_I)
+                {
+                    uncompressedIpv6Header.hopLimit = timeToLiveValues[iphc0 & 0x03];
+                }
+                else
+                {
+                    uncompressedIpv6Header.hopLimit = *uncompressionPtr;
+                    uncompressionPtr++;
+                }
+
+                //
+                // Source address. Put the source address compression mode SAM
+                // in the temp variable.
+                //
+                temp = (byte)(((iphc1 & (byte)IPHC.SAM_11) >> (byte)IPHC.SAM_BIT) & 0x03);
+
+                // Context-based compression
+                if ((iphc1 & (byte)IPHC.SAC) == 1)
+                {
+                    byte sci = (byte)(((iphc1 & (byte)IPHC.CID) == 1) ? compressedPacket[2] >> 4 : 0);
+
+                    // Source address. Check if context != NULL only if SAM
+                    // bits are != 0
+                    if (temp != 0)
+                    {
+                        context = AddressContextLookupByNumber(sci);
+                    }
+                    if (context == null)
+                    {
+                        Debug.WriteLine("Header decompression error; context not found for source address.");
+                        return null;
+                    }
+
+                    // If temp == 0, we don't have a context and therefore no
+                    // prefix.
+                    UncompressAddress(ref uncompressedIpv6Header.sourceAddress,
+                                      temp != 0 ? context.prefix : null,
+                                      uncompressContextBased[temp],
+                                      uncompressionPtr
+                                      );
+                }
+                else
+                {
+                    // No compression and link local
+                    UncompressAddress(ref uncompressedIpv6Header.sourceAddress,
+                                      linkLocalPrefix,
+                                      uncompressLinkLocal[temp],
+                                      uncompressionPtr
+                                      );
+                }
+
+                //
+                // Destination address. Put the destination address compression
+                // mode into the temp variable.
+                //
+                temp = (byte)(((iphc1 & (byte)IPHC.DAM_11) >> (byte)IPHC.DAM_BIT) & 0x03);
+
+                // Multicast compression
+                if ((iphc1 & (byte)IPHC.M) == 1)
+                {
+                    // Context-based multicast compression
+                    if ((iphc1 & (byte)IPHC.DAC) == 1)
+                    {
+                        // This was not implemented in the Contiki OS
+                    }
+                    else
+                    {
+                        // Non-context based multicast compression.
+                        // DAM_00: 128 bits.
+                        // DAM_01: 48 bits. FFXX::00XX:XXXX:XXXX
+                        // DAM_10: 32 bits. FFXX::00XX:XXXX
+                        // DAM_11: 8 bits. FF02::00XX
+                        byte[] prefix = { 0xFF, 0x02 };
+                        if (temp > 0 && temp < 3)
+                        {
+                            prefix[1] = *uncompressionPtr;
+                            uncompressionPtr++;
+                        }
+
+                        UncompressAddress(ref uncompressedIpv6Header.destinationAddress,
+                                          prefix,
+                                          uncompressNonContextBasedMulticast[temp],
+                                          uncompressionPtr
+                                          );
+                    }
+                }
+                else
+                {
+                    // No multicast, context-based
+                    if ((iphc1 & (byte)IPHC.DAC) == 1)
+                    {
+                        byte dci = (byte)(((iphc1 & (byte)IPHC.CID) == 1) ? compressedPacket[2] & 0x0F : 0);
+                        context = AddressContextLookupByNumber(dci);
+
+                        // All valid cases below need the context
+                        if (context == null)
+                        {
+                            Debug.WriteLine("Header decompression: context not found for destination address.");
+                            return null;
+                        }
+
+                        UncompressAddress(ref uncompressedIpv6Header.destinationAddress,
+                                          context.prefix,
+                                          uncompressContextBased[temp],
+                                          uncompressionPtr
+                                          );
+                    }
+                    else
+                    {
+                        // Not context based. Link local. M = 0, DAC = 0,
+                        // same as SAC.
+                        UncompressAddress(ref uncompressedIpv6Header.destinationAddress,
+                                          linkLocalPrefix,
+                                          uncompressLinkLocal[temp],
+                                          uncompressionPtr
+                                          );
+                    }
+                }
+
+                uncompressedHeaderLength += 40;
+
+                //
+                // Next header processing - continued.
+                //
+                if ((iphc1 & (byte)IPHC.NH_C) == 1)
+                {
+                    // Next header (UDP) is compressed. NHC follows.
+                    if ((*uncompressionPtr & (byte)NHC.UDP_MASK) == (byte)NHC.UDP_ID)
+                    {
+                        byte checksumCompressed;
+                        uncompressedIpv6Header.nextHeader = 17; // UDP
+                        checksumCompressed = (byte)(*uncompressionPtr & (byte)NHC.UDP_CHECKSUM_C);
+
+                        Debug.WriteLine($"IPHC: Incoming header value: {*uncompressionPtr:X2}");
+
+                        switch ((*uncompressionPtr & (byte)NHC.UDP_CS_P_11))
+                        {
+                            case (byte)NHC.UDP_CS_P_00:
+
+                                // 1 byte for NHC, 4 bytes for ports, 2 bytes checksum
+                                fixed (ushort* srcportPtr = &uncompressedUdpHeader.sourcePort)
+                                {
+                                    memcpy(srcportPtr, uncompressionPtr + 1, 2);
+                                }
+                                fixed (ushort* destPortPtr = &uncompressedUdpHeader.destinationPort)
+                                {
+                                    memcpy(destPortPtr, uncompressionPtr + 3, 2);
+                                }
+
+                                Debug.WriteLine($"IPHC: Uncompressed UDP ports (ptr + 5): {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.sourcePort)}, {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.destinationPort)}");
+
+                                uncompressionPtr += 5;
+
+                                break;
+                            case (byte)NHC.UDP_CS_P_01:
+
+                                // 1 byte for NHC + source 16 bits inline, destination = 0xF0 + 8 bits inline
+                                Debug.WriteLine("IPHC: decompressing destination.");
+                                fixed (ushort* sourcePortPtr = &uncompressedUdpHeader.sourcePort)
+                                {
+                                    memcpy(sourcePortPtr, uncompressionPtr + 1, 2);
+                                }
+                                uncompressedUdpHeader.destinationPort = (ushort)IPAddress.HostToNetworkOrder((ushort)UdpPort.UDP_8_BIT_PORT_MIN + (*(uncompressionPtr + 3)));
+
+                                Debug.WriteLine($"IPHC: Uncompressed UDP ports (ptr + 4): {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.sourcePort)}, {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.destinationPort)}");
+                                uncompressionPtr += 4;
+
+                                break;
+                            case (byte)NHC.UDP_CS_P_10:
+
+                                // 1 byte for NHC + source = 0xF0 + 8 bit inline, destination = 16 bits inline
+                                Debug.WriteLine("IPHC: Decompressing source.");
+                                uncompressedUdpHeader.sourcePort = (ushort)IPAddress.HostToNetworkOrder((ushort)UdpPort.UDP_8_BIT_PORT_MIN + (*(uncompressionPtr + 1)));
+                                fixed (ushort* destPortPtr = &uncompressedUdpHeader.destinationPort)
+                                {
+                                    memcpy(destPortPtr, uncompressionPtr + 2, 2);
+                                }
+
+                                Debug.WriteLine($"IPHC: Uncompressed UDP ports (ptr + 4): {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.sourcePort)}, {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.destinationPort)}");
+
+                                uncompressionPtr += 4;
+
+                                break;
+
+                            case (byte)NHC.UDP_CS_P_11:
+
+                                // 1 byte for NHC, 1 byte for ports
+                                uncompressedUdpHeader.sourcePort = (ushort)IPAddress.HostToNetworkOrder((ushort)UdpPort.UDP_4_BIT_PORT_MIN + (*(uncompressionPtr + 1) >> 4));
+                                uncompressedUdpHeader.destinationPort = (ushort)IPAddress.HostToNetworkOrder((ushort)UdpPort.UDP_4_BIT_PORT_MIN + (*(uncompressionPtr + 1) & 0x0F));
+
+                                Debug.WriteLine($"IPHC: Uncompressed UDP ports (ptr + 2): {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.sourcePort)}, {IPAddress.HostToNetworkOrder(uncompressedUdpHeader.destinationPort)}");
+
+                                uncompressionPtr += 2;
+
+                                break;
+
+                            default:
+
+                                Debug.WriteLine("Header decompression error: unsupported UDP compression.");
+                                return null;
+                        }
+
+                        if (checksumCompressed == 0)
+                        {
+                            // Has checksum, default
+                            fixed (ushort* checksumPtr = &uncompressedUdpHeader.checksum)
+                            {
+                                memcpy(checksumPtr, uncompressionPtr, 2);
+                            }
+                            uncompressionPtr += 2;
+                            Debug.WriteLine("IPHC: checksum included when uncompressing UDP header.");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("IPHC: checksum not included when uncompressing UDP header.");
+                        }
+
+                        uncompressedHeaderLength += 8;  // UDP header length
+                    }
+                }
+
+                //
+                // Payload length field for the IPv6 header
+                //
+                uncompressedIpv6Header.payloadLength = (ushort)payloadLength;
+
+                //
+                // Payload length field for the UDP header
+                //
+                uncompressedUdpHeader.length = (ushort)(payloadLength + 8);
+
+                //
+                // Now that we've finished decompressing the headers (IPv6 and
+                // UDP), copy the contents of the uncompressed headers into
+                // the new packet, then copy the payload
+                //
+
+                // Copy the IPv6 header fields
+                CopyIpv6HeaderToBuffer(uncompressedIpv6Header, ref uncompressedPacket);
+
+                // Copy the UDP header fields
+                CopyUdpHeaderToBuffer(uncompressedUdpHeader, ref uncompressedPacket);
+
+                // Copy the payload (starting at byte 48 - 40 for IPv6 header +
+                // 8 bytes for UDP header)
+                for (int i = 48, j = compressedHeaderLength, count = 0;
+                    count < payloadLength; i++, j++, count++)
+                {
+                    uncompressedPacket[i] = compressedPacket[j];
+                }
+
+                // Shrink the new compressed packet to the actual contents
+                Array.Resize(ref uncompressedPacket, 48 + payloadLength);
+            }
+
+            return uncompressedPacket;
+        }
+
+        #endregion
+
+        #region Constructor
+
+        public HeaderCompression()
+        {
+            // Initialize the AddressContext array
+            for (int i = 0; i < MAX_ADDRESS_CONTEXTS; i++)
+            {
+                addressContexts[i] = new AddressContext();
+            }
         }
 
         #endregion

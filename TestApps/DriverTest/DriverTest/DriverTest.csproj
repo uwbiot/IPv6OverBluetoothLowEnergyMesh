@@ -133,8 +133,14 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="IPv6ToBleBluetoothGattLibraryForUWP">
+      <HintPath>..\..\..\Libraries\IPv6ToBleSixLowPanLibrary\IPv6ToBleSixLowPanLibraryForUWP\bin\Release\IPv6ToBleBluetoothGattLibraryForUWP.dll</HintPath>
+    </Reference>
     <Reference Include="IPv6ToBleDriverInterfaceForUWP">
       <HintPath>..\..\..\Libraries\DriverInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>
+    </Reference>
+    <Reference Include="IPv6ToBleSixLowPanLibraryForUWP">
+      <HintPath>..\..\..\Libraries\IPv6ToBleSixLowPanLibrary\IPv6ToBleSixLowPanLibraryForUWP\bin\Release\IPv6ToBleSixLowPanLibraryForUWP.dll</HintPath>
     </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
