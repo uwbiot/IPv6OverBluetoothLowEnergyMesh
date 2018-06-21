@@ -135,10 +135,10 @@ With these notes in mind, these instructions will assume you are running the dri
     8. Follow the steps on the above linked page to provision the VM with Visual Studio. It should reboot into a "WDKRemoteUser" account with a "Test Mode" watermark stamp in the bottom right of the screen. Use network provisioning with the static IP address you assigned to the host network adapter earlier. You might also need to acquire the Bus Parameters for the target PC's host-only network adapter. You can get that information in Device Manager on the test VM in the host-only network adapter's properties.
 
 2. After provisioning the target PC correctly, go to `Build > Deploy Solution` in Visual Studio with Debug | x64 selected in the Configuration Manager. You should see command prompt windows pop up on the VM. Visual Studio will tell you in the output when deployment succeeds.
-3. The driver files are deployed to the `C:\DriverTest\Drivers` directory on the VM. Right-click the IPvtToBle.inf (Setup Information) file, then click **Install**.
+3. The driver files are deployed to the `C:\DriverTest\Drivers` directory on the VM. Right-click the IPv6ToBle.inf (Setup Information) file, then click **Install**.
 4. To run the driver, open an elevated command prompt window and type `net start ipv6toble`. To stop the driver, type `net stop ipv6toble`.
 
-**Important** The driver is configured to behave differently depending on whether it is running on a border router device or not. For testing purposes, leave it as a non-border router (the default). That will cause it to catch all outbound traffic and will let you test the system. To change the registry key, open Regedit.exe and navigate to `Computer\HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\IPv6ToBle\Parameters`. Change the *Border Router* flag to 1 if you'd like to experiment with filter list operations with the DriverTest app.
+**Important** The driver is configured to behave differently depending on whether it is running on a border router device or not. For testing purposes, leave it as a non-border router (the default). That will cause it to catch all outbound traffic that is IPv6/UDP and will let you test the system. To change the registry key, open Regedit.exe and navigate to `Computer\HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\IPv6ToBle\Parameters`. Change the *Border Router* flag to 1 if you'd like to experiment with filter list operations with the DriverTest app.
 
 ### Deploy and install the driver on an IoT Core device (OPTIONAL)
 
@@ -151,7 +151,7 @@ Post-deployment installation usually fails and requires a manual PowerShell sess
 3. Apply the update with this command: `Applyupdate -stage duncanmacmichael.drivers.ipv6toble.cab`.
 4. Commit the update with this command: `Applyupdate -commit`.
 
-The Raspberry Pi/IoT device should restart, then you should see the spinning gears that means it is applying the driver to the board image.
+The Raspberry Pi/IoT device should restart, then you should see the spinning gears that means it is applying the driver to the board image. The driver is configured to auto-start when the system boots, so it will be running the next time the IoT device boots.
 
 If you encounter an issue when committing the update, clear the update cache first by using this command: `Applyupdate -clear`. Then try applying the update again.
 
@@ -173,6 +173,8 @@ If you'd like to see what the driver is doing as it operates, use Traceview.exe.
     3. To see only critical errors, choose the Error level.
 
 If you do this before starting the driver, you can see what it does as it starts up. Otherwise, if the driver is already running, TraceView will just start showing what the driver is doing at the moment. If you interact with the driver by using the DriverTest app or by using the packet processing app, you can watch the output illustrate the steps the driver is taking.
+
+Try experimenting with the DriverTest app to exercise the driver's capabilities. Change the *Border Router* registry key (described above) to **1**, then try the commands to manipulate the white list and mesh list. You can see it working by watching the output and examining the child keys under the main parameters key.
 
 ### Configure the Raspberry Pi 3s/IoT node devices
 
@@ -202,8 +204,8 @@ Don't start this app yet, either.
 
 ### Deploy the packet processing app to Iot Core Node 2
 
-1. Open the PacketProcessing_Node_1 app.
-2. In the project properties, go to Debug and enter Node 1's IP address in the Remote Machine field.
+1. Open the PacketProcessing_Node_2 app.
+2. In the project properties, go to Debug and enter Node 2's IP address in the Remote Machine field.
 3. Press **F5** or go to `Debug > Start Debugging` to deploy the app to the device.
 
 ## Usage
@@ -211,7 +213,7 @@ Don't start this app yet, either.
 With the driver running on the VM and the packet processing apps running on all three devices, now you can test the system.
 
 1. Click "Start" on the packet processing app on Node 2. It will scan for nearby devies and find no one, which is expected. It then starts the GATT server and starts advertising its presence.
-2. Click "Start" on the packet processing app on Node 1. It will scan and find Node 2, then query it to make sure it is supported. You should see "Found 1 devices" in the debug output if successful.
+2. Click "Start" on the packet processing app on Node 1. It will scan and find Node 2, then query it to make sure it is supported. You should see "Found 1 devices" in the debug output if successful. It then starts the GATT server.
 3. Start the packet processing app on the VM. It will scan for and find both Nodes. You should see "Found 2 devices" in the debug output if successful.
 4. Now, you can either use the DriverTest app on the VM to send some packets to the driver that will be intercepted and passed to the packet processing app, or you can just wait. After anywhere from a few seconds to a minute, the driver will always intercept an outbound packet that the OS randomly generates.
 5. Once the driver has passed a packet to the packet processing app on the VM, you should see that it sends the packet to each of the nodes in turn after showing the contents of the packet. When once of the nodes receives a packet, you'll see the packet contents in the debug output of that node. Node 1 should then turn around and send the packet to Node 2, which will show that it received the packet from both Node 1 and the VM. The second time it receives a packet, it will discard it as a duplicate.
