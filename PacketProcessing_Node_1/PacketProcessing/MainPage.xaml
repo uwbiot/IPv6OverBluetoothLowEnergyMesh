@@ -1,0 +1,19 @@
+﻿<Page
+    x:Class="PacketProcessing.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PacketProcessing"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <TextBox x:Name="packetContentBox" HorizontalAlignment="Center" Text="Received packet contents" VerticalAlignment="Center" Height="123" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,333,52,544"/>
+        <Button x:Name="startButton" Content="Start" HorizontalAlignment="Left" Margin="282,108,0,0" VerticalAlignment="Top" Height="165" Width="335" FontSize="36" Click="startButton_Click"/>
+        <Button x:Name="stopButton" Content="Stop" HorizontalAlignment="Left" Margin="899,108,0,0" VerticalAlignment="Top" Height="165" Width="335" FontSize="36" Click="stopButton_Click"/>
+        <TextBox x:Name="transmissionStatusBox" HorizontalAlignment="Center" Text="Packet transmission status" VerticalAlignment="Center" Height="123" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,510,52,367"/>
+        <TextBox x:Name="overallStatusBox" HorizontalAlignment="Center" Text="Overall status" VerticalAlignment="Center" Height="241" Width="1395" IsReadOnly="True" FontSize="36" Margin="53,667,52,92"/>
+
+    </Grid>
+</Page>

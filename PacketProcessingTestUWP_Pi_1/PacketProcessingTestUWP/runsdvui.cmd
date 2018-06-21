@@ -1,2 +1,0 @@
-cd /d "C:\Users\Duncan\Documents\GitHub\IPv6OverBluetoothLowEnergyMesh\TestApps\PacketProcessingTestUWP\PacketProcessingTestUWP" &msbuild "PacketProcessingTestUWP.csproj" /t:sdvViewer /p:configuration="Debug" /p:platform=ARM
-exit %errorlevel% 

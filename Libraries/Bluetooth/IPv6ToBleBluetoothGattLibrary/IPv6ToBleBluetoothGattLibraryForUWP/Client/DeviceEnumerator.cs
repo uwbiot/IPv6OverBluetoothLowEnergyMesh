@@ -18,7 +18,6 @@ using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
-using Windows.Foundation;
 
 namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 {
@@ -128,6 +127,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             {
                 "System.Devices.Aep.DeviceAddress",
                 "System.Devices.Aep.IsConnected",
+                "System.Devices.Aep.ProtocolId",
                 "System.Devices.Aep.Bluetooth.Le.IsConnectable"
             };
 
@@ -473,8 +473,8 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                 // and reconnects if it thinks it's still occupied.
                 //
                 // Additionally, at this step, if you had connected any events
-                // to the services or characteristics, you'd have to do that first.
-                // But we didn't do that here, so no need.
+                // to the services or characteristics, you'd have to disconnect
+                // them first. But we didn't do that here, so no need.
 
                 ipv6ToBlePacketProcessingService?.Dispose();
                 currentDevice?.Dispose();

@@ -34,8 +34,7 @@ Porting this project to Linux/Unix is possible by not using the driver, then usi
 
 This Windows Filtering Platform callout driver acts as part of the bridge between the TCP/IP stack on Windows and the Bluetooth stack. The driver's binary is IPv6ToBle.sys. The driver is designed to either filter traffic destined for a device in the BLE network, if it is running on a border router device, or it is designed to catch all outbound traffic for the nodes running in the BLE network.
 
-> [!NOTE]
-> Source code for this project is best viewed in Visual Studio, as line endings and indentation are sometimes thrown off by Git converting line endings if you view it in the browser.
+**Note** Source code for this project is best viewed in Visual Studio, as line endings and indentation are sometimes thrown off by Git converting line endings if you view it in the browser.
 
 For detailed information about this driver, see the ReadMe.txt file in the `IPv6ToBle.sys` directory.
 
@@ -106,11 +105,13 @@ In the `TestApps` directory are several apps used for testing during development
 4. IPv6ToBlePacketProcessingForIoTCore
     1. Nearly identical to the main PacketProcessingTestUWP app, but designed to run in the background on a Windows 10 IoT core device such as a Raspberry Pi 3. Unused due to limitations of performing device discovery scans from a background thread. Requires modification to perform device enumeration in the background properly.
 
-## Installation and usage
+## Installation
 
-In its current form, this project requires a specific test environment to run. You must install both the Windows SDK and the Windows Driver Kit, or WDK, on your primary PC. The version of the SDK/WDK used during development was for Windows 10, version 1709, or build 16299. This is the version of the libraries against which the driver is linked, so it's probably easiest to download and install those versions. At the time of writing, the current version is for Windows 10, version 1803, or build 17134. The older versions of the SDK and WDK should be available as a link from the main download pages. Otherwise, if you use a newer version, you'll have to update the linker paths for the libraries in the driver project settings.
+In its current form, this project requires a specific test environment to run. You must install both the Windows SDK and the Windows Driver Kit, or WDK, on your primary PC. The version of the SDK/WDK used during development was for Windows 10, version 1709, or build 16299. This is the version of the libraries against which the driver is linked, so it's probably easiest to download and install those versions. If you use a newer version, you'll have to update the linker paths for the libraries in the driver project settings.
 
-### Install the driver
+Running this project also requires Visual Studio 2017.
+
+### Deploy and install the driver on a VM
 
 There are two important things to note for IPv6ToBle.sys.
 
@@ -137,13 +138,82 @@ With these notes in mind, these instructions will assume you are running the dri
 3. The driver files are deployed to the `C:\DriverTest\Drivers` directory on the VM. Right-click the IPvtToBle.inf (Setup Information) file, then click **Install**.
 4. To run the driver, open an elevated command prompt window and type `net start ipv6toble`. To stop the driver, type `net stop ipv6toble`.
 
+**Important** The driver is configured to behave differently depending on whether it is running on a border router device or not. For testing purposes, leave it as a non-border router (the default). That will cause it to catch all outbound traffic and will let you test the system. To change the registry key, open Regedit.exe and navigate to `Computer\HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\IPv6ToBle\Parameters`. Change the *Border Router* flag to 1 if you'd like to experiment with filter list operations with the DriverTest app.
 
+### Deploy and install the driver on an IoT Core device (OPTIONAL)
+
+The steps above are for deploying and running the driver on a Windows Desktop SKU device (laptop or desktop, x86 or x64). Technically, the driver can also run on the IoT Core devices if it is compiled for ARM or whatever processor your board has. It is Universal and has been tested to work on IoT devices. However, deploying and properly installing the driver onto an IoT Core device is more complicated than the process to deploy to a standard x64 or x86 PC. The steps on this page describe how to do so: [Driver deployment](https://docs.microsoft.com/windows/iot-core/learn-about-hardware/driverdeployment). The package file described on that page is already created in the driver source directory, so if you provision the IoT core device properly then you just have to add that file to the project and deploy it. Make sure you remove the file from the project (but don't delete it) if you want to switch to x64 again.
+
+Post-deployment installation usually fails and requires a manual PowerShell session to work around the issue. Follow these steps if you are able to deploy the driver, but not install it. For example, if you get a CBS error during deployment, that means the driver files were deployed but they were not installed properly.
+
+1. Follow the steps on this page if you're unfamiliar with how to connect to a Windows 10 IoT Core device remotely with PowerShell: [Using PowerShell for Windows IoT](https://docs.microsoft.com/windows/iot-core/connect-your-device/powershell).
+2. With PowerShell, change to the directory where the driver files are located: `cd c:\data\test\bin\drivertest\driversnew`.
+3. Apply the update with this command: `Applyupdate -stage duncanmacmichael.drivers.ipv6toble.cab`.
+4. Commit the update with this command: `Applyupdate -commit`.
+
+The Raspberry Pi/IoT device should restart, then you should see the spinning gears that means it is applying the driver to the board image.
+
+If you encounter an issue when committing the update, clear the update cache first by using this command: `Applyupdate -clear`. Then try applying the update again.
+
+**Note** If you make a change to the driver, re-compile, and re-deploy to an IoT device, you must also bump the version number in the project properties > PackageGen.
+
+It is notable that, at the time of writing, the Windows 10, version 1803 version of the WDK contains a bug that prevents provisioning IoT Core devices for driver deployment. The Windows 10, version 1709 version of the WDK was used for development because it did not have this bug.
+
+### See trace output from the driver (OPTIONAL)
+
+If you'd like to see what the driver is doing as it operates, use Traceview.exe.
+
+1. On the host PC, it's located in the `C:\Program Files (x86)\Windows Kits\10\Tools\x64` directory. Use the shared folder setup with your VM to transfer it to the VM. 
+2. Locate the driver's program database (PDB) file in the `IPv6ToBle.sys/x64/Debug` directory of this project. If it's not there, go to `Build > Build full program database file for solution`. Transfer it to the VM as well.
+3. Start TraceView.exe on the VM, right-click and select "Start New Log Session."
+4. Click "Add Provider," then choose "PDB (Debug Information)" file. Click the ellipsis (...) and choose the driver's PDB file. Click OK.
+5. When you hit "Next," choose "Set Flags and Level" on the next pane. Double-click "Level," then pick the level of output you want to see.
+    1. For output of every single operation the driver does, choose the Information level.
+    2. To only see non-critical warnings, choose the Warning level.
+    3. To see only critical errors, choose the Error level.
+
+If you do this before starting the driver, you can see what it does as it starts up. Otherwise, if the driver is already running, TraceView will just start showing what the driver is doing at the moment. If you interact with the driver by using the DriverTest app or by using the packet processing app, you can watch the output illustrate the steps the driver is taking.
 
 ### Configure the Raspberry Pi 3s/IoT node devices
 
-This project was tested using two Raspberry Pi 3 devices as nodes in the BLE network, both running Windows 10 IoT Core. 
+This project was tested using two Raspberry Pi 3 devices as nodes in the BLE network, both running Windows 10 IoT Core.
 
 1. Use the [Windows 10 IoT Downloads](https://developer.microsoft.com/en-us/windows/iot/downloads) page to download the Windows 10 IoT Core Dashboard app, then use the app to flash the Windows 10 IoT Core image onto the Raspberry Pis' SD cards.
 2. After going through the OOBE, note the Pi's IP address.
 
-### Deploy the packet processing app.
+### Deploy the packet processing app to the desktop
+
+1. Open the PacketProcessing app.
+2. In the project properties, go to Debug and enter the VM/target PC's IP address in the Remote Machine field.
+3. Press **F5** or go to `Debug > Start Debugging` to deploy the app to the VM.
+4. Make sure the driver is running.
+
+Don't start this app yet. You'll start the apps on the IoT devices first, then start this one last.
+
+### Deploy the packet processing app to IoT Core Node 1
+
+Open the PacketProcessing_Node_1 app, which is identical to the main PacketProcessing app except that certain blocks of code are commented out. On the desktop, code for the GATT server is commented out because the Bluetooth dongle used in development did not support being a GATT server. On the node devices (Raspberry Pi), the GATT code is uncommented but the driver code is commented out.
+
+1. Open the PacketProcessing_Node_1 app.
+2. In the project properties, go to Debug and enter Node 1's IP address in the Remote Machine field.
+3. Press **F5** or go to `Debug > Start Debugging` to deploy the app to the device.
+
+Don't start this app yet, either.
+
+### Deploy the packet processing app to Iot Core Node 2
+
+1. Open the PacketProcessing_Node_1 app.
+2. In the project properties, go to Debug and enter Node 1's IP address in the Remote Machine field.
+3. Press **F5** or go to `Debug > Start Debugging` to deploy the app to the device.
+
+## Usage
+
+With the driver running on the VM and the packet processing apps running on all three devices, now you can test the system.
+
+1. Click "Start" on the packet processing app on Node 2. It will scan for nearby devies and find no one, which is expected. It then starts the GATT server and starts advertising its presence.
+2. Click "Start" on the packet processing app on Node 1. It will scan and find Node 2, then query it to make sure it is supported. You should see "Found 1 devices" in the debug output if successful.
+3. Start the packet processing app on the VM. It will scan for and find both Nodes. You should see "Found 2 devices" in the debug output if successful.
+4. Now, you can either use the DriverTest app on the VM to send some packets to the driver that will be intercepted and passed to the packet processing app, or you can just wait. After anywhere from a few seconds to a minute, the driver will always intercept an outbound packet that the OS randomly generates.
+5. Once the driver has passed a packet to the packet processing app on the VM, you should see that it sends the packet to each of the nodes in turn after showing the contents of the packet. When once of the nodes receives a packet, you'll see the packet contents in the debug output of that node. Node 1 should then turn around and send the packet to Node 2, which will show that it received the packet from both Node 1 and the VM. The second time it receives a packet, it will discard it as a duplicate.
+
+If you encounter errors during this process, you might have to restart the devices and redeploy the apps. The Bluetooth LE driver on Raspberry Pi 3 devices is not always reliable in establishing repeated communications, and might error out after several attempts or even during the scanning stage.
