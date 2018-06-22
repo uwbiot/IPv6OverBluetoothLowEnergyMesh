@@ -36,7 +36,7 @@ This Windows Filtering Platform callout driver acts as part of the bridge betwee
 
 **Note** Source code for this project is best viewed in Visual Studio, as line endings and indentation are sometimes thrown off by Git converting line endings if you view it in the browser.
 
-For detailed information about this driver, see the ReadMe.txt file in the `IPv6ToBle.sys` directory.
+For detailed information about this driver, see the ReadMe.md file in the `IPv6ToBle.sys` directory.
 
 ### Packet processing app
 
@@ -53,13 +53,13 @@ The packet processing app is the core user mode component that completes the bri
 
 A message queue is used to monitor if messages have been seen before and prevent unnecessary retransmissions.
 
-For detailed information about this app, see the ReadMe.txt file in the `PacketProcessingTestUWP` directory.
+For detailed information about this app, see the ReadMe.md file in the `PacketProcessing` directory.
 
 ### Driver interop library
 
 This library, based on two MSDN magazine articles by Jeffrey Richter in March 2007 and June 2007, is what the packet processing app calls to talk to the driver. It supports synchronous commands, for manipulating the driver's lists of devices for filtering traffic, and asynchronous commands backed by the system thread pool to receive IPv6 packets from the driver.
 
-For detailed information about this library, see the ReadMe.txt file in the `Libraries/DriverInteropLibrary` directory.
+For detailed information about this library, see the ReadMe.md file in the `Libraries/DriverInteropLibrary` directory.
 
 ### Bluetooth GATT library
 
@@ -72,7 +72,7 @@ The GATT server advertises two services:
 
 GATT client code uses the Windows DeviceWatcher class to scan for nearby BLE devices, queries them for the previously mentioned GATT server services, and writes packets to nearby supported devices when a packet is received either from the driver or over the air.
 
-For detailed information about this library, see the ReadMe.txt file in the `Libraries/Bluetooth/IPv6ToBleBluetoothGattLibrary` directory.
+For detailed information about this library, see the ReadMe.md file in the `Libraries/Bluetooth/IPv6ToBleBluetoothGattLibrary` directory.
 
 ### Bluetooth Advertisement library
 
@@ -86,11 +86,11 @@ This library, based on the Microsoft *BluetoothAdvertisement* sample, uses a Blu
 2. Fragmentation and reassembly
 3. Stateless auto configuration
 
-This library fulfills the first and third goals; the second goal is automatically performed at the Bluetooth L2CAP layer by the Windows Bluetooth LE APIs. 
+This library fulfills the first and third goals; the second goal is automatically performed at the Bluetooth L2CAP layer by the Windows Bluetooth LE APIs.
 
 It is important to observe that this code is implemented as a library, not as an operating system layer or module. In open source operating systems such as Contiki OS, on which the header compression/decompression code was based for this library, 6LoWPAn is implemented as an adaptation layer in the network stack. This is not possible on Windows because it is closed source. Therefore, the *concept* of an adaptation layer is spread across the driver and this module, as shown in the system architecture diagram above. The *implementation* for 6LoWPAn itself lies here, though.
 
-For detailed information about this library, see the ReadMe.txt file in the `Libraries/IPv6ToBleSixLowPanLibrary` directory.
+For detailed information about this library, see the ReadMe.md file in the `Libraries/IPv6ToBleSixLowPanLibrary` directory.
 
 ### Additional test apps
 
