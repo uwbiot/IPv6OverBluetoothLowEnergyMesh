@@ -1,10 +1,6 @@
 # IPv6ToBleSixLowPanLibrary overview
 
-## General info
-
-
-
-## Purpose and supported devices
+## General info and purpose
 
 
 
@@ -16,4 +12,4 @@
 
 
 
-## File descriptions
+## Classes

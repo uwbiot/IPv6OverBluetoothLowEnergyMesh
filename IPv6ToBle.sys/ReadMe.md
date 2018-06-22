@@ -1,6 +1,6 @@
 # IPv6ToBle.sys overview
 
-This file contains important information about this driver's purpose, functionality, and naming conventions, as well as a summary of what you will find in each of the files that make up this project.
+This ReadMe contains important information about this driver's purpose, functionality, and naming conventions, as well as a summary of what you will find in each of the files that make up this project.
 
 ## General info
 
@@ -51,32 +51,33 @@ On the border router device, the main WDFDEVICE device object also registers a t
 
 ## High-level code order of operations
 
-Initialization
+### Initialization
 
 1. Create driver object
 2. Create device object
 3. Initialize I/O queues
 4. Register callouts with the WFP filter engine (depending on state of lists)
 
-Running
+### Running
 
 1. Receive IOCTLs from usermode
-    a. Add a listening request to a queue, to be retrieved by the classify
+    1. Add a listening request to a queue, to be retrieved by the classify
         callouts
-    b. Inject a given packet into the TCP/IP stack (send only on border router,
+    2. Inject a given packet into the TCP/IP stack (send only on border router,
         receive on both nodes and border router)
-    c. Add/remove entries from the white list and mesh list (on border router)
-        i. State of lists determines whether callouts are registered or
+    3. Add/remove entries from the white list and mesh list (on border router)
+        1. State of lists determines whether callouts are registered or
             unregistered
+    4. Report the role of the device 
 2. Classify network data with callouts
-    a. Inbound on border router: pass packets to usermode if from white list 
+    1. Inbound on border router: pass packets to usermode if from white list 
         and for mesh list
-    b. Outbound on border router: pass packets to usermode if from white list
+    2. Outbound on border router: pass packets to usermode if from white list
         (self) and for mesh list
-    c. Outbound on node device: pass all packets to usermode
+    3. Outbound on node device: pass all packets to usermode
 3. Periodically flush white list and/or mesh list to registry (on border router)
 
-Unloading
+### Unloading
 
 1. Unregister callouts
 2. Destroy the handle to the WFP filter engine
