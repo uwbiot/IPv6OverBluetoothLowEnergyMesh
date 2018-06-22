@@ -121,47 +121,48 @@ For information about SAL in Windows drivers, see this link: https://docs.micros
 
 ## File descriptions
 
-IPv6ToBle.inf
+IPv6ToBle.inf  
     Driver configuration information for installation/uninstallation.
 
-Includes.h
+Includes.h  
     Header file for all includes for the project.
 
-Public.h
+Public.h  
     Header file to be shared with applications. Contains IOCTL definitions.
 
-Trace.h
+Trace.h  
     Definitions for Windows PreProcessor (WPP) tracing for use in debugging.
 
-Driver.c & Driver.h
+Driver.c & Driver.h  
     DriverEntry and WDFDRIVER related functionality and callbacks. Includes
     DriverEntry, the driver's entry point, DriverUnload, and WDFTIMER
     functionality for flushing the runtime lists to the registry.
 
-Device.c & Device.h
+Device.c & Device.h  
     WDFDEVICE related functionality and callbacks. Includes device creation.
-Queue.c & Queue.h
+
+Queue.c & Queue.h  
     WDFQUEUE related functionality and callbacks, including IOCTL handling. Also
     contain the packet injection functions.
 
-Callout.c & Callout.h
+Callout.c & Callout.h  
     Windows Filtering Platform callout classify callbacks and functions to
     register/deregister callouts.
 
-RuntimeList.c & RuntimeList.h
+RuntimeList.c & RuntimeList.h  
     Definitions and functionality for working with the runtime lists: the
     trusted external device white list and the list of devices in the BLE
     mesh network.
 
-Helpers_NDIS.c & Helpers_NDIS.h
+Helpers_NDIS.c & Helpers_NDIS.h  
     Helper functions for allocating, populating, purging, and destroying NDIS
     memory pools.
 
-Helpers_NetBuffer.c & Helpers_NetBuffer.h
+Helpers_NetBuffer.c & Helpers_NetBuffer.h  
     Helper functions for converting packets between kernel mode NET_BUFFER_LIST
     structures and user mode byte arrays.
 
-Helpers_Registry.c & Helpers_Registry.h
+Helpers_Registry.c & Helpers_Registry.h  
     Helper functions for working with the registry, including opening/creating
     keys, loading list info from the registry, and flushing runtime lists to
     the registry.
