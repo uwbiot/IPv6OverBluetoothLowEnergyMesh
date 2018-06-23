@@ -101,7 +101,7 @@ In the `TestApps` directory are several apps used for testing during development
 2. IPv6AddressPrinterForIoTCore
     1. This app is a simple app that prints out a device's generated link-local IPv6 address that is based on its Bluetooth radio ID.
 3. IPv6ToBlePacketProcessingForDesktop
-    1. An experimental Windows Service to run in the background on a Windows Desktop (x86/x64) border router device. Incomplete.
+    1. An experimental Windows Service to run in the background on a Windows Desktop (x86/x64) border router device. Incomplete. **Note** To further expand this Windows Service, it would be necessary to duplicate the DLLs that the main UWP packet processing app uses. This is because the DLLs for UWP target .NET Core, whereas DLLs for Windows Desktop services would need to target .NET Framework.
 4. IPv6ToBlePacketProcessingForIoTCore
     1. Nearly identical to the main PacketProcessingTestUWP app, but designed to run in the background on a Windows 10 IoT core device such as a Raspberry Pi 3. Unused due to limitations of performing device discovery scans from a background thread. Requires modification to perform device enumeration in the background properly.
 
