@@ -133,8 +133,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="IPv6ToBleBluetoothGattLibraryForUWP">
-      <HintPath>..\..\Libraries\IPv6ToBleSixLowPanLibrary\IPv6ToBleSixLowPanLibraryForUWP\bin\Release\IPv6ToBleBluetoothGattLibraryForUWP.dll</HintPath>
+    <Reference Include="IPv6ToBleBluetoothGattLibraryForUWP, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\Libraries\Bluetooth\IPv6ToBleBluetoothGattLibrary\IPv6ToBleBluetoothGattLibraryForUWP\bin\Release\IPv6ToBleBluetoothGattLibraryForUWP.dll</HintPath>
     </Reference>
     <Reference Include="IPv6ToBleDriverInterfaceForUWP">
       <HintPath>..\..\Libraries\DriverInteropLibrary\IPv6ToBleDriverInterfaceForUWP\bin\Release\IPv6ToBleDriverInterfaceForUWP.dll</HintPath>

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Windows.Storage.Streams;
 
 using Microsoft.Win32.SafeHandles;
 
@@ -69,6 +70,13 @@ namespace PacketProcessing
         // service in the GATT server
         private IPv6ToBlePacketWriteCharacteristic localPacketWriteCharacteristic;
 
+        // The local characteristic to receive a compressed header's length
+        private CompressedHeaderLengthCharacteristic localCompressedHeaderLengthCharacteristic;
+
+        // The local characteristic to receive the payload length of a
+        // compressed header
+        private PayloadLengthCharacteristic localPayloadLengthCharacteristic;
+
         // A FIFO queue of recent messages/packets to use with managed flooding
         private Queue<byte[]> messageCache = null;
 
@@ -109,6 +117,47 @@ namespace PacketProcessing
                 }
             }
         }
+
+        // The compressed header length for a packet received over BLE that has
+        // had its header compressed
+        private int compressedHeaderLength = 0;
+
+        public int CompressedHeaderLength
+        {
+            get
+            {
+                return compressedHeaderLength;
+            }
+            private set
+            {
+                if (compressedHeaderLength != value)
+                {
+                    compressedHeaderLength = value;
+                }
+            }
+        }
+
+        // The payload length for a packet received over BLE that has had its
+        // header compressed. Needed to decompress on this side.
+        private int payloadLength = 0;
+
+        public int PayloadLength
+        {
+            get
+            {
+                return payloadLength;
+            }
+            private set
+            {
+                if (payloadLength != value)
+                {
+                    payloadLength = value;
+                }
+            }
+        }
+
+        // A header compression/decompression object from the 6LoWPAN library
+        HeaderCompression headerCompression = new HeaderCompression();
 
         #endregion
 
@@ -208,8 +257,10 @@ namespace PacketProcessing
                 Debug.WriteLine("GATT server started.");
             }
 
-            // Get a handle to the local packet write characteristic
+            // Get a handle to the local packet write characteristic and its siblings
             localPacketWriteCharacteristic = gattServer.PacketProcessingService.PacketWriteCharacteristic;
+            localCompressedHeaderLengthCharacteristic = gattServer.PacketProcessingService.CompressedHeaderLengthCharacteristic;
+            localPayloadLengthCharacteristic = gattServer.PacketProcessingService.PayloadLengthCharacteristic;
 
             // Subscribe to the characteristic's "packet received" event
             localPacketWriteCharacteristic.PropertyChanged += WatchForPacketReception;
@@ -348,10 +399,24 @@ namespace PacketProcessing
             {
                 if (eventArgs.PropertyName == "Value")
                 {
+                    // Get the received packet
                     Packet = GattHelpers.ConvertBufferToByteArray(localPacketWriteCharacteristic.Value);
+
+                    // Get the other two characteristics' info for decompressing
+                    // the packet
+                    DataReader reader = DataReader.FromBuffer(localCompressedHeaderLengthCharacteristic.Value);
+                    CompressedHeaderLength = reader.ReadInt32();
+                    reader = DataReader.FromBuffer(localPayloadLengthCharacteristic.Value);
+                    PayloadLength = reader.ReadInt32();
 
                     Debug.WriteLine("Received this packet over " +
                                      "Bluetooth: " + Utilities.BytesToString(packet));
+
+                    // Decompress the packet
+                    headerCompression.UncompressHeaderIphc(packet,
+                                                           compressedHeaderLength,
+                                                           payloadLength
+                                                           );
 
                     // Only send it back out if this device is not the destination;
                     // in other words, if this device is a middle router in the
@@ -442,19 +507,8 @@ namespace PacketProcessing
         {
             Debug.WriteLine("Starting to send packet over BLE.");
 
-            //
-            // Step 1
-            // Stop the GATT server so we can switch to client operations
-            //
-            if (gattServerStarted)
-            {
-                //Debug.WriteLine("Stopping GATT server...");
-                //StopGattServer();
-                //Debug.WriteLine("GATT server stopped.");
-            }
-
             // 
-            // Step 2
+            // Step 1
             // Check if there are any supported devices to which to write
             //
             if (supportedBleDevices == null || supportedBleDevices.Count == 0)
@@ -474,7 +528,7 @@ namespace PacketProcessing
                     Debug.WriteLine("Still no remote devices to which to " +
                                     "write this packet. Aborting attempt."
                                     );
-                    goto Exit;
+                    return;
                 }
             }
 
@@ -483,8 +537,18 @@ namespace PacketProcessing
                 Debug.WriteLine("No supported devices in range to which to " +
                                 "transmit this packet. Aborting."
                                 );
-                goto Exit;
+                return;
             }
+
+            //
+            // Step 2
+            // Compress the packet
+            //
+            int compressedHeaderLength, payloadLength;
+            byte[] compressedPacket = headerCompression.CompressHeaderIphc(packet,
+                                                                           out compressedHeaderLength,
+                                                                           out payloadLength
+                                                                           );
 
             //
             // Step 3
@@ -505,7 +569,9 @@ namespace PacketProcessing
                     {
                         // Send the packet to the device if it is the target
                         packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(supportedBleDevices[address],
-                                                                                            packet
+                                                                                            compressedPacket,
+                                                                                            compressedHeaderLength,
+                                                                                            payloadLength
                                                                                             );
                     }
                     catch (Exception e)
@@ -551,7 +617,9 @@ namespace PacketProcessing
                     try
                     {
                         packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
-                                                                                            packet
+                                                                                            compressedPacket,
+                                                                                            compressedHeaderLength,
+                                                                                            payloadLength
                                                                                             );
                     }
                     catch (Exception e)
@@ -580,31 +648,12 @@ namespace PacketProcessing
                                         destinationAddress.ToString()
                                         );
                     }
+
+                    // Wait until sending the packet to the next target so as
+                    // not to run over other devices trying to write to it
+                    Thread.Sleep(1000);
                 }
-            }
-
-            //
-            // Step 5
-            // Re-start the GATT server so we can receive another packet
-            //
-
-            Exit:
-
-            if (!gattServerStarted)
-            {
-                //gattServerStarted = await StartGattServer();
-
-                //if (!gattServerStarted)
-                //{
-                //    Debug.WriteLine("Error ocurred during SendPacketOverBluetoothLe" +
-                //                    " when trying to restart the GATT server."
-                //                    );
-                //}
-                //else
-                //{
-                //    Debug.WriteLine("GATT server restarted for next packet.");
-                //}
-            }
+            }            
         }
         #endregion
 
@@ -824,6 +873,87 @@ namespace PacketProcessing
                             );
             return null;
         }
+        #endregion
+
+        #region Packet header compression and decompression
+
+        /// <summary>
+        /// Compresses the IPv6 header of a full packet received from the
+        /// driver.
+        /// </summary>
+        /// <param name="packet">The uncompressed packet.</param>
+        /// <param name="processedHeaderLength">The length, in bytes, of the resultant compressed header.</param>
+        /// <param name="payloadLength">The length of the packet's payload.</param>
+        /// <returns></returns>
+        private byte[] CompressHeader(
+            ref byte[] packet,
+            out int processedHeaderLength,
+            out int payloadLength
+         )
+        {
+            Debug.WriteLine("Original packet size: " + packet.Length);
+            Debug.WriteLine("Original packet contents: " + Utilities.BytesToString(packet));
+            Debug.WriteLine("Compressing packet...");
+
+            byte[] compressedPacket = headerCompression.CompressHeaderIphc(packet,
+                                                                           out processedHeaderLength,
+                                                                           out payloadLength
+                                                                           );
+
+            Debug.WriteLine("Compression of packet complete.");
+
+            if (compressedPacket == null)
+            {
+                Debug.WriteLine("Error occurred during packet compression. " +
+                                "Unable to compress."
+                                );
+            }
+            else
+            {
+                Debug.WriteLine("Compressed packet size: " + compressedPacket.Length);
+                Debug.WriteLine("Compressed packet contents: " + Utilities.BytesToString(compressedPacket));
+            }
+
+            return compressedPacket;
+        }
+
+        /// <summary>
+        /// Decompresses a compressed packet that was received over BLE back
+        /// to its original uncompressed form.
+        /// </summary>
+        /// <param name="compressedPacket">The compressed packet.</param>
+        /// <param name="processedHeaderLength">The length of the compressed header.</param>
+        /// <param name="payloadLength">The length of the packet's payload.</param>
+        /// <returns></returns>
+        private byte[] DecompressHeader(
+            ref byte[] compressedPacket,
+            int processedHeaderLength,
+            int payloadLength
+        )
+        {
+            Debug.WriteLine("Decompressing packet...");
+
+            byte[] uncompressedPacket = headerCompression.UncompressHeaderIphc(compressedPacket,
+                                                                               processedHeaderLength,
+                                                                               payloadLength
+                                                                               );
+
+            if (uncompressedPacket == null)
+            {
+                Debug.WriteLine("Error occurred during packet decompression.");
+            }
+            else
+            {
+                Debug.WriteLine("Uncompressed packet size: " + uncompressedPacket.Length);
+                Debug.WriteLine("Uncompressed packet contents: " + Utilities.BytesToString(uncompressedPacket));
+
+                Debug.WriteLine("Decompressed packet size is same as original: " + (packet.Length == uncompressedPacket.Length));
+                Debug.WriteLine("Decompressed packet is identical to the original: " + (Utilities.PacketsEqual(packet, uncompressedPacket)));
+            }
+
+            return uncompressedPacket;
+        }
+
         #endregion
     }
 }
