@@ -68,6 +68,47 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Services
             }
         }
 
+        // Characteristic to receive the compressed header length for a packet
+        // that has had its IPv6 header compressed
+        private CompressedHeaderLengthCharacteristic compressedHeaderLengthCharacteristic;
+
+        public CompressedHeaderLengthCharacteristic CompressedHeaderLengthCharacteristic
+        {
+            get
+            {
+                return compressedHeaderLengthCharacteristic;
+            }
+            set
+            {
+                if (compressedHeaderLengthCharacteristic != value)
+                {
+                    compressedHeaderLengthCharacteristic = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("CompressedHeaderLength"));
+                }
+            }
+        }
+
+        // Characteristic to receive the payload length for a packet
+        private PayloadLengthCharacteristic payloadLengthCharacteristic;
+
+        public PayloadLengthCharacteristic PayloadLengthCharacteristic
+        {
+            get
+            {
+                return payloadLengthCharacteristic;
+            }
+            set
+            {
+                if (payloadLengthCharacteristic != value)
+                {
+                    payloadLengthCharacteristic = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("PayloadLength"));
+                }
+            }
+        }
+
+        // Characteristic to provide this device's generated link-local IPv6
+        // address to a remote device
         private IPv6ToBleIPv6AddressCharacteristic iPv6AddressCharacteristic;
 
         public IPv6ToBleIPv6AddressCharacteristic IPv6AddressCharacteristic
@@ -125,6 +166,60 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Services
 
             //
             // Step 3
+            // Create the compressed header length characteristic
+            //
+            GattLocalCharacteristic createdCompressedHeaderLengthCharacteristic = null;
+            characteristicResult = await ServiceProvider.Service.CreateCharacteristicAsync(
+                                            Constants.IPv6ToBleCompressedHeaderLengthCharacteristicUuid,
+                                            GattHelpers.packetWriteParameters
+                                            );
+
+            //
+            // Step 4
+            // Assign the created compressed header length characteristic to this service's internal one
+            //
+            GattHelpers.GetCharacteristicFromResult(characteristicResult,
+                                                    ref createdCompressedHeaderLengthCharacteristic
+                                                    );
+            if (createdCompressedHeaderLengthCharacteristic != null)
+            {
+                CompressedHeaderLengthCharacteristic = new CompressedHeaderLengthCharacteristic(
+                                                            createdCompressedHeaderLengthCharacteristic,
+                                                            this
+                                                        );
+            }
+
+            characteristicResult = null;
+
+            //
+            // Step 5
+            // Create the payload length characteristic
+            //
+            GattLocalCharacteristic createdPayloadLengthCharacteristic = null;
+            characteristicResult = await ServiceProvider.Service.CreateCharacteristicAsync(
+                                            Constants.IPv6ToBlePayloadLengthCharacteristicUuid,
+                                            GattHelpers.packetWriteParameters
+                                            );
+
+            //
+            // Step 6
+            // Assign the created payload length characteristic to this service's internal one
+            //
+            GattHelpers.GetCharacteristicFromResult(characteristicResult,
+                                                    ref createdPayloadLengthCharacteristic
+                                                    );
+            if (createdPayloadLengthCharacteristic != null)
+            {
+                PayloadLengthCharacteristic = new PayloadLengthCharacteristic(
+                                                        createdPayloadLengthCharacteristic,
+                                                        this
+                                                    );
+            }
+
+            characteristicResult = null;
+
+            //
+            // Step 7
             // Create the IPv6 address read characteristic
             //
 
@@ -146,7 +241,7 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Services
                                             );
 
             //
-            // Step 4
+            // Step 8
             // Assign the created IPv6 address read characteristic to this service's internal one
             //
             GattHelpers.GetCharacteristicFromResult(characteristicResult,

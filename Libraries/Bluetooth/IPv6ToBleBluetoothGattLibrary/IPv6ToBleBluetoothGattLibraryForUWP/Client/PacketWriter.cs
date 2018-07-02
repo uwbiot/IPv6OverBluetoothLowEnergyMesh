@@ -11,6 +11,7 @@ using Windows.Devices.Enumeration;
 
 using IPv6ToBleBluetoothGattLibraryForUWP;
 using IPv6ToBleBluetoothGattLibraryForUWP.Helpers;
+using Windows.Storage.Streams;
 
 namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 {
@@ -20,12 +21,18 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
     public static class PacketWriter
     {
         /// <summary>
-        /// Write a packet to a given device.
+        /// Writes a packet to a given device.
         /// </summary>
+        /// <param name="targetDevice">The target device.</param>
+        /// <param name="packet">The packet, compressed or not.</param>
+        /// <param name="compressedHeaderLength">Optional. The length of the compressed header if the caller is sending a compressed packet.</param>
+        /// <param name="payloadLength">Optional. The paylaod length of the packet. Only needed if the caller is sending a compressed packet.</param>
         /// <returns></returns>
         public static async Task<bool> WritePacketAsync(
             DeviceInformation targetDevice,
-            byte[] packet
+            byte[] packet,
+            int compressedHeaderLength,
+            int payloadLength
         )
         {
             BluetoothError status = BluetoothError.Success;
@@ -36,8 +43,10 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             GattDeviceService ipv6ToBlePacketProcessingService = null;
             IReadOnlyList<GattCharacteristic> deviceCharacteristics = null;
 
-            // Variable for the remote packet write characteristic
+            // Variables for the remote packet write characteristic
             GattCharacteristic ipv6PacketWriteCharacteristic = null;
+            GattCharacteristic compressedHeaderLengthCharacteristic = null;
+            GattCharacteristic payloadLengthCharacteristic = null;
 
             //
             // Step 1
@@ -154,24 +163,33 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
                 goto Exit;
             }
 
+            // Find the required characteristics for packet writing
             if (deviceCharacteristics != null)
             {
-                // Find the packet write characteristic
                 foreach (GattCharacteristic characteristic in deviceCharacteristics)
                 {
                     if (characteristic.Uuid == Constants.IPv6ToBlePacketWriteCharacteristicUuid)
                     {
                         ipv6PacketWriteCharacteristic = characteristic;
-                        break;
+                    }
+                    if(characteristic.Uuid == Constants.IPv6ToBleCompressedHeaderLengthCharacteristicUuid)
+                    {
+                        compressedHeaderLengthCharacteristic = characteristic;
+                    }
+                    if(characteristic.Uuid == Constants.IPv6ToBlePayloadLengthCharacteristicUuid)
+                    {
+                        payloadLengthCharacteristic = characteristic;
                     }
                 }
             }
 
-            if (ipv6PacketWriteCharacteristic == null)
+            if (ipv6PacketWriteCharacteristic == null ||
+                compressedHeaderLengthCharacteristic == null ||
+                payloadLengthCharacteristic == null)
             {
                 status = BluetoothError.OtherError;
-                Debug.WriteLine("Could not access the packet write" +
-                                " characteristic."
+                Debug.WriteLine("Could not access all three characteristics " +
+                                "required for packet writing."
                                 );
                 goto Exit;
             }
@@ -181,14 +199,40 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             // Write the packet now that we have verified that the device is
             // supported and is either the destination or in the path to the
             // destination
-            //
-            GattCommunicationStatus writeStatus =
-                await ipv6PacketWriteCharacteristic.WriteValueAsync(GattHelpers.ConvertByteArrayToBuffer(packet));
+            //            
+
+            DataWriter writer = new DataWriter();
+
+            // Write the compressed header length
+            writer.WriteInt32(compressedHeaderLength);
+            GattCommunicationStatus writeStatus = await compressedHeaderLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
+            if (writeStatus != GattCommunicationStatus.Success)
+            {
+                status = BluetoothError.OtherError;
+                Debug.WriteLine("Could not write compressed header length.");
+                goto Exit;
+            }
+
+            // Write the payload length
+            writer = new DataWriter();
+            writer.WriteInt32(payloadLength);
+            writeStatus = await payloadLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
+            if (writeStatus != GattCommunicationStatus.Success)
+            {
+                status = BluetoothError.OtherError;
+                Debug.WriteLine("Could not write payload length.");
+                goto Exit;
+            }
+
+            // Write the packet itself last so the receiver knows that it has
+            // all needed data when this characteristic is written to
+            writeStatus = await ipv6PacketWriteCharacteristic.WriteValueAsync(GattHelpers.ConvertByteArrayToBuffer(packet));
             if (writeStatus != GattCommunicationStatus.Success)
             {
                 status = BluetoothError.OtherError;
                 Debug.WriteLine("Could not write the IPv6 packet to the" +
                                 " remote device");
+                goto Exit;
             }
 
             Exit:

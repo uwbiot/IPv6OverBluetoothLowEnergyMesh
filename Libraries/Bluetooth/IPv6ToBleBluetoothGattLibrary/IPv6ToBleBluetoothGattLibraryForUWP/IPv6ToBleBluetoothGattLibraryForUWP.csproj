@@ -106,9 +106,11 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Characteristics\CompressedHeaderLengthCharacteristic.cs" />
     <Compile Include="Characteristics\GenericGattCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBleIPv6AddressCharacteristic.cs" />
     <Compile Include="Characteristics\IPv6ToBlePacketWriteCharacteristic.cs" />
+    <Compile Include="Characteristics\PayloadLengthCharacteristic.cs" />
     <Compile Include="Client\PacketWriter.cs" />
     <Compile Include="Helpers\BluetoothRoleSupport.cs" />
     <Compile Include="Helpers\Constants.cs" />

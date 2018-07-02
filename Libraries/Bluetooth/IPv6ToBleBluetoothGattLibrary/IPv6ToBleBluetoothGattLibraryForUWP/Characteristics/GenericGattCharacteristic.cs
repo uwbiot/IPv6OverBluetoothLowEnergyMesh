@@ -282,17 +282,17 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Characteristics
             }
 
             // Debugging print!
-            byte[] data;
-            CryptographicBuffer.CopyToByteArray(Value, out data);
+            //byte[] data;
+            //CryptographicBuffer.CopyToByteArray(Value, out data);
 
-            if(data == null)
-            {
-                Debug.WriteLine("Value after write completion was NULL. :(");
-            }
-            else
-            {
-                Debug.WriteLine($"Write completed. Received packet from {args.Session.DeviceId.ToString()}, value is now {Utilities.BytesToString(data)}");
-            }
+            //if(data == null)
+            //{
+            //    Debug.WriteLine("Value after write completion was NULL. :(");
+            //}
+            //else
+            //{
+            //    Debug.WriteLine($"Write completed. Received packet from {args.Session.DeviceId.ToString()}, value is now {Utilities.BytesToString(data)}");
+            //}
 
             Exit:
 

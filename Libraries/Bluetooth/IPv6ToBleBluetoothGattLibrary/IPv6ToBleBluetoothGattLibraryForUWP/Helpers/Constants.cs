@@ -23,6 +23,12 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Helpers
         // UUID for the IPv6ToBlePacketProcessingService's packet write characteristic
         public static readonly Guid IPv6ToBlePacketWriteCharacteristicUuid = Guid.Parse("582DC845-8AE1-428D-8743-AAA38556AE3B");
 
+        // UUID for the IPv6ToBlePacketProcessingService's compressed header length characteristic
+        public static readonly Guid IPv6ToBleCompressedHeaderLengthCharacteristicUuid = Guid.Parse("3F49D3CF-1BA3-407A-959A-275C898CA55F");
+
+        // UUID for the IPv6ToBlePacketProcessingService's payload length characteristic
+        public static readonly Guid IPv6ToBlePayloadLengthCharacteristicUuid = Guid.Parse("4AA61628-770D-4A13-AC2A-ECC19660C069");
+
         // UUID for the IPv6ToBlePacketProcessingService's IPv6 address read characteristic
         public static readonly Guid IPv6ToBleIPv6AddressCharacteristicUuid = Guid.Parse("BADF5F54-80E3-4FEE-8DFD-1D827A88A73E");
 
