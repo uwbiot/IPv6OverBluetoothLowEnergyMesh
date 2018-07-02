@@ -220,7 +220,11 @@ Return Value:
 			// usermode app will be, at most, 1280 bytes (octets). The driver
 			// will not be able to handle packets larger than that and will
 			// drop them (see the inbound IPv6 packet classify callback).
-			if (OutputBufferLength < (sizeof(BYTE) * 1280))
+            //
+            // The length must be exactly 1280 bytes, so it is big enough to
+            // hold any reasonably-sized packet but not larger than the
+            // Bluetooth MTU.
+			if (OutputBufferLength != (sizeof(BYTE) * 1280))
 			{
 
 				// If not provided enough space, return invalid parameter, set 
