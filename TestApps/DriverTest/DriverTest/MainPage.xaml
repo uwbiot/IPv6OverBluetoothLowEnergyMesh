@@ -47,15 +47,8 @@
         <ContentDialog x:Name="ErrorDialog"></ContentDialog>
 
         <Button x:Name="Button_1_Listen" Content="Send listen request(s)" Grid.Column="0" Grid.Row="1"
-                    Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="96" 
-                    Width="195" Click="Button_1_Listen_Click" FontSize="18" FontWeight="Normal" Margin="55,0,0,0"/>
-        <Button x:Name="Button_2_Inject_Inbound" Content="Inject inbound" Grid.Column="2
-                " Grid.Row="1"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Click="Button_2_Inject_Inbound_Click"/>
-        <Button x:Name="Button_3_Inject_Inbound" Content="Inject outbound" Grid.Column="2"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Top" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Click="Button_3_Inject_Outbound_Click" Margin="0,51,0,0"/>
+                    Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
+                    Width="195" Click="Button_1_Listen_Click" FontSize="18" FontWeight="Normal"/>
         <Button x:Name="Button_4_Add_To_White_List" Content="Add to white list" Grid.Column="0" Grid.Row="2"
             Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
             Width="195" FontSize="18" FontWeight="Normal" Click="Button_4_Add_To_White_List_Click"/>
@@ -75,17 +68,19 @@
             Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
             Width="195" FontSize="18" FontWeight="Normal" Click="Button_9_Purge_Mesh_List_Click"/>
         <Button x:Name="Button_10_send_udp_packet" Content="Send UDP packets"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Click="Button_10_send_udp_packet_Click" Grid.Row="1" Margin="255,0,0,0"/>
+            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
+            Width="195" FontSize="18" FontWeight="Normal" Click="Button_10_send_udp_packet_Click" Grid.Row="1" Grid.Column="1"/>
         <Button x:Name="Button_11_query_mesh_role" Content="Query mesh role"
             Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
             Width="195" FontSize="18" FontWeight="Normal" Click="Button_11_query_mesh_role_Click"/>
         <Button x:Name="button_12_stop_packet_test" Content="Stop testing"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Grid.Row="1" Margin="255,0,0,0" Grid.Column="1" Click="button_12_stop_packet_test_Click"/>
-        <TextBox x:Name="packetNumberInputBox" HorizontalAlignment="Center" Margin="0,10,0,0" Text="" VerticalAlignment="Top" PlaceholderText="# Packets" Grid.Column="1" Grid.Row="1" Width="340"/>
+            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
+            Width="195" FontSize="18" FontWeight="Normal" Grid.Row="1" Grid.Column="2
+                " Click="button_12_stop_packet_test_Click"/>
+        <TextBox x:Name="packetNumberInputBox" HorizontalAlignment="Left" Margin="0,20,150,0" Text="" VerticalAlignment="Top" PlaceholderText="# Packets" Grid.Column="1" Grid.Row="1" Width="160" LostFocus="packetNumberInputBox_LostFocus"/>
         <Button x:Name="button_13_start_packet_test" Content="Start testing"
-            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="96" 
-            Width="195" FontSize="18" FontWeight="Normal" Grid.Row="1" Margin="55,0,0,0" Grid.Column="1" Click="button_13_start_packet_test_Click"/>
+            Style="{StaticResource ResourceKey=ButtonRevealStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="96" 
+            Width="195" FontSize="18" FontWeight="Normal" Grid.Column="2" Click="button_13_start_packet_test_Click"/>
+        <TextBox x:Name="payloadLengthInputBox" HorizontalAlignment="Right" Margin="0,20,0,0" Text="" VerticalAlignment="Top" PlaceholderText="Payload length" Grid.Column="1" Grid.Row="1" Width="160" LostFocus="payloadLengthInputBox_LostFocus"/>
     </Grid>
 </Page>

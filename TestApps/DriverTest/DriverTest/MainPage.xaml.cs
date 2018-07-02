@@ -38,10 +38,23 @@ namespace DriverTest
         public MainPage()
         {
             this.InitializeComponent();
+
+            // Testing - try setting a higher number for max thread pool completion ports
+            //ThreadPool.SetMaxThreads(10000, 10000);
+
+            ThreadPool.GetMaxThreads(out maxThreadPoolWorkers, out maxThreadPoolCompletionPorts);
+            Debug.WriteLine($"Max thread pool workers: {maxThreadPoolWorkers}, " +
+                            $"max thread pool completion ports: {maxThreadPoolCompletionPorts}"
+                            );
         }
 
         // Private variables for performance testing
-        private volatile bool isTesting = false;
+        private int maxThreadPoolWorkers = 0;
+        private int maxThreadPoolCompletionPorts = 0;
+        
+        private int testingNumPackets = 0;
+        private int testingPayloadLength = 0;
+
         private Stopwatch stopwatch = new Stopwatch();
 
         private volatile int numPacketsReceived = 0;
@@ -91,20 +104,7 @@ namespace DriverTest
 
                 await errorDialog.ShowAsync();
             });
-        }
-
-        private bool isInputValid(out int desiredNumber)
-        {
-            bool isInputValid = int.TryParse(packetNumberInputBox.Text, out desiredNumber);
-            if (!isInputValid)
-            {
-                DisplayErrorDialog("Testing was not started or the number of" +
-                                   " desired packets was invalid. Try again."
-                                    );
-            }
-
-            return isInputValid;
-        }
+        }        
 
         /// <summary>
         /// Sends IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6 to the driver.
@@ -113,14 +113,18 @@ namespace DriverTest
         /// <param name="e"></param>
         private unsafe void Button_1_Listen_Click(object sender, RoutedEventArgs e)
         {
-            int desiredNumber;
-            if(isInputValid(out desiredNumber) && isTesting)
+            if (testingNumPackets == 0)
             {
-                for (int i = 0; i < desiredNumber; i++)
-                {
-                    SendListeningRequestToDriver();
-                }
-            }            
+                DisplayErrorDialog("Number of test packets is zero. Enter a " +
+                                   "valid value."
+                                   );
+                return;
+            }
+
+            for (int i = 0; i < testingNumPackets; i++)
+            {
+                SendListeningRequestToDriver();
+            }           
         }
 
         private void SendListeningRequestToDriver()
@@ -149,7 +153,12 @@ namespace DriverTest
                 NumThreadsActive++;
             }            
 
-            IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 1280, IPv6ToBleListenCompletionCallback, null);
+            IAsyncResult result = DeviceIO.BeginGetPacketFromDriverAsync<byte[]>(device, 
+                                                                                IPv6ToBleIoctl.IOCTL_IPV6_TO_BLE_LISTEN_NETWORK_V6, 
+                                                                                1280, 
+                                                                                IPv6ToBleListenCompletionCallback, 
+                                                                                null
+                                                                                );
         }
 
         /// <summary>
@@ -205,55 +214,55 @@ namespace DriverTest
             //
             // Compress the packet (test)
             //
-            Debug.WriteLine("Original packet size: " + packet.Length);
-            Debug.WriteLine("Original packet contents: " + Utilities.BytesToString(packet));
-            Debug.WriteLine("Compressing packet...");
+            //Debug.WriteLine("Original packet size: " + packet.Length);
+            //Debug.WriteLine("Original packet contents: " + Utilities.BytesToString(packet));
+            //Debug.WriteLine("Compressing packet...");
 
-            HeaderCompression compression = new HeaderCompression();
+            //HeaderCompression compression = new HeaderCompression();
 
-            int processedHeaderLength = 0;
-            int payloadLength = 0;
-            byte[] compressedPacket = compression.CompressHeaderIphc(packet,
-                                                                     out processedHeaderLength,
-                                                                     out payloadLength
-                                                                     );
+            //int processedHeaderLength = 0;
+            //int payloadLength = 0;
+            //byte[] compressedPacket = compression.CompressHeaderIphc(packet,
+            //                                                         out processedHeaderLength,
+            //                                                         out payloadLength
+            //                                                         );
 
-            Debug.WriteLine("Compression of packet complete.");
+            //Debug.WriteLine("Compression of packet complete.");
 
-            if(compressedPacket == null)
-            {
-                Debug.WriteLine("Error occurred during packet compression. " +
-                                "Unable to compress."
-                                );
-            }
-            else
-            {
-                Debug.WriteLine("Compressed packet size: " + compressedPacket.Length);
-                Debug.WriteLine("Compressed packet contents: " + Utilities.BytesToString(compressedPacket));
-            }
+            //if(compressedPacket == null)
+            //{
+            //    Debug.WriteLine("Error occurred during packet compression. " +
+            //                    "Unable to compress."
+            //                    );
+            //}
+            //else
+            //{
+            //    Debug.WriteLine("Compressed packet size: " + compressedPacket.Length);
+            //    Debug.WriteLine("Compressed packet contents: " + Utilities.BytesToString(compressedPacket));
+            //}
 
-            //
-            // Decompress the compressed packet back into its original form (test)
-            //
-            Debug.WriteLine("Decompressing packet...");
+            ////
+            //// Decompress the compressed packet back into its original form (test)
+            ////
+            //Debug.WriteLine("Decompressing packet...");
 
-            byte[] uncompressedPacket = compression.UncompressHeaderIphc(compressedPacket,
-                                                                         processedHeaderLength,
-                                                                         payloadLength
-                                                                         );
+            //byte[] uncompressedPacket = compression.UncompressHeaderIphc(compressedPacket,
+            //                                                             processedHeaderLength,
+            //                                                             payloadLength
+            //                                                             );
 
-            if (uncompressedPacket == null)
-            {
-                Debug.WriteLine("Error occurred during packet decompression.");
-            }
-            else
-            {
-                Debug.WriteLine("Uncompressed packet size: " + uncompressedPacket.Length);
-                Debug.WriteLine("Uncompressed packet contents: " + Utilities.BytesToString(uncompressedPacket));
+            //if (uncompressedPacket == null)
+            //{
+            //    Debug.WriteLine("Error occurred during packet decompression.");
+            //}
+            //else
+            //{
+            //    Debug.WriteLine("Uncompressed packet size: " + uncompressedPacket.Length);
+            //    Debug.WriteLine("Uncompressed packet contents: " + Utilities.BytesToString(uncompressedPacket));
 
-                Debug.WriteLine("Decompressed packet size is same as original: " + (packet.Length == uncompressedPacket.Length));
-                Debug.WriteLine("Decompressed packet is identical to the original: " + (Utilities.PacketsEqual(packet, uncompressedPacket)));
-            }
+            //    Debug.WriteLine("Decompressed packet size is same as original: " + (packet.Length == uncompressedPacket.Length));
+            //    Debug.WriteLine("Decompressed packet is identical to the original: " + (Utilities.PacketsEqual(packet, uncompressedPacket)));
+            //}
 
             // Test: Send another listening request to the driver. Comment out
             // if sending a fixed number in the first place; uncomment if
@@ -293,26 +302,6 @@ namespace DriverTest
                     }
                 }                
             }
-        }
-
-        /// <summary>
-        /// Sends IOCTL_IPV6_TO_BLE_INJECT_INBOUND_NETWORK_V6 to the driver.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private unsafe void Button_2_Inject_Inbound_Click(object sender, RoutedEventArgs e)
-        {
-            
-        }
-
-        /// <summary>
-        /// Sends IOCTL_IPV6_INJECT_OUTBOUND_NETWORK_V6 to the driver
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private unsafe void Button_3_Inject_Outbound_Click(object sender, RoutedEventArgs e)
-        {
-            
         }
 
         /// <summary>
@@ -591,26 +580,55 @@ namespace DriverTest
 
         private void Button_10_send_udp_packet_Click(object sender, RoutedEventArgs e)
         {
+            if(testingPayloadLength == 0)
+            {
+                DisplayErrorDialog("Payload length is zero. Enter a valid " +
+                                   "value."
+                                   );
+                return;
+            }
+            if(testingNumPackets == 0)
+            {
+                DisplayErrorDialog("Must set a number of requested packets.");
+                return;
+            }
+
             using (UdpClient client = new UdpClient(AddressFamily.InterNetworkV6))
             {
-                int desiredNumber;
-                if (isInputValid(out desiredNumber) && isTesting)
+                // Set up a test payload based on the desired payload length
+                StringBuilder payload = new StringBuilder();
+                int count = 0;
+                for(int i = 0; i < testingPayloadLength; i++)
                 {
-                    byte[] test = Encoding.ASCII.GetBytes("Test");
+                    payload.Append($"{count}");
 
-                    IPAddress multicastAddress = IPAddress.Parse("ff02::1");
-                    IPEndPoint endPoint = new IPEndPoint(multicastAddress, 11000);
-                    client.JoinMulticastGroup(multicastAddress);
-
-                    // Start timing, assuming listening requests have been sent
-                    // previously
-                    stopwatch.Start();
-
-                    for (int i = 0; i < desiredNumber; i++)
-                    {                        
-                        client.Send(test, test.Length, endPoint);
+                    // Cycle through 0-9
+                    if(count == 9)
+                    {
+                        count = 0;
                     }
-                }                
+                    else
+                    {
+                        count++;
+                    }
+                }
+
+                byte[] test = Encoding.ASCII.GetBytes(payload.ToString());
+                Debug.WriteLine($"Test payload length: {test.Length}.");
+                    
+
+                IPAddress multicastAddress = IPAddress.Parse("ff02::1");
+                IPEndPoint endPoint = new IPEndPoint(multicastAddress, 11000);
+                client.JoinMulticastGroup(multicastAddress);
+
+                // Start timing, assuming listening requests have been sent
+                // previously
+                stopwatch.Start();
+
+                for (int i = 0; i < testingNumPackets; i++)
+                {                        
+                    client.Send(test, test.Length, endPoint);
+                }              
             }
         }
 
@@ -678,16 +696,75 @@ namespace DriverTest
 
         private void button_12_stop_packet_test_Click(object sender, RoutedEventArgs e)
         {
-            isTesting = false;
-
             NumThreadsActiveChanged -= ListenForBackgroundThreadCompletion;
         }
 
         private void button_13_start_packet_test_Click(object sender, RoutedEventArgs e)
         {
-            isTesting = true;
-
             NumThreadsActiveChanged += ListenForBackgroundThreadCompletion;
+        }
+
+        /// <summary>
+        /// Invoked after a user is done typing in the packet input box, to
+        /// validate the input (done typing means hit enter or clicked away).
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void packetNumberInputBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            bool isAnInt = int.TryParse(packetNumberInputBox.Text, out testingNumPackets);
+            if(!isAnInt)
+            {
+                DisplayErrorDialog("Invalid number for requested packets. " +
+                                   "Input must be an integer. Try again."
+                                   );
+                goto ErrorCleanup;
+            }
+            if (testingNumPackets > maxThreadPoolCompletionPorts)
+            {
+                DisplayErrorDialog("Number of packets requested exceeds " +
+                                   "the system max number of thread pool" +
+                                   " I/O completion ports. Max number of " +
+                                   $"completion ports: {maxThreadPoolCompletionPorts}."
+                                   );
+                goto ErrorCleanup;
+            }
+            if (testingNumPackets < 1)
+            {
+                DisplayErrorDialog("Number of packets must be at least one. " +
+                                   "Try again."
+                                   );
+                goto ErrorCleanup;
+            }
+
+            return;
+
+        ErrorCleanup:
+
+            testingNumPackets = 0;
+            packetNumberInputBox.Text = "";
+        }
+
+        /// <summary>
+        /// Invoked after a user is done typing in the payload length box, to
+        /// validate the input (done typing means hit enter or clicked away).
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void payloadLengthInputBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            int[] validPayloadLengths = { 2, 16, 64, 512, 1024 };
+            bool isAnInt = int.TryParse(payloadLengthInputBox.Text, out testingPayloadLength);
+            if (!isAnInt || !validPayloadLengths.Contains(testingPayloadLength))
+            {
+                DisplayErrorDialog("Payload length was either not an " +
+                                   "integer or was not a valid payload " +
+                                   "length. Length must be 2, 16, 64, 512, " +
+                                   "or 1024. Try again."
+                                   );
+                testingPayloadLength = 0;
+                payloadLengthInputBox.Text = "";
+            }
         }
     }
 }
