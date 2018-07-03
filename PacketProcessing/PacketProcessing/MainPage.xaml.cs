@@ -163,7 +163,6 @@ namespace PacketProcessing
         // Testing variables
         //---------------------------------------------------------------------
 
-        private Stopwatch bleTransmissionTimer = new Stopwatch();
         private Stopwatch bleReceptionTimer = new Stopwatch();
 
         #endregion
@@ -565,39 +564,34 @@ namespace PacketProcessing
                 return;
             }
 
-            // TESTING: Start the timer for transmitting the packet over BLE
-            bleTransmissionTimer.Start();
+            //
+            // Step 2
+            // Compress the packet
+            //
+            byte[] compressedPacket = null;
+            int compressedHeaderLength, payloadLength;
+            try
+            {
+                compressedPacket = headerCompression.CompressHeaderIphc(packet,
+                                                                        out compressedHeaderLength,
+                                                                        out payloadLength
+                                                                        );
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("Exception occurred during header compression. " +
+                                "Message: " + e.Message
+                                );
+                return;
+            }
 
-            ////
-            //// Step 2
-            //// Compress the packet
-            ////
-            //byte[] compressedPacket = null;
-            //int compressedHeaderLength, payloadLength;
-            //try
-            //{
-            //    compressedPacket = headerCompression.CompressHeaderIphc(packet,
-            //                                                            out compressedHeaderLength,
-            //                                                            out payloadLength
-            //                                                            );
-            //}
-            //catch (Exception e)
-            //{
-            //    Debug.WriteLine("Exception occurred during header compression. " +
-            //                    "Message: " + e.Message
-            //                    );
-            //    bleTransmissionTimer.Stop();
-            //    return;
-            //}
-            
-            //if(compressedPacket == null)
-            //{
-            //    Debug.WriteLine("Error while compressing header. Compressed " +
-            //                    "packet was null. Aborting."
-            //                    );
-            //    bleTransmissionTimer.Stop();
-            //    return;
-            //}
+            if (compressedPacket == null)
+            {
+                Debug.WriteLine("Error while compressing header. Compressed " +
+                                "packet was null. Aborting."
+                                );
+                return;
+            }
 
             //
             // Step 3
@@ -617,11 +611,11 @@ namespace PacketProcessing
                     try
                     {
                         // Send the packet to the device if it is the target
-                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(supportedBleDevices[address],
-                                                                                            packet,//compressedPacket,
-                                                                                            compressedHeaderLength,
-                                                                                            payloadLength
-                                                                                            );
+                        packetTransmittedSuccessfully = await TestingPacketWriter.WritePacketAsync(supportedBleDevices[address],
+                                                                                                    packet,//compressedPacket,
+                                                                                                    compressedHeaderLength,
+                                                                                                    payloadLength
+                                                                                                    );
                     }
                     catch (Exception e)
                     {
@@ -669,7 +663,7 @@ namespace PacketProcessing
                 {
                     try
                     {
-                        packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
+                        packetTransmittedSuccessfully = await TestingPacketWriter.WritePacketAsync(device,
                                                                                             packet,//compressedPacket,
                                                                                             compressedHeaderLength,
                                                                                             payloadLength
@@ -707,14 +701,6 @@ namespace PacketProcessing
                     Thread.Sleep(1000);
                 }
             }
-
-            // TESTING: Stop the timer and record the time
-            bleTransmissionTimer.Stop();
-            Debug.WriteLine("Packet transmission over BLE complete. Minus the " +
-                            "artificial one-second delay, transmission took " +
-                            $"{bleTransmissionTimer.ElapsedMilliseconds - 1000} milliseconds."
-                            );
-            bleTransmissionTimer = new Stopwatch();
         }
         #endregion
 
