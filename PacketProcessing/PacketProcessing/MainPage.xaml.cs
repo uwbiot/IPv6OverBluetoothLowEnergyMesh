@@ -159,6 +159,13 @@ namespace PacketProcessing
         // A header compression/decompression object from the 6LoWPAN library
         HeaderCompression headerCompression = new HeaderCompression();
 
+        //---------------------------------------------------------------------
+        // Testing variables
+        //---------------------------------------------------------------------
+
+        private Stopwatch bleTransmissionTimer = new Stopwatch();
+        private Stopwatch bleReceptionTimer = new Stopwatch();
+
         #endregion
 
         #region UI stuff
@@ -379,7 +386,7 @@ namespace PacketProcessing
 
         #endregion
 
-        #region Packet reception over the air
+        #region Bluetooth packet reception
 
         /// <summary>
         /// Awaits the reception of a packet on the packet write characteristic
@@ -412,15 +419,29 @@ namespace PacketProcessing
                     Debug.WriteLine("Received this packet over " +
                                      "Bluetooth: " + Utilities.BytesToString(packet));
 
+                    // TESTING: Start the timer for header decompression to time
+                    // total transmission/reception time
+                    bleReceptionTimer.Start();
+
                     // Decompress the packet
-                    headerCompression.UncompressHeaderIphc(packet,
+                    try
+                    {
+                        headerCompression.UncompressHeaderIphc(packet,
                                                            compressedHeaderLength,
                                                            payloadLength
                                                            );
+                    }
+                    catch(Exception e)
+                    {
+                        Debug.WriteLine("Exception occurred during header " +
+                                        "decompression. Message: " + e.Message
+                                        );
+                        bleReceptionTimer.Stop();
+                        return;
+                    }
 
-                    // TESTING: Take a time stamp to stop measuring the actual process
-                    // to receive the packet over BLE
-                    Debug.WriteLine("Packet reception and decompression over BLE complete. Current timestamp: " + DateTime.Now.TimeOfDay.ToString());
+                    bleReceptionTimer.Stop();
+                    Debug.WriteLine($"Header decompression took {bleReceptionTimer.ElapsedMilliseconds} milliseconds.");
 
                     // Only send it back out if this device is not the destination;
                     // in other words, if this device is a middle router in the
@@ -498,7 +519,7 @@ namespace PacketProcessing
 
         #endregion
 
-        #region Bluetooth LE operations
+        #region Bluetooth packet transmission
         /// <summary>
         /// Sends a packet out over Bluetooth Low Energy. Spins up a watcher
         /// for advertisements from nearby servers who can receive the packet.
@@ -544,19 +565,39 @@ namespace PacketProcessing
                 return;
             }
 
-            // TESTING: Take a time stamp to start measuring the actual process
-            // to transmit the packet over BLE
-            Debug.WriteLine("Starting packet transmission over BLE. Current timestamp: " + DateTime.Now.TimeOfDay.ToString());
+            // TESTING: Start the timer for transmitting the packet over BLE
+            bleTransmissionTimer.Start();
 
-            //
-            // Step 2
-            // Compress the packet
-            //
-            int compressedHeaderLength, payloadLength;
-            byte[] compressedPacket = headerCompression.CompressHeaderIphc(packet,
-                                                                           out compressedHeaderLength,
-                                                                           out payloadLength
-                                                                           );
+            ////
+            //// Step 2
+            //// Compress the packet
+            ////
+            //byte[] compressedPacket = null;
+            //int compressedHeaderLength, payloadLength;
+            //try
+            //{
+            //    compressedPacket = headerCompression.CompressHeaderIphc(packet,
+            //                                                            out compressedHeaderLength,
+            //                                                            out payloadLength
+            //                                                            );
+            //}
+            //catch (Exception e)
+            //{
+            //    Debug.WriteLine("Exception occurred during header compression. " +
+            //                    "Message: " + e.Message
+            //                    );
+            //    bleTransmissionTimer.Stop();
+            //    return;
+            //}
+            
+            //if(compressedPacket == null)
+            //{
+            //    Debug.WriteLine("Error while compressing header. Compressed " +
+            //                    "packet was null. Aborting."
+            //                    );
+            //    bleTransmissionTimer.Stop();
+            //    return;
+            //}
 
             //
             // Step 3
@@ -577,7 +618,7 @@ namespace PacketProcessing
                     {
                         // Send the packet to the device if it is the target
                         packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(supportedBleDevices[address],
-                                                                                            compressedPacket,
+                                                                                            packet,//compressedPacket,
                                                                                             compressedHeaderLength,
                                                                                             payloadLength
                                                                                             );
@@ -609,6 +650,10 @@ namespace PacketProcessing
                                         );
                     }
 
+                    // Wait until sending the packet to the next target so as
+                    // not to run over other devices trying to write to it
+                    Thread.Sleep(1000);
+
                     break;
                 }
             }
@@ -625,7 +670,7 @@ namespace PacketProcessing
                     try
                     {
                         packetTransmittedSuccessfully = await PacketWriter.WritePacketAsync(device,
-                                                                                            compressedPacket,
+                                                                                            packet,//compressedPacket,
                                                                                             compressedHeaderLength,
                                                                                             payloadLength
                                                                                             );
@@ -661,7 +706,15 @@ namespace PacketProcessing
                     // not to run over other devices trying to write to it
                     Thread.Sleep(1000);
                 }
-            }            
+            }
+
+            // TESTING: Stop the timer and record the time
+            bleTransmissionTimer.Stop();
+            Debug.WriteLine("Packet transmission over BLE complete. Minus the " +
+                            "artificial one-second delay, transmission took " +
+                            $"{bleTransmissionTimer.ElapsedMilliseconds - 1000} milliseconds."
+                            );
+            bleTransmissionTimer = new Stopwatch();
         }
         #endregion
 
