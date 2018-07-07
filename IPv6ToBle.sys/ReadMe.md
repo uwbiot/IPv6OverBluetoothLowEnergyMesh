@@ -81,7 +81,15 @@ On the border router device, the main WDFDEVICE device object also registers a t
 
 1. Unregister callouts
 2. Destroy the handle to the WFP filter engine
-3. Destroy the runtime lists if applicable and free the NDIS memory pools
+3. Destroy the runtime lists if applicable and free the NDIS memory 
+
+The following diagram shows a simplified state machine for this driver that illustrates the general flow for running on a border router device. Note that this diagram leaves out error handling and error states.
+
+![IPv6ToBle.sys state machine for border router](../images/driver_state_machine_border_router.png)
+
+The next diagram shows the state machine for the driver as it runs on a node device.
+
+![IPv6ToBle.sys state machine for node](../images/driver_state_machine_node.png)
 
 ## Function and structure naming conventions
 
