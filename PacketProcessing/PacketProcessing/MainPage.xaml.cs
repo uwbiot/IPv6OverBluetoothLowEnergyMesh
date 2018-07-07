@@ -568,30 +568,30 @@ namespace PacketProcessing
             // Step 2
             // Compress the packet
             //
-            byte[] compressedPacket = null;
-            int compressedHeaderLength, payloadLength;
-            try
-            {
-                compressedPacket = headerCompression.CompressHeaderIphc(packet,
-                                                                        out compressedHeaderLength,
-                                                                        out payloadLength
-                                                                        );
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine("Exception occurred during header compression. " +
-                                "Message: " + e.Message
-                                );
-                return;
-            }
+            //byte[] compressedPacket = null;
+            //int compressedHeaderLength, payloadLength;
+            //try
+            //{
+            //    compressedPacket = headerCompression.CompressHeaderIphc(packet,
+            //                                                            out compressedHeaderLength,
+            //                                                            out payloadLength
+            //                                                            );
+            //}
+            //catch (Exception e)
+            //{
+            //    Debug.WriteLine("Exception occurred during header compression. " +
+            //                    "Message: " + e.Message
+            //                    );
+            //    return;
+            //}
 
-            if (compressedPacket == null)
-            {
-                Debug.WriteLine("Error while compressing header. Compressed " +
-                                "packet was null. Aborting."
-                                );
-                return;
-            }
+            //if (compressedPacket == null)
+            //{
+            //    Debug.WriteLine("Error while compressing header. Compressed " +
+            //                    "packet was null. Aborting."
+            //                    );
+            //    return;
+            //}
 
             //
             // Step 3
@@ -621,7 +621,8 @@ namespace PacketProcessing
                     {
                         Debug.WriteLine("Exception ocurred while trying to " +
                                         "transmit the packet over BLE. \n" +
-                                        "Exception: " + e.Message
+                                        "Exception: " + e.Message + "\n" + 
+                                        "Stack trace: " + e.StackTrace
                                         );
                     }
 
@@ -673,7 +674,8 @@ namespace PacketProcessing
                     {
                         Debug.WriteLine("Exception ocurred while trying to " +
                                         "transmit the packet over BLE. \n" +
-                                        "Exception: " + e.Message
+                                        "Exception: " + e.Message + "\n" +
+                                        "Stack trace: " + e.StackTrace
                                         );
                     }
 

@@ -411,10 +411,10 @@ namespace PacketProcessing
 
                     // Get the other two characteristics' info for decompressing
                     // the packet
-                    DataReader reader = DataReader.FromBuffer(localCompressedHeaderLengthCharacteristic.Value);
-                    CompressedHeaderLength = reader.ReadInt32();
-                    reader = DataReader.FromBuffer(localPayloadLengthCharacteristic.Value);
-                    PayloadLength = reader.ReadInt32();
+                    //DataReader reader = DataReader.FromBuffer(localCompressedHeaderLengthCharacteristic.Value);
+                    //CompressedHeaderLength = reader.ReadInt32();
+                    //reader = DataReader.FromBuffer(localPayloadLengthCharacteristic.Value);
+                    //PayloadLength = reader.ReadInt32();
 
                     Debug.WriteLine("Received this packet over " +
                                      "Bluetooth: " + Utilities.BytesToString(packet));

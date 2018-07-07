@@ -215,37 +215,39 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
             // Write the packet now that we have verified that the device is
             // supported and is either the destination or in the path to the
             // destination
-            //     
+            //
 
             // Start the GATT transmission timer
             gattTransmissionTimer.Start();
 
-            DataWriter writer = new DataWriter();
+            //DataWriter writer = new DataWriter();
 
-            // Write the compressed header length
-            writer.WriteInt32(compressedHeaderLength);
-            GattCommunicationStatus writeStatus = await compressedHeaderLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
-            if (writeStatus != GattCommunicationStatus.Success)
-            {
-                status = BluetoothError.OtherError;
-                Debug.WriteLine("Could not write compressed header length.");
-                goto Exit;
-            }
+            //// Write the compressed header length
+            //writer.WriteInt32(compressedHeaderLength);
+            //GattCommunicationStatus writeStatus = await compressedHeaderLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
+            //if (writeStatus != GattCommunicationStatus.Success)
+            //{
+            //    status = BluetoothError.OtherError;
+            //    Debug.WriteLine("Could not write compressed header length.");
+            //    goto Exit;
+            //}
 
-            // Write the payload length
-            writer = new DataWriter();
-            writer.WriteInt32(payloadLength);
-            writeStatus = await payloadLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
-            if (writeStatus != GattCommunicationStatus.Success)
-            {
-                status = BluetoothError.OtherError;
-                Debug.WriteLine("Could not write payload length.");
-                goto Exit;
-            }
+            //// Write the payload length
+            //writer = new DataWriter();
+            //writer.WriteInt32(payloadLength);
+            //writeStatus = await payloadLengthCharacteristic.WriteValueAsync(writer.DetachBuffer());
+            //if (writeStatus != GattCommunicationStatus.Success)
+            //{
+            //    status = BluetoothError.OtherError;
+            //    Debug.WriteLine("Could not write payload length.");
+            //    goto Exit;
+            //}
 
             // Write the packet itself last so the receiver knows that it has
-            // all needed data when this characteristic is written to
-            writeStatus = await ipv6PacketWriteCharacteristic.WriteValueAsync(GattHelpers.ConvertByteArrayToBuffer(packet));
+            // all needed data when this characteristic is written to            
+            GattCommunicationStatus writeStatus = await ipv6PacketWriteCharacteristic.WriteValueAsync(GattHelpers.ConvertByteArrayToBuffer(packet),
+                                                                                                      GattWriteOption.WriteWithoutResponse
+                                                                                                      );
             if (writeStatus != GattCommunicationStatus.Success)
             {
                 status = BluetoothError.OtherError;
@@ -256,8 +258,9 @@ namespace IPv6ToBleBluetoothGattLibraryForUWP.Client
 
             // Stop the GATT transmission timer and record the time if successful
             gattTransmissionTimer.Stop();
+            long microseconds = gattTransmissionTimer.ElapsedTicks / (Stopwatch.Frequency / (1000L * 1000L));
             Debug.WriteLine("GATT transmission completed successfully. Total " +
-                            $"time: {gattLatencyTimer.ElapsedMilliseconds} milliseconds."
+                            $"time: {microseconds} microseconds."
                             );
 
             Exit:

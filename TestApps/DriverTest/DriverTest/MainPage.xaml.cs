@@ -40,7 +40,7 @@ namespace DriverTest
             this.InitializeComponent();
 
             // Testing - try setting a higher number for max thread pool completion ports
-            //ThreadPool.SetMaxThreads(10000, 10000);
+            ThreadPool.SetMaxThreads(10000, 10000);
 
             ThreadPool.GetMaxThreads(out maxThreadPoolWorkers, out maxThreadPoolCompletionPorts);
             Debug.WriteLine($"Max thread pool workers: {maxThreadPoolWorkers}, " +
